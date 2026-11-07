@@ -51,6 +51,8 @@ describe("chat read: arguments", () => {
       { method: "around", chat: USER, id: 1, limit: 5 },
       "limit does not apply to the around method; it takes chat, id, before_count, after_count, topic",
     ],
+    [{ method: "fetch", chat: USER, topic: 1 }, "topic does not apply to the fetch method; it takes chat, pages"],
+    [{ method: "list", pages: 1 }, "pages does not apply to the list method"],
     [{ method: "view", chat: USER, before_count: 1 }, "before_count does not apply to the view method"],
     [{ method: "topics", chat: SUPERGROUP, id: 1 }, "id does not apply to the topics method"],
   ])("refuses an argument of the other method %j", async (args, message) => {
@@ -68,7 +70,10 @@ describe("chat read: arguments", () => {
     expect((await t.read(view)).messages).toBeDefined()
     t.follow({ id: SUPERGROUP, kind: "supergroup", name: "Dev Forum", username: null, forum: true })
     const topics = { method: "topics", account: "default", chat: SUPERGROUP, limit: 5 }
-    await t.serve({ topics: () => ({ topics: [] }) })
+    await t.serve({
+      topics: () => ({ topics: [] }),
+      fetch: () => ({ added: 0, pages: 1, oldest_ts: null, complete: true }),
+    })
     expect((await t.read(topics)).topics).toEqual([])
     const search = {
       method: "search",
@@ -82,6 +87,8 @@ describe("chat read: arguments", () => {
     expect((await t.read(search)).messages).toHaveLength(1)
     const around = { method: "around", account: "default", chat: USER, id: 1, before_count: 1, after_count: 1 }
     expect((await t.read(around)).anchor).toBe(1)
+    const fetch = { method: "fetch", account: "default", chat: USER, pages: 2 }
+    expect((await t.read(fetch)).fetched?.complete).toBe(true)
   })
 
   test.each([
@@ -89,6 +96,7 @@ describe("chat read: arguments", () => {
     { method: "send" },
     { method: "search" },
     { method: "around" },
+    { method: "fetch" },
     { method: "list", extra: 1 },
     { method: "list", unread: "yes" },
     { method: "list", limit: "5" },

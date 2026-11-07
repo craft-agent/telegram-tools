@@ -143,6 +143,7 @@ describe("chat read: around arguments", () => {
       ["cursor", "x"],
       ["query", "m"],
       ["after", "2026-11-07"],
+      ["pages", 1],
     ] as const) {
       const error = await t.failure({ method: "around", chat: USER, id: 7, [name]: value })
       expect(error.message).toContain(`${name} does not apply to the around method`)

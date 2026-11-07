@@ -5,6 +5,8 @@ import {
   SERVICE_REQUESTS,
   type AroundParams,
   type AroundResult,
+  type FetchParams,
+  type FetchResult,
   type HistoryParams,
   type HistoryResult,
   type RefreshResult,
@@ -15,6 +17,9 @@ import type { StoredMessage } from "./message-rows"
 
 /** How long a refresh of the chat list may take: the service reads every dialog from Telegram, paced. */
 export const REFRESH_TIMEOUT_MS = 120_000
+
+/** How long a history fetch may take: up to five pages from Telegram, paced. */
+export const FETCH_TIMEOUT_MS = 180_000
 
 /** Milliseconds in a second: `ttl` is in seconds, times in milliseconds. */
 const MS_PER_S = 1000
@@ -32,6 +37,15 @@ export function requestTopics(socket: string, params: TopicsParams, signal?: Abo
 /** A live read of the messages around one, in a chat the mirror does not keep. */
 export function requestAround(socket: string, params: AroundParams, signal?: AbortSignal): Promise<AroundResult> {
   return callService<AroundResult>(socket, SERVICE_REQUESTS.around, params, { effect: "read", signal })
+}
+
+/** Older history of a mirrored chat, fetched by the service into the mirror. */
+export function requestFetch(socket: string, params: FetchParams, signal?: AbortSignal): Promise<FetchResult> {
+  return callService<FetchResult>(socket, SERVICE_REQUESTS.fetch, params, {
+    effect: "read",
+    signal,
+    timeoutMs: FETCH_TIMEOUT_MS,
+  })
 }
 
 /** The chat list taken from Telegram into the mirror. */

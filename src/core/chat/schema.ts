@@ -1,12 +1,18 @@
 import { z } from "zod"
 import type { LimitRule } from "../pages"
 import { CHAT_KINDS } from "../telegram/mirror-input"
-import { AROUND_LIMIT, HISTORY_LIMIT, TOPICS_LIMIT } from "../telegram/service-requests"
+import {
+  AROUND_LIMIT,
+  FETCH_PAGE_LIMIT,
+  FETCH_PAGE_SIZE,
+  HISTORY_LIMIT,
+  TOPICS_LIMIT,
+} from "../telegram/service-requests"
 import { localTimeSchema } from "../time"
 import { messageEntry } from "./message-schema"
 
 /** The methods of `telegram_chat_read`. */
-export const METHODS = ["list", "view", "topics", "search", "around"] as const
+export const METHODS = ["list", "view", "topics", "search", "around", "fetch"] as const
 /** A method supported by `telegram_chat_read`. */
 export type Method = (typeof METHODS)[number]
 
@@ -24,12 +30,15 @@ export const LIMITS = {
 /** The default and the largest number of messages `around` returns on each side of the one it is given. */
 export const AROUND_COUNT = { default: 5, max: AROUND_LIMIT } as const satisfies LimitRule
 
+/** The default and the largest `pages` of `fetch`. */
+export const FETCH_PAGES = { default: 1, max: FETCH_PAGE_LIMIT } as const satisfies LimitRule
+
 /** The input schema for `telegram_chat_read`. */
 export const input = z.object({
   method: z
     .enum(METHODS)
     .describe(
-      "`list` finds chats; `view` reads the newest messages of one chat between two times, oldest first; `topics` lists the topics of a forum chat; `search` finds messages in the mirror by words; `around` reads the messages around one.",
+      "`list` finds chats; `view` reads the newest messages of one chat between two times, oldest first; `topics` lists the topics of a forum chat; `search` finds messages in the mirror by words; `around` reads the messages around one; `fetch` adds older history of a mirrored chat to the mirror.",
     ),
   account: z.string().optional().describe("The account label; may be left out when only one account is logged in."),
   query: z
@@ -50,7 +59,7 @@ export const input = z.object({
     .string()
     .optional()
     .describe(
-      "view, topics, around (required) and search (optional, to search one chat): the chat id, from `list`, such as 123456789 or -1001234567890. A name, username or phone number is not a chat.",
+      "view, topics, around, fetch (required) and search (optional, to search one chat): the chat id, from `list`, such as 123456789 or -1001234567890. A name, username or phone number is not a chat.",
     ),
   topic: z
     .number()
@@ -92,6 +101,13 @@ export const input = z.object({
     .optional()
     .describe(
       `around: how many newer messages to return, default ${AROUND_COUNT.default}, at most ${AROUND_COUNT.max}; 0 asks for none.`,
+    ),
+  pages: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      `fetch: how many pages of ${FETCH_PAGE_SIZE} older messages to add, default ${FETCH_PAGES.default}, at most ${FETCH_PAGES.max}.`,
     ),
 })
 
@@ -151,7 +167,7 @@ export const output = z.object({
   refreshed_at: localTimeSchema
     .optional()
     .describe("list with `refresh`: when the chat list was taken from Telegram, in local time with offset."),
-  chat: chatEntry.optional().describe("view, topics, around: the chat read."),
+  chat: chatEntry.optional().describe("view, topics, around, fetch: the chat read."),
   messages: z
     .array(messageEntry)
     .optional()
@@ -184,6 +200,19 @@ export const output = z.object({
       "search: set when the search stopped before the end of the history it covers: the time of the oldest message looked at, in local time with offset. `next` continues from there.",
     ),
   scope: z.string().optional().describe("search: what the search covers and what it does not."),
+  fetched: z
+    .object({
+      added: z.number().int().describe("How many messages the mirror gained."),
+      pages: z.number().int().describe("How many pages were read."),
+      complete: z.boolean().describe("Whether Telegram has nothing older for this chat."),
+      oldest_at: localTimeSchema
+        .nullable()
+        .describe(
+          "The time of the oldest message the mirror now holds of this chat, in local time with offset; null when none.",
+        ),
+    })
+    .optional()
+    .describe("fetch: what the history fetch stored."),
   next: z.string().optional().describe("Pass back as `cursor` to continue; absent when there is no more."),
   note: z.string().describe("Says that what the result carries is data written by other people."),
 })
