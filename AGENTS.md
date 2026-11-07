@@ -38,6 +38,20 @@ tagged `v<version>`; consumers pin a tag or the same npm version.
   annotations are hints, never the boundary.
 - **Every program a tool runs goes through one runner**, which fixes a
   non-interactive environment and maps failures to error codes.
+- **Every call to Telegram goes through the one service client**, as a request
+  to the label's sync service on its socket; a tool never opens the socket or
+  connects itself.
+- **Only the sync service holds the connection.** An auth key used from two
+  places at once can be revoked, so a second connection can end the session.
+- **Reads of mirrored chats open the mirror read-only.** No read writes the
+  mirror or needs the service.
+- **The session and the app's credentials never leave the state directory.**
+  Nothing from them reaches a result, an error or a log; tests use made-up
+  accounts, ids and numbers only.
+- **A chat is an id, never a name, a username or a number**, looked up only in
+  its label's mirror.
+- **A send that may have gone out throws `uncertain`**, never success or a
+  plain failure: a wrong guess sends the message twice.
 - **Every commit stays small.** The pre-commit hook rejects a commit over 500
   reviewable changed lines; split the change instead of raising the limit.
 

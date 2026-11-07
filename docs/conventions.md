@@ -80,6 +80,7 @@ says what to do next.
 | `rate_limited`     | the service refused the call for its rate limit                            |
 | `declined`         | the person declined a confirmation the tool asked for                      |
 | `upstream_error`   | the service or program the tool calls failed; the message carries its text |
+| `uncertain`        | a write may have taken effect; check before trying it again                |
 | `internal_error`   | a bug in a tool or an entry point, such as a result off its schema         |
 
 A project adds a code to `src/core/errors.ts` and to this table together.
@@ -134,6 +135,7 @@ Every entry point takes the same settings:
 - **`confirm`** is `harness` (the default) or `elicitation`; it says who asks
   before an administrative tool acts (see "Write classes"). The default leaves
   the question to the harness, whose approval every user already knows.
+- **`state_dir`**: where every account's state lives (see "Accounts and state").
 
 ## The core contract
 
@@ -175,3 +177,157 @@ Every entry point takes the same settings:
   against a fake of that program on `PATH`.
 - A test file stays within about 300 lines, split by topic
   (`<name>.<topic>.test.ts`), so one commit can carry a change and its test.
+
+## Accounts and state
+
+- **One label is one logged-in session.** The tools join a Telegram account
+  through [mtcute](https://mtcute.dev) with an `api_id` and `api_hash` the
+  user obtains at [my.telegram.org](https://my.telegram.org); they never read
+  another client's data. Logging in is a person's step, and it names the label
+  the session is known by.
+- **A label is 1 to 24 lowercase letters, digits and `_`**, starting and
+  ending with a letter or a digit; logging in names it `default` when no label
+  is given. A label is also a directory name, so the set is kept to what every
+  file system takes as it is.
+- **Each label keeps all of its state in one directory**,
+  `<state root>/<label>/`, created with mode 700: the session and the app's
+  `api_id` and `api_hash`, mtcute's storage, the mirror, the service's socket,
+  and short-lived copies of files in transit. The state root is the `state_dir`
+  setting, by default `$XDG_STATE_HOME/telegram-tools`, or
+  `~/.local/state/telegram-tools` without it. One directory per label means a
+  label is moved, backed up or removed as a whole, and nothing of one account
+  sits in another's.
+- **`account` picks the label.** Left out, it picks the only logged-in label;
+  with several, the call fails as `invalid_argument` and lists them. One
+  account is the common case and needs no argument, while several never
+  depend on which one a tool guesses.
+- **A label reaches only its own account.** A chat id is looked up only in
+  that label's mirror, and a call to Telegram goes only through that label's
+  service, so no argument can carry a call to an account the label does not
+  name.
+- **The session and credentials never leave the state directory.** Nothing
+  from the session or the app's credentials reaches a result, an error or a
+  log, and no tool reads or writes the state directory except through the
+  mirror, the service client and the outbox. The session stands for the
+  account itself: whoever holds it reads and sends as the user, on every
+  device.
+
+## The service client
+
+- **Every call to Telegram goes through one client**, as every program goes
+  through one runner: JSON-RPC 2.0 on the label's UNIX socket, one request
+  per line, a time limit with cancellation, the service's errors mapped to the
+  error codes above, and nothing but the label's own socket reached. A tool
+  never opens the socket itself and never connects to Telegram.
+
+## The sync service
+
+- **The sync service holds the label's only connection to Telegram**, on
+  mtcute, behind one module: it receives updates, writes the mirror and
+  answers the tools' requests. An auth key used from two places at once can
+  be revoked by Telegram, so a second connection can end the session.
+- **Update handlers are in place before connecting**, so the catch-up replays
+  edits and deletes that happened while offline before new updates arrive. A
+  mirror that cannot be written stops the service at once, so the update
+  state never moves past an update the mirror did not store.
+- **A missing or revoked session stops the service.** With no session, or
+  once Telegram has ended it, the service exits and stays down until the label
+  logs in again, rather than restarting against an account it can no longer
+  reach.
+- **The service is a quiet client.** It sends no read marks, online status or
+  typing indicators of its own, so the phone keeps its notifications and
+  nobody learns that a message was read by a tool. The API terms §1.4 forbid
+  tampering with read and online statuses; the service changes nothing the
+  user's own devices show, and marks nothing read unless a tool is called to.
+- **Background reads are paced and flood waits are honored.** A flood wait is
+  never retried through, since retrying lengthens the wait.
+
+## The mirror
+
+- **What the mirror keeps depends on the kind of chat.** Private chats, bots,
+  basic groups and Saved Messages are mirrored always; supergroups while on
+  the sync list; channels only with the `channels` setting on; forum topics as
+  topics.
+- **A chat is Telegram's signed chat id as a string**, such as `"123456789"`
+  for a user or a bot, `"-4567"` for a basic group, or `"-1001234567890"` for
+  a supergroup or channel. Chat ids are strings because a supergroup id has
+  13 digits and a sign, and a string is never rounded. A forum topic is an
+  argument of its own. Names, usernames and phone numbers are never accepted
+  as a chat: anyone can choose a name, and a username can change hands.
+- **A message is its chat plus its id within that chat**, since Telegram
+  numbers messages per chat.
+- **History starts where the service started following a chat.** Older
+  history comes only from a history fetch, and the skills say so.
+- **The mirror keeps what Telegram shows the user.** Messages they receive,
+  messages they send from other devices, and the tools' own sends as they
+  come back from Telegram; an edit keeps every earlier
+  version. Delete for everyone removes the message, its files and its earlier
+  versions, with a short-lived tombstone so a fetch in flight does not bring
+  it back.
+- **Disappearing and view-once messages leave when they expire.** They leave
+  the mirror with their files by default, as their sender meant and the API
+  terms §1.4 require. With `keep_disappearing` on they are kept and marked with
+  a note in a field of its own that they are for the user only, with their
+  files kept as they arrive.
+- **Channels never bring sponsored messages.** None is fetched or shown:
+  advertisements are text nobody in the chat chose, and keeping them out
+  avoids untrusted prompts reaching the model.
+- **Every read opens the mirror read-only and needs no service**, so reading
+  works while the service is down and can never change what was received.
+  Reads of chats the mirror does not keep are requests to the service and
+  store nothing. Read-only means every write refused (`query_only`), never
+  migrating, and never creating the mirror; the connection itself is SQLite's
+  ordinary one, since a read-only connection cannot open a WAL database once
+  its `-shm` file is gone, and a WAL reader takes part in the shared-memory
+  locking that lets it read while the service writes.
+- **Other people's words are data.** Message text, names, captions and file
+  names are written by other people; every read tool's description and the
+  skills say so, and nothing a message says is followed as an instruction.
+
+## Files
+
+- **Files go in and out only through the directories a setting names**,
+  judged by real path, so a link that leads elsewhere counts as elsewhere.
+  The state directory and the tools' own install directory are never among
+  them. Which settings, and their defaults, are settled with the tools that
+  save and send files.
+
+## Writes
+
+- **A write's arguments are the whole change**: the chat by id, the text as
+  it should arrive (surrounding blank space trimmed), the files by path.
+  Nothing is chosen at run time from the current state. The harness shows the
+  arguments when it asks, so what it shows is what goes out.
+- **A send is one call with one `random_id`**, never repeated by the package.
+  A repeat of the same call with the same id is `RANDOM_ID_DUPLICATE`, never a
+  second message, whereas a new id would be.
+- **A send's outcome is never guessed.** A result means Telegram accepted the
+  message. A failure known to happen before anything left throws its code.
+  Everything else throws `uncertain`: the message may have gone out, the mirror
+  cannot tell, and it is checked in the chat before any second send. A resend
+  that guessed wrong reaches the other person twice.
+
+## Toolsets
+
+- **One per domain**: `account`, `chats`, `sync` (which supergroups and
+  channels the mirror keeps), `files`, `sends`, and `actions` for what the
+  user does to messages beyond sending them.
+- **`account`, `chats`, `sync` and `sends` are on by default.** They cover
+  reading a chat, choosing what the mirror keeps, and answering it without
+  needing anything turned on. Saving received files writes to disk and opens
+  archives, and the actions change what others have already read, so each is
+  one setting away.
+- **`keep_disappearing` and `channels` are off by default.** They are taken
+  like `state_dir` (a flag, a `TELEGRAM_TOOLS_*` environment variable, or a
+  plugin option). Keeping disappearing messages goes against API terms §1.4.
+  For channels, API terms §3.3 asks an app showing channel content to show
+  sponsored messages, which are text from advertisers nobody in the chat
+  chose, a new way for instructions to reach the model; whoever turns
+  channels on accepts that §3.3 risk.
+
+## Unofficial
+
+- **The package is unofficial.** The README and the device name the service
+  logs in as say the package is unofficial, as the API terms §2.2 and §2.3
+  require. Each user registers their own app at
+  [my.telegram.org](https://my.telegram.org) (§2.1).
