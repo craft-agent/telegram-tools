@@ -41,9 +41,14 @@ function isErrorCode(value: unknown): value is ErrorCode {
   return typeof value === "string" && Object.hasOwn(ERROR_CODES, value)
 }
 
-/** The service's own message text: phone-number-like text replaced with `[number]`, trimmed, and cut. */
+/** `text` with phone-number-like parts replaced by `[number]`. */
+export function maskPhoneNumbers(text: string): string {
+  return text.replace(PHONE_NUMBER, "[number]")
+}
+
+/** The service's own message text: phone-number-like text masked, trimmed, and cut. */
 function cut(message: string): string {
-  return message.replace(PHONE_NUMBER, "[number]").trim().slice(0, MAX_DETAIL_LENGTH)
+  return maskPhoneNumbers(message).trim().slice(0, MAX_DETAIL_LENGTH)
 }
 
 /** The service's own message text for an error: masked, cut, and led by `: `; empty when there is none. */

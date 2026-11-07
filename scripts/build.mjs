@@ -1,15 +1,8 @@
 import { build } from "esbuild"
 import { readFileSync } from "node:fs"
+import { shared } from "./bundle-options.mjs"
 
 const { version } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"))
-
-const shared = {
-  bundle: true,
-  platform: "node",
-  format: "esm",
-  target: "node24",
-  logLevel: "info",
-}
 
 await build({
   ...shared,
