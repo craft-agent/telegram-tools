@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { PROJECT } from "../project"
 import type { EntryProfile } from "./profile"
-import { parseSettings, parseToolSettings } from "./settings"
+import { parseServiceSettings, parseSettings, parseToolSettings } from "./settings"
 import { failure, profile } from "./settings.testing"
 
 const parse = (argv: string[], env: Record<string, string | undefined> = {}) => parseSettings(argv, env, profile)
@@ -10,7 +10,7 @@ const parseTool = (argv: string[], env: Record<string, string | undefined> = {})
 
 describe("parseSettings", () => {
   test("defaults to the harness confirming and no other setting", () => {
-    expect(parse([])).toEqual({ confirm: "harness" })
+    expect(parse([])).toEqual({ confirm: "harness", state_dir: expect.any(String) })
   })
 
   test("reads each flag", () => {
@@ -25,6 +25,8 @@ describe("parseSettings", () => {
         "demo_thing_merge",
         "--confirm",
         "elicitation",
+        "--state-dir",
+        "/custom/state",
       ]),
     ).toEqual({
       toolsets: ["alpha", "beta"],
@@ -32,18 +34,27 @@ describe("parseSettings", () => {
       tools: ["demo_thing_read"],
       exclude_tools: ["demo_thing_merge"],
       confirm: "elicitation",
+      state_dir: "/custom/state",
     })
   })
 
   test("reads the --flag=value form", () => {
     expect(
-      parse(["--toolsets=gamma", "--tools=a,b", "--exclude-tools=c", "--confirm=elicitation", "--read-only"]),
+      parse([
+        "--toolsets=gamma",
+        "--tools=a,b",
+        "--exclude-tools=c",
+        "--confirm=elicitation",
+        "--read-only",
+        "--state-dir=/custom/state",
+      ]),
     ).toEqual({
       toolsets: ["gamma"],
       tools: ["a", "b"],
       exclude_tools: ["c"],
       read_only: true,
       confirm: "elicitation",
+      state_dir: "/custom/state",
     })
   })
 
@@ -55,6 +66,7 @@ describe("parseSettings", () => {
         DEMO_TOOLS: "x",
         DEMO_EXCLUDE_TOOLS: "y,z",
         DEMO_CONFIRM: "elicitation",
+        DEMO_STATE_DIR: "/env/state",
       }),
     ).toEqual({
       toolsets: ["beta", "gamma"],
@@ -62,6 +74,7 @@ describe("parseSettings", () => {
       tools: ["x"],
       exclude_tools: ["y", "z"],
       confirm: "elicitation",
+      state_dir: "/env/state",
     })
   })
 
@@ -100,17 +113,45 @@ describe("parseSettings", () => {
       DEMO_EXCLUDE_TOOLS: "y",
       DEMO_CONFIRM: "elicitation",
       DEMO_READ_ONLY: "0",
+      DEMO_STATE_DIR: "/env/state",
     }
     expect(
       parse(
-        ["--toolsets", "alpha", "--tools", "a", "--exclude-tools", "b", "--confirm", "harness", "--read-only"],
+        [
+          "--toolsets",
+          "alpha",
+          "--tools",
+          "a",
+          "--exclude-tools",
+          "b",
+          "--confirm",
+          "harness",
+          "--read-only",
+          "--state-dir",
+          "/flag/state",
+        ],
         env,
       ),
-    ).toEqual({ toolsets: ["alpha"], tools: ["a"], exclude_tools: ["b"], confirm: "harness", read_only: true })
+    ).toEqual({
+      toolsets: ["alpha"],
+      tools: ["a"],
+      exclude_tools: ["b"],
+      confirm: "harness",
+      read_only: true,
+      state_dir: "/flag/state",
+    })
   })
 
   test("an empty environment variable counts as unset", () => {
-    expect(parse([], { DEMO_TOOLSETS: "", DEMO_CONFIRM: " " })).toEqual({ confirm: "harness" })
+    expect(parse([], { DEMO_TOOLSETS: "", DEMO_CONFIRM: " " })).toEqual({
+      confirm: "harness",
+      state_dir: expect.any(String),
+    })
+  })
+
+  test("rejects a relative state_dir in flag or environment", () => {
+    expect(failure(() => parse(["--state-dir", "rel/path"])).message).toContain("--state-dir")
+    expect(failure(() => parse([], { DEMO_STATE_DIR: "rel/path" })).message).toContain("DEMO_STATE_DIR")
   })
 
   test("drops empty list items", () => {
@@ -155,20 +196,73 @@ describe("parseSettings", () => {
   })
 
   test("with no toolsets defined, a named toolset is rejected and the message says so", () => {
-    const none: EntryProfile = { envPrefix: "DEMO", toolsets: { names: [], defaults: [] } }
+    const none: EntryProfile = { name: "demo-tools", envPrefix: "DEMO", toolsets: { names: [], defaults: [] } }
     expect(failure(() => parseSettings(["--toolsets", "alpha"], {}, none)).message).toContain("no toolsets are defined")
     expect(parseSettings(["--toolsets", "all"], {}, none).toolsets).toBe("all")
   })
 })
 
+describe("keep_disappearing and channels", () => {
+  test("are absent unless set", () => {
+    expect(parse([])).not.toHaveProperty("keep_disappearing")
+    expect(parse([])).not.toHaveProperty("channels")
+  })
+
+  test("read from the flags, the environment, and the flag wins", () => {
+    expect(parse(["--keep-disappearing", "--channels"])).toMatchObject({ keep_disappearing: true, channels: true })
+    expect(parse([], { DEMO_KEEP_DISAPPEARING: "1", DEMO_CHANNELS: "true" })).toMatchObject({
+      keep_disappearing: true,
+      channels: true,
+    })
+    expect(parse([], { DEMO_CHANNELS: "0" }).channels).toBe(false)
+    expect(parse(["--channels"], { DEMO_CHANNELS: "0" }).channels).toBe(true)
+  })
+
+  test("a bad environment value is rejected, naming the variable; a value after the flag is too", () => {
+    expect(failure(() => parse([], { DEMO_CHANNELS: "yes" })).message).toContain("DEMO_CHANNELS")
+    expect(failure(() => parse(["--channels=1"])).message).toContain("--channels")
+  })
+
+  test("parseToolSettings reads them too", () => {
+    expect(parseTool(["--channels"], { DEMO_KEEP_DISAPPEARING: "true" })).toMatchObject({
+      keep_disappearing: true,
+      channels: true,
+    })
+  })
+})
+
+describe("parseServiceSettings", () => {
+  const parseService = (argv: string[], env: Record<string, string | undefined> = {}) =>
+    parseServiceSettings(argv, env, profile)
+
+  test("gives the state directory and both booleans, off by default", () => {
+    expect(parseService([])).toEqual({ state_dir: expect.any(String), keep_disappearing: false, channels: false })
+    expect(parseService(["--state-dir=/s", "--channels"], { DEMO_KEEP_DISAPPEARING: "1" })).toEqual({
+      state_dir: "/s",
+      keep_disappearing: true,
+      channels: true,
+    })
+  })
+
+  test("rejects any other settings flag, naming it", () => {
+    expect(failure(() => parseService(["--read-only"])).message).toContain("--read-only")
+    expect(failure(() => parseService(["--nope"])).message).toContain("--nope")
+  })
+})
+
 describe("parseToolSettings", () => {
   test("reads the tool settings and gives no confirm setting", () => {
-    expect(parseTool([])).toEqual({})
-    expect(parseTool(["--toolsets=gamma", "--read-only", "--tools", "a"], { DEMO_EXCLUDE_TOOLS: "b" })).toEqual({
+    expect(parseTool([])).toEqual({ state_dir: expect.any(String) })
+    expect(
+      parseTool(["--toolsets=gamma", "--read-only", "--tools", "a", "--state-dir=/tool/state"], {
+        DEMO_EXCLUDE_TOOLS: "b",
+      }),
+    ).toEqual({
       toolsets: ["gamma"],
       read_only: true,
       tools: ["a"],
       exclude_tools: ["b"],
+      state_dir: "/tool/state",
     })
   })
 
@@ -178,6 +272,6 @@ describe("parseToolSettings", () => {
   })
 
   test("ignores DEMO_CONFIRM, even a bad one", () => {
-    expect(parseTool([], { DEMO_CONFIRM: "ask" })).toEqual({})
+    expect(parseTool([], { DEMO_CONFIRM: "ask" })).toEqual({ state_dir: expect.any(String) })
   })
 })

@@ -1,6 +1,9 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { spawnSync } from "node:child_process"
+import { mkdtempSync, readdirSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const CLI = fileURLToPath(new URL("../dist/cli.js", import.meta.url))
@@ -45,7 +48,7 @@ async function listsTheServersTools() {
         `Expected a described tool, got ${JSON.stringify(tool)}`,
       )
     }
-    console.log(`${label} gives the ${listed.length} tools the MCP server lists.`)
+    console.log(`${label} gives the ${listed.length} tools the MCP server lists: ${expected.join(", ")}.`)
   }
 }
 
@@ -66,10 +69,31 @@ function rejectsConfirm() {
   console.log(`--confirm x exits ${EXIT_USAGE}: ${run.stderr.trim()}`)
 }
 
+/** Each person command is routed and rejects an unknown flag with usage, before touching the state directory. */
+function routesThePersonCommands() {
+  const stateDir = mkdtempSync(join(tmpdir(), "smoke-cli-"))
+  try {
+    for (const command of ["login", "sync", "service", "logout", "remove"]) {
+      const run = cli([command, "--bogus", "--state-dir", stateDir])
+      expect(
+        run.status === EXIT_USAGE && run.stdout === "" && run.stderr.includes("--bogus"),
+        `Expected exit ${EXIT_USAGE} naming --bogus for ${command}, got ${run.status}: ${run.stdout}${run.stderr}`,
+      )
+      console.log(`${command} --bogus exits ${EXIT_USAGE}: ${run.stderr.trim()}`)
+    }
+    const both = cli(["login", "--phone", "--telethon", "--state-dir", stateDir])
+    expect(both.status === EXIT_USAGE, `Expected exit ${EXIT_USAGE} for login --phone --telethon, got ${both.status}`)
+    expect(readdirSync(stateDir).length === 0, "Expected the state directory to be left untouched")
+  } finally {
+    rmSync(stateDir, { recursive: true, force: true })
+  }
+}
+
 try {
   await listsTheServersTools()
   rejectsAnUnknownTool()
   rejectsConfirm()
+  routesThePersonCommands()
 } catch (error) {
   console.error(error)
   process.exit(1)

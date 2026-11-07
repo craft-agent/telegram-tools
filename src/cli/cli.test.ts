@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { annotations, selectTools } from "../core"
+import { annotations, selectTools, type ToolSpec } from "../core"
 import { PROJECT } from "../project"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, type CliIo } from "./cli"
 import { ADD_ID, ADMIN_ID, BROKEN_ID, MISSING_ID, PROFILE, READ_ID, SLOW_ID, cli, json, specs } from "./testing"
@@ -140,6 +140,23 @@ describe("run", () => {
     expect(json(run).error.code).toBe("internal_error")
     expect(json(run).error.message).toContain("cancelled")
   })
+
+  test("passes stateDir from parsed settings to execute", async () => {
+    let capturedStateDir: string | undefined
+    const checkTool: ToolSpec = {
+      ...specs[0]!,
+      id: "demo_thing_read",
+      async execute(_args, ctx) {
+        capturedStateDir = ctx.stateDir
+        return { tool: "demo_thing_read", cwd: "/x" }
+      },
+    }
+    const run = await cli(["run", "demo_thing_read", "--cwd", "/x", "--state-dir", "/custom/state"], "", {
+      specs: [checkTool],
+    })
+    expect(run.code).toBe(EXIT_OK)
+    expect(capturedStateDir).toBe("/custom/state")
+  })
 })
 
 describe("usage", () => {
@@ -161,6 +178,9 @@ describe("usage", () => {
     [["run", ADD_ID, "--cwd", "/x", "--confirm", "harness"], "--confirm"],
     [["target", ADD_ID], "--cwd"],
     [["target", ADD_ID, "--cwd", "/x", "--read-only"], "--read-only"],
+    [["target", ADD_ID, "--cwd", "/x", "--toolsets", "all"], "--toolsets"],
+    [["target", ADD_ID, "--cwd", "/x", "--state-dir"], "--state-dir"],
+    [["target", ADD_ID, "--cwd", "/x", "--state-dir", "rel/path"], "--state-dir"],
   ])("%j is one line on stderr, exit 2 and nothing on stdout", async (argv, message) => {
     const run = await cli(argv as string[])
     expect(run.code).toBe(EXIT_USAGE)
@@ -172,5 +192,28 @@ describe("usage", () => {
 
   test("ignores DEMO_CONFIRM", async () => {
     expect((await cli(["list"], "", { env: { DEMO_CONFIRM: "ask" } })).code).toBe(EXIT_OK)
+  })
+})
+
+describe("person commands", () => {
+  test.each([["login"], ["sync"], ["service"], ["logout"], ["remove"]])(
+    "%s is handed its own arguments",
+    async (name) => {
+      const run = await cli([name, "--bogus"])
+      expect(run.code).toBe(EXIT_USAGE)
+      expect(run.stdout).toBe("")
+      expect(run.stderr).toContain("--bogus")
+      expect(run.stderr).not.toContain("Unknown command")
+    },
+  )
+
+  test("only the person commands are routed there: an inherited name is an unknown command", async () => {
+    const run = await cli(["constructor"])
+    expect(run.code).toBe(EXIT_USAGE)
+    expect(run.stderr).toContain('Unknown command "constructor"')
+  })
+
+  test("the unknown-command message names them", async () => {
+    expect((await cli(["bogus"])).stderr).toContain("login, sync, service, logout or remove")
   })
 })

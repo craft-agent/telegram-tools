@@ -1,17 +1,31 @@
 import { ToolError, type ToolSettings, type Toolsets } from "../core"
 import { PROJECT_PROFILE, type EntryProfile } from "./profile"
+import { resolveStateDir } from "./state-dir"
 
 /** Who asks the person before an administrative tool acts: the harness, or the tool through the client's form. */
 export type ConfirmMode = "harness" | "elicitation"
 
-export type EntrySettings = ToolSettings & { confirm: ConfirmMode }
+/**
+ * The settings needed to run tools: tool selection, read-only mode, the resolved state directory and the
+ * two the sync service takes (off when absent).
+ */
+export type RunSettings = ToolSettings & {
+  state_dir: string
+  /** Whether messages that disappear are kept. */
+  keep_disappearing?: boolean
+  /** Whether channels are listed and their messages received. */
+  channels?: boolean
+}
+
+export type EntrySettings = RunSettings & { confirm: ConfirmMode }
 
 const CONFIRM_MODES: readonly ConfirmMode[] = ["harness", "elicitation"]
 const ALL_TOOLSETS = "all"
 const TRUE_VALUES: readonly string[] = ["1", "true"]
 const FALSE_VALUES: readonly string[] = ["0", "false"]
 
-type OptionName = "toolsets" | "read_only" | "tools" | "exclude_tools" | "confirm"
+type OptionName =
+  "toolsets" | "read_only" | "tools" | "exclude_tools" | "confirm" | "state_dir" | "keep_disappearing" | "channels"
 
 /** A setting's command-line flag and the end of its environment variable, which follows the profile's prefix; a boolean flag takes no value. */
 type Option = { flag: string; envSuffix: string; boolean?: true }
@@ -22,7 +36,13 @@ const OPTIONS: Record<OptionName, Option> = {
   tools: { flag: "--tools", envSuffix: "TOOLS" },
   exclude_tools: { flag: "--exclude-tools", envSuffix: "EXCLUDE_TOOLS" },
   confirm: { flag: "--confirm", envSuffix: "CONFIRM" },
+  state_dir: { flag: "--state-dir", envSuffix: "STATE_DIR" },
+  keep_disappearing: { flag: "--keep-disappearing", envSuffix: "KEEP_DISAPPEARING", boolean: true },
+  channels: { flag: "--channels", envSuffix: "CHANNELS", boolean: true },
 }
+
+/** The two boolean settings the sync service takes. */
+const SERVICE_OPTION_NAMES = ["keep_disappearing", "channels"] as const satisfies readonly OptionName[]
 
 function envName(name: OptionName, profile: EntryProfile): string {
   return `${profile.envPrefix}_${OPTIONS[name].envSuffix}`
@@ -122,7 +142,10 @@ export function parseSettings(
   const value = (name: OptionName): SettingText | undefined =>
     flags[name] !== undefined ? { text: flags[name], source: OPTIONS[name].flag } : envText(name, env, profile)
 
-  const settings: EntrySettings = { confirm: "harness" }
+  const settings: EntrySettings = {
+    confirm: "harness",
+    state_dir: resolveStateDir(value("state_dir"), env, profile),
+  }
   const toolsets = value("toolsets")
   if (toolsets) settings.toolsets = checkToolsets(splitList(toolsets.text), toolsets.source, profile.toolsets)
   const readOnly = value("read_only")
@@ -133,6 +156,10 @@ export function parseSettings(
   if (excluded) settings.exclude_tools = splitList(excluded.text)
   const confirm = value("confirm")
   if (confirm) settings.confirm = parseConfirm(confirm.text.trim(), confirm.source)
+  for (const name of SERVICE_OPTION_NAMES) {
+    const given = value(name)
+    if (given) settings[name] = parseBoolean(given.text, given.source)
+  }
   return settings
 }
 
@@ -146,7 +173,7 @@ export function parseToolSettings(
   argv: string[],
   env: Record<string, string | undefined>,
   profile: EntryProfile = PROJECT_PROFILE,
-): ToolSettings {
+): RunSettings {
   const { flag } = OPTIONS.confirm
   if (argv.some((arg) => arg === flag || arg.startsWith(`${flag}=`))) {
     throw new ToolError("invalid_argument", `Option ${flag} is not available here.`)
@@ -159,7 +186,64 @@ export function parseToolSettings(
   return settings
 }
 
-const TOOL_OPTION_NAMES = ["toolsets", "read_only", "tools", "exclude_tools"] as const satisfies readonly OptionName[]
+/**
+ * Reads only the `state_dir` setting from a command line that takes no other
+ * setting, for commands that select no tools: any other settings flag is
+ * `invalid_argument`. The flag wins over its environment variable.
+ */
+export function parseStateDir(
+  argv: string[],
+  env: Record<string, string | undefined>,
+  profile: EntryProfile = PROJECT_PROFILE,
+): string {
+  const flags = readFlags(argv)
+  const other = (Object.keys(flags) as OptionName[]).find((name) => name !== "state_dir")
+  if (other !== undefined)
+    throw new ToolError("invalid_argument", `Option ${OPTIONS[other].flag} is not available here.`)
+  const given = flags.state_dir !== undefined ? { text: flags.state_dir, source: OPTIONS.state_dir.flag } : undefined
+  return resolveStateDir(given ?? envText("state_dir", env, profile), env, profile)
+}
+
+/** What the sync service and its service unit take from the command line: the state directory and two booleans. */
+export type ServiceSettings = { state_dir: string; keep_disappearing: boolean; channels: boolean }
+
+/**
+ * Reads the settings of the commands that run or install the sync service
+ * from their remaining flags: the state directory, `--keep-disappearing` and
+ * `--channels` (flag over `<envPrefix>_*`, both off by default). Any other
+ * settings flag is `invalid_argument`.
+ */
+export function parseServiceSettings(
+  argv: string[],
+  env: Record<string, string | undefined>,
+  profile: EntryProfile = PROJECT_PROFILE,
+): ServiceSettings {
+  const flags = readFlags(argv)
+  const allowed: readonly OptionName[] = ["state_dir", ...SERVICE_OPTION_NAMES]
+  const other = (Object.keys(flags) as OptionName[]).find((name) => !allowed.includes(name))
+  if (other !== undefined)
+    throw new ToolError("invalid_argument", `Option ${OPTIONS[other].flag} is not available here.`)
+  const value = (name: OptionName): SettingText | undefined =>
+    flags[name] !== undefined ? { text: flags[name], source: OPTIONS[name].flag } : envText(name, env, profile)
+  const on = (name: (typeof SERVICE_OPTION_NAMES)[number]): boolean => {
+    const given = value(name)
+    return given !== undefined && parseBoolean(given.text, given.source)
+  }
+  return {
+    state_dir: resolveStateDir(value("state_dir"), env, profile),
+    keep_disappearing: on("keep_disappearing"),
+    channels: on("channels"),
+  }
+}
+
+const TOOL_OPTION_NAMES = [
+  "toolsets",
+  "read_only",
+  "tools",
+  "exclude_tools",
+  "state_dir",
+  ...SERVICE_OPTION_NAMES,
+] as const satisfies readonly OptionName[]
 type ToolOptionName = (typeof TOOL_OPTION_NAMES)[number]
 
 function stringList(value: unknown): string[] | undefined {
@@ -170,6 +254,11 @@ function optionError(name: string, expected: string): ToolError {
   return new ToolError("invalid_argument", `Option "${name}" must be ${expected}.`)
 }
 
+function stateDirOption(value: unknown): string {
+  if (typeof value !== "string") throw optionError("state_dir", "an absolute path")
+  return value
+}
+
 function toolsetsOption(value: unknown, toolsets: Toolsets): string[] | "all" | undefined {
   if (value === ALL_TOOLSETS) return ALL_TOOLSETS
   const names = stringList(value)
@@ -177,9 +266,11 @@ function toolsetsOption(value: unknown, toolsets: Toolsets): string[] | "all" | 
   return checkToolsets(names, 'option "toolsets"', toolsets)
 }
 
-function booleanOption(value: unknown): boolean {
-  if (typeof value !== "boolean") throw optionError("read_only", "true or false")
-  return value
+function booleanOption(name: OptionName): (value: unknown) => boolean {
+  return (value) => {
+    if (typeof value !== "boolean") throw optionError(name, "true or false")
+    return value
+  }
 }
 
 function listOption(name: "tools" | "exclude_tools"): (value: unknown) => string[] {
@@ -201,7 +292,7 @@ export function settingsFromOptions(
   options: Record<string, unknown> | undefined,
   env: Record<string, string | undefined>,
   profile: EntryProfile = PROJECT_PROFILE,
-): ToolSettings {
+): RunSettings {
   const given = options ?? {}
   const unknown = Object.keys(given).find((name) => !(TOOL_OPTION_NAMES as readonly string[]).includes(name))
   if (unknown !== undefined) {
@@ -218,15 +309,25 @@ export function settingsFromOptions(
     return text !== undefined ? fromText(text) : undefined
   }
 
-  const settings: ToolSettings = {}
+  const stateDirGiven =
+    given.state_dir !== undefined
+      ? { text: stateDirOption(given.state_dir), source: 'Option "state_dir"' }
+      : envText("state_dir", env, profile)
+  const settings: RunSettings = {
+    state_dir: resolveStateDir(stateDirGiven, env, profile),
+  }
   const toolsets = resolve(
     "toolsets",
     (value) => toolsetsOption(value, profile.toolsets),
     ({ text, source }) => checkToolsets(splitList(text), source, profile.toolsets),
   )
   if (toolsets !== undefined) settings.toolsets = toolsets
-  const readOnly = resolve("read_only", booleanOption, ({ text, source }) => parseBoolean(text, source))
+  const readOnly = resolve("read_only", booleanOption("read_only"), ({ text, source }) => parseBoolean(text, source))
   if (readOnly !== undefined) settings.read_only = readOnly
+  for (const name of SERVICE_OPTION_NAMES) {
+    const given = resolve(name, booleanOption(name), ({ text, source }) => parseBoolean(text, source))
+    if (given !== undefined) settings[name] = given
+  }
   const tools = resolve("tools", listOption("tools"), ({ text }) => splitList(text))
   if (tools !== undefined) settings.tools = tools
   const excluded = resolve("exclude_tools", listOption("exclude_tools"), ({ text }) => splitList(text))

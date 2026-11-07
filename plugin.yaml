@@ -3,7 +3,8 @@ version: 0.0.0
 description: "Unofficial Telegram tools for coding agents: chats, messages, received files and sends."
 manifest_version: 1
 requires_hermes: ">=0.22"
-provides_tools: []
+provides_tools:
+  - telegram_account_read
 provides_hooks:
   - pre_tool_call
 config_schema:
@@ -18,3 +19,11 @@ config_schema:
   exclude_tools:
     type: list
     description: Single tools to remove by id. Wins over tools and toolsets.
+  state_dir:
+    description: "Where every label's state lives; an absolute path, or one starting with ~. Defaults to $XDG_STATE_HOME/telegram-tools, or ~/.local/state/telegram-tools."
+  keep_disappearing:
+    type: bool
+    description: Keeps disappearing and view-once messages for the user; off by default. Read by the sync service.
+  channels:
+    type: bool
+    description: Lets the mirror list channels; off by default. Read by the sync service.
