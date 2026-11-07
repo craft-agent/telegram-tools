@@ -2,8 +2,12 @@ import { ToolError } from "../errors"
 import { isChatId, isCount } from "./mirror-input"
 import { isRecord } from "./service-errors"
 import {
+  AROUND_LIMIT,
+  FETCH_PAGE_LIMIT,
   HISTORY_LIMIT,
   TOPICS_LIMIT,
+  type AroundParams,
+  type FetchParams,
   type HistoryParams,
   type TopicsOffset,
   type TopicsParams,
@@ -15,6 +19,8 @@ export const INT32_MAX = 2 ** 31 - 1
 const HISTORY_KEYS = ["chat", "limit", "topic", "before_id", "after", "before"]
 const TOPICS_KEYS = ["chat", "limit", "offset"]
 const OFFSET_KEYS = ["date", "id", "topic"]
+const AROUND_KEYS = ["chat", "id", "before_count", "after_count", "topic"]
+const FETCH_KEYS = ["chat", "pages"]
 
 function invalid(message: string): ToolError {
   return new ToolError("invalid_argument", message)
@@ -52,6 +58,7 @@ function optionalNumberAt(
 const isIdNumber = (value: number) => isCount(value) && value >= 1 && value <= INT32_MAX
 const isTelegramCount = (value: number) => isCount(value) && value <= INT32_MAX
 const isLimitUpTo = (max: number) => (value: number) => isCount(value) && value >= 1 && value <= max
+const isCountUpTo = (max: number) => (value: number) => isCount(value) && value <= max
 
 const ID_TEXT = "a positive integer"
 const COUNT_TEXT = "a non-negative integer"
@@ -100,6 +107,30 @@ export function parseTopicsParams(params: unknown): TopicsParams {
   const offset = offsetAt(fields)
   if (offset) parsed.offset = offset
   return parsed
+}
+
+/** The parameters of an `around` request, checked; anything off is `invalid_argument`. */
+export function parseAroundParams(params: unknown): AroundParams {
+  const fields = recordOf(params, AROUND_KEYS, "The around parameters")
+  const countText = `an integer from 0 to ${AROUND_LIMIT}`
+  const parsed: AroundParams = {
+    chat: chatAt(fields),
+    id: numberAt(fields, "id", isIdNumber, ID_TEXT),
+    before_count: numberAt(fields, "before_count", isCountUpTo(AROUND_LIMIT), countText),
+    after_count: numberAt(fields, "after_count", isCountUpTo(AROUND_LIMIT), countText),
+  }
+  const topic = optionalNumberAt(fields, "topic", isIdNumber, ID_TEXT)
+  if (topic !== undefined) parsed.topic = topic
+  return parsed
+}
+
+/** The parameters of a `fetch` request, checked; anything off is `invalid_argument`. */
+export function parseFetchParams(params: unknown): FetchParams {
+  const fields = recordOf(params, FETCH_KEYS, "The fetch parameters")
+  return {
+    chat: chatAt(fields),
+    pages: numberAt(fields, "pages", isLimitUpTo(FETCH_PAGE_LIMIT), `an integer from 1 to ${FETCH_PAGE_LIMIT}`),
+  }
 }
 
 /** Checks that a request that takes no parameters got none. */

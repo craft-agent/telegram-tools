@@ -12,6 +12,10 @@ export const SERVICE_REQUESTS = {
   topics: "topics",
   /** The chat list taken from Telegram now: no parameters → `RefreshResult`. */
   refresh: "refresh",
+  /** A live read of the messages around one, in a chat the mirror does not keep: `AroundParams` → `AroundResult`. */
+  around: "around",
+  /** Older history of a chat the mirror keeps, fetched into the mirror: `FetchParams` → `FetchResult`. */
+  fetch: "fetch",
 } as const
 
 /** The most messages one live read returns. */
@@ -69,3 +73,44 @@ export type TopicsResult = { topics: TopicInfo[]; next?: TopicsOffset }
 
 /** When the chat list was taken from Telegram: now, or a moment ago when it was taken within the last minute. */
 export type RefreshResult = { refreshed_at: number }
+
+/** The most messages on each side of the one `around` reads. */
+export const AROUND_LIMIT = 50
+
+/** A live read of message `id` with up to `before_count` older and `after_count` newer messages of `chat`. */
+export type AroundParams = {
+  /** A chat the mirror lists and does not keep. */
+  chat: string
+  /** The message in the middle. */
+  id: number
+  /** 0 to `AROUND_LIMIT`. */
+  before_count: number
+  /** 0 to `AROUND_LIMIT`. */
+  after_count: number
+  /** Only messages of this forum topic; the General topic is 1. */
+  topic?: number
+}
+
+/** The message `id` and those around it, newest first, stored nowhere; a missing `id` is `not_found`. */
+export type AroundResult = { messages: MessageInput[] }
+
+/** A history fetch's page size: Telegram's largest. */
+export const FETCH_PAGE_SIZE = 100
+
+/** The most pages one history fetch takes. */
+export const FETCH_PAGE_LIMIT = 5
+
+/** Older history of a chat the mirror keeps, page after page from its oldest stored message, paced. */
+export type FetchParams = {
+  /** A chat the mirror keeps. */
+  chat: string
+  /** 1 to `FETCH_PAGE_LIMIT`. */
+  pages: number
+}
+
+/**
+ * What a history fetch stored: `added` messages over `pages` pages, the time
+ * of the oldest message the mirror now has of the chat (`null` when none), and
+ * `complete` once Telegram has nothing older.
+ */
+export type FetchResult = { added: number; pages: number; oldest_ts: number | null; complete: boolean }

@@ -121,6 +121,7 @@ async function start(run: Run, session: Session): Promise<void> {
     signal: ending.signal,
     refresh,
     endSession: () => ending.end({ kind: "session-ended" }),
+    failRun: (error) => ending.end(endedBy(error)),
   })
   session.serverStarting = serveService(
     paths.socket,

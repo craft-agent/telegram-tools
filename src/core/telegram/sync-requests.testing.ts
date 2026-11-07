@@ -12,8 +12,9 @@ import {
   userPeer,
 } from "./fake-telegram.testing"
 import { setFollowed, upsertChats } from "./ingest-chats"
+import { storeMessage } from "./ingest-messages"
 import type { ChatInput } from "./mirror-input"
-import { SUPERGROUP, chatInput } from "./mirror.testing"
+import { SUPERGROUP, chatInput, messageInput } from "./mirror.testing"
 import { callService } from "./service"
 import { START_MS, type SyncFixture } from "./sync.testing"
 
@@ -64,6 +65,24 @@ const SECOND_MS = 1000
 /** The Unix milliseconds `groupMessage` stamps its message with. */
 export function sentAtMs(secondsAfter: number): number {
   return (FAKE_DATE + secondsAfter) * SECOND_MS
+}
+
+/** A message from Alice in the kept private chat, as Telegram brings it; sent `secondsAfter` seconds after the fake moment. */
+export function keptMessage(id: number, secondsAfter = id): Message {
+  return messageOf(fakeMessage({ id, date: FAKE_DATE + secondsAfter }), fakeUser())
+}
+
+/** Stores messages `from` to `to` of the kept chat, as `keptMessage` stamps them, the way an earlier run left them. */
+export function seedKeptMessages(fixture: SyncFixture, from: number, to: number): void {
+  fixture.seed((mirror) => {
+    for (let id = from; id <= to; id++) {
+      storeMessage(
+        mirror,
+        { now: START_MS, keepDisappearing: false },
+        messageInput({ chat: KEPT, id, ts: sentAtMs(id) }),
+      )
+    }
+  })
 }
 
 /** A topic of the forum supergroup whose newest message is `topMessage` (included only when `withMessage`). */
