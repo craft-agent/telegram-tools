@@ -16,7 +16,9 @@ async function listTools() {
     if (serverName !== PLUGIN_NAME)
       throw new Error(`Expected the server to be named ${PLUGIN_NAME}, got ${serverName}.`)
     const { tools } = await client.listTools()
-    console.log(`The MCP server ${serverName} lists ${tools.length} tools.`)
+    console.log(
+      `The MCP server ${serverName} lists ${tools.length} tools: ${tools.map((tool) => tool.name).join(", ")}.`,
+    )
 
     const result = await client.callTool({ name: UNKNOWN_TOOL })
     const [block] = result.content
