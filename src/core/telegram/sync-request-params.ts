@@ -5,10 +5,12 @@ import {
   AROUND_LIMIT,
   FETCH_PAGE_LIMIT,
   HISTORY_LIMIT,
+  SYNC_LIST_LIMIT,
   TOPICS_LIMIT,
   type AroundParams,
   type FetchParams,
   type HistoryParams,
+  type SyncChangeParams,
   type TopicsOffset,
   type TopicsParams,
 } from "./service-requests"
@@ -21,6 +23,7 @@ const TOPICS_KEYS = ["chat", "limit", "offset"]
 const OFFSET_KEYS = ["date", "id", "topic"]
 const AROUND_KEYS = ["chat", "id", "before_count", "after_count", "topic"]
 const FETCH_KEYS = ["chat", "pages"]
+const SYNC_CHANGE_KEYS = ["chats"]
 
 function invalid(message: string): ToolError {
   return new ToolError("invalid_argument", message)
@@ -131,6 +134,18 @@ export function parseFetchParams(params: unknown): FetchParams {
     chat: chatAt(fields),
     pages: numberAt(fields, "pages", isLimitUpTo(FETCH_PAGE_LIMIT), `an integer from 1 to ${FETCH_PAGE_LIMIT}`),
   }
+}
+
+/** The parameters of a `sync_add` or `sync_remove` request, checked; anything off is `invalid_argument`. */
+export function parseSyncChangeParams(params: unknown): SyncChangeParams {
+  const fields = recordOf(params, SYNC_CHANGE_KEYS, "The sync list parameters")
+  const { chats } = fields
+  if (!Array.isArray(chats) || chats.length < 1 || chats.length > SYNC_LIST_LIMIT) {
+    throw invalid(`chats must be a list of 1 to ${SYNC_LIST_LIMIT} chat ids.`)
+  }
+  if (!chats.every(isChatId)) throw invalid("chats must hold chat ids as text.")
+  if (new Set(chats).size !== chats.length) throw invalid("chats must not name a chat twice.")
+  return { chats }
 }
 
 /** Checks that a request that takes no parameters got none. */

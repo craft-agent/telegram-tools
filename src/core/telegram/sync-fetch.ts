@@ -9,6 +9,7 @@ import { floodWaitSecondsOf, isSessionEnded } from "./rpc-errors"
 import { StorageFailure, writing } from "./sync-ending"
 import type { ResolvedSyncOptions } from "./sync-options"
 import { errorLabel } from "./sync-outcome"
+import { isListable, markSeeded } from "./sync-list"
 import type { SyncTelegram } from "./sync-telegram"
 import { waitThrough } from "./sync-wait"
 
@@ -133,13 +134,21 @@ function newestStored(mirror: Mirror, chat: string): number | null {
   return row.id
 }
 
-/** The followed chats with no stored messages whose last activity is at or after `since`, the most recent first. */
+/**
+ * The followed chats to seed: first the listed ones not seeded yet, whatever
+ * their last activity, then the unlisted ones with no stored messages whose
+ * last activity is at or after `since`; the most recent first within each.
+ */
 function seedCandidates(mirror: Mirror, since: number): string[] {
   const rows = mirror
     .prepare(
-      `SELECT id FROM chats
-       WHERE followed = 1 AND last_ts >= ? AND NOT EXISTS (SELECT 1 FROM messages WHERE messages.chat = chats.id)
-       ORDER BY last_ts DESC`,
+      `SELECT chats.id AS id FROM chats LEFT JOIN sync_list ON sync_list.chat = chats.id
+       WHERE chats.followed = 1 AND (
+         (sync_list.chat IS NOT NULL AND sync_list.seeded IS NULL)
+         OR (sync_list.chat IS NULL AND chats.last_ts >= ?
+             AND NOT EXISTS (SELECT 1 FROM messages WHERE messages.chat = chats.id))
+       )
+       ORDER BY (sync_list.chat IS NOT NULL AND sync_list.seeded IS NULL) DESC, chats.last_ts DESC`,
     )
     .all(since) as { id: string }[]
   return rows.map((row) => row.id)
@@ -166,11 +175,12 @@ export async function fillGaps(ctx: BackgroundContext, dialogs: ChatInput[]): Pr
 }
 
 /**
- * One seeding round: followed chats with no stored messages and some activity
- * within `seedWithinMs` get their newest `seedCount` messages, at most
- * `seedChatsPerRound` chats. A failed chat is tried again next round, up to
- * `seedAttempts` times; a flood wait is waited out and does not count as a
- * try. Returns how many chats were seeded.
+ * One seeding round: listed chats not seeded yet, then followed chats with no
+ * stored messages and some activity within `seedWithinMs`, get their newest
+ * `seedCount` messages, at most `seedChatsPerRound` chats. A listed chat is
+ * marked seeded once its fetch succeeded, even with no message. A failed chat
+ * is tried again next round, up to `seedAttempts` times; a flood wait is
+ * waited out and does not count as a try. Returns how many chats were seeded.
  */
 export async function seedRound(ctx: BackgroundContext, tries: SeedTries): Promise<number> {
   const { mirror, settings, signal } = ctx
@@ -189,7 +199,14 @@ export async function seedRound(ctx: BackgroundContext, tries: SeedTries): Promi
       continue
     }
     storeFetched(ctx, chat, messages)
-    tries.set(chat, settings.seedAttempts)
+    const kind = findChat(mirror, chat)?.kind
+    if (kind && isListable(kind)) {
+      // The list records a seed, so a chat removed and listed anew is seeded again within the run.
+      writing(() => markSeeded(mirror, chat, settings.now()))
+      tries.delete(chat)
+    } else {
+      tries.set(chat, settings.seedAttempts)
+    }
     seeded++
   }
   return seeded
