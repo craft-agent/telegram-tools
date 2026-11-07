@@ -1,11 +1,11 @@
 {
-  "name": "craftsamo",
+  "name": "craft-agent",
   "interface": {
     "displayName": "craftsamo"
   },
   "plugins": [
     {
-      "name": "agent-tool-starter",
+      "name": "telegram-tools",
       "source": {
         "source": "local",
         "path": "./"
