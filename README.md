@@ -130,6 +130,18 @@ Add the server to the host's MCP configuration. Flags go in `args`:
 
 Each toolset comes with a skill that tells an agent how to use its tools.
 
+### Account (`account`)
+
+| Tool                    | What it does                                                                                                                                  | Class |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| `telegram_account_read` | which labels are logged in, whether each sync service runs, when it last heard from Telegram, the mirror's counts, and the person's next step | read  |
+
+It reads local state only: no daemon, no network, and no phone number, account
+id or key in its result. The skill is
+[`telegram-account`](skills/telegram-account/SKILL.md), shown as
+`telegram-tools:telegram-account` in Claude Code and `telegram-tools:account`
+in Hermes.
+
 ## Adding a tool
 
 1. Write the spec in `src/core/<domain>/<verb>.ts` with `defineTool`: an ID
@@ -184,16 +196,16 @@ Where a write is asked about, and where it is not:
 Every entry point takes the same settings. A flag wins over its environment
 variable, and an option or setting wins over the variable too.
 
-| Setting             | Flag                  | Variable                           | Meaning                                                                       |
-| ------------------- | --------------------- | ---------------------------------- | ----------------------------------------------------------------------------- |
-| `toolsets`          | `--toolsets`          | `TELEGRAM_TOOLS_TOOLSETS`          | the toolsets that are on, or `all`; default those `src/project.ts` names      |
-| `read_only`         | `--read-only`         | `TELEGRAM_TOOLS_READ_ONLY`         | registers no tool that writes; wins over every other setting                  |
-| `tools`             | `--tools`             | `TELEGRAM_TOOLS_TOOLS`             | single tools to add by ID, whatever their toolset                             |
-| `exclude_tools`     | `--exclude-tools`     | `TELEGRAM_TOOLS_EXCLUDE_TOOLS`     | single tools to remove by ID; wins over `tools` and `toolsets`                |
-| `confirm`           | `--confirm`           | `TELEGRAM_TOOLS_CONFIRM`           | MCP server only: `harness` (default) or `elicitation`, as the conventions say |
-| `state_dir`         | `--state-dir`         | `TELEGRAM_TOOLS_STATE_DIR`         | where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`     |
-| `keep_disappearing` | `--keep-disappearing` | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | keep disappearing and view-once messages for the user; off by default         |
-| `channels`          | `--channels`          | `TELEGRAM_TOOLS_CHANNELS`          | list, read, mirror and send to channels; off by default, see below            |
+| Setting             | Flag                  | Variable                           | Meaning                                                                                                                                                    |
+| ------------------- | --------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `toolsets`          | `--toolsets`          | `TELEGRAM_TOOLS_TOOLSETS`          | the toolsets that are on, or `all`; default those `src/project.ts` names                                                                                   |
+| `read_only`         | `--read-only`         | `TELEGRAM_TOOLS_READ_ONLY`         | registers no tool that writes; wins over every other setting                                                                                               |
+| `tools`             | `--tools`             | `TELEGRAM_TOOLS_TOOLS`             | single tools to add by ID, whatever their toolset                                                                                                          |
+| `exclude_tools`     | `--exclude-tools`     | `TELEGRAM_TOOLS_EXCLUDE_TOOLS`     | single tools to remove by ID; wins over `tools` and `toolsets`                                                                                             |
+| `confirm`           | `--confirm`           | `TELEGRAM_TOOLS_CONFIRM`           | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                                              |
+| `state_dir`         | `--state-dir`         | `TELEGRAM_TOOLS_STATE_DIR`         | where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`                                                                                  |
+| `keep_disappearing` | `--keep-disappearing` | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | keep disappearing and view-once messages for the user; off by default; read by `sync` and `service install`, run `service install` again after changing it |
+| `channels`          | `--channels`          | `TELEGRAM_TOOLS_CHANNELS`          | list, read, mirror and send to channels; off by default, see below; read by `sync` and `service install`, run `service install` again after changing it    |
 
 Lists are comma-separated in a flag or a variable. Where each harness reads them:
 
@@ -258,6 +270,70 @@ data.
   starts following a chat.
 - **A new login is shown to your other devices**, and Telegram ends sessions
   unused for the period set under the account's settings.
+
+### Logging in and running the sync service
+
+Before you start, register an app at [my.telegram.org](https://my.telegram.org)
+(API development tools) to get an `api_id` and `api_hash`. The tools need
+[Node.js](https://nodejs.org/) 24 or later. macOS and Linux are supported.
+
+```sh
+# Log in: on your phone, open Telegram > Settings > Devices > Link Desktop Device,
+# and scan the QR code this prints.
+telegram-tools-cli login --account work
+
+# Start receiving at logon, and restart after a failure.
+telegram-tools-cli service install --account work
+telegram-tools-cli service status --account work
+```
+
+`--account` may be left out when only one label exists (`login` names a new
+one `default`), and every command takes `--state-dir` like the tools.
+
+| Command                                                       | What it does                                                                                                    |
+| ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `login [--account <label>] [--phone \| --telethon]`           | logs in by QR code (default), phone and code (`--phone`), or Telethon v1 string session (`--telethon`)          |
+| `sync [--account <label>] [--keep-disappearing] [--channels]` | runs the sync service in the foreground, logging to standard error, until it is stopped                         |
+| `service install \| uninstall \| status [--account <label>]`  | registers the sync service as a launchd agent (macOS) or a systemd user unit (Linux), removes it, or reports it |
+| `logout [--account <label>]`                                  | ends the session at Telegram and keeps the mirror, while removing local session storage                         |
+| `remove --account <label> [--yes]`                            | uninstalls the service and permanently deletes the label's directory, after `--yes` or typing the label back    |
+
+- **Logging in**: `login` shows a QR code by default. Scan it in Telegram on
+  your phone under Settings → Devices → Link Desktop Device. `--phone` logs in
+  with your phone number and login code; `--telethon` imports a Telethon v1
+  string session, read without echo on a terminal or from standard input. If
+  your account uses a two-step verification password, `login` asks for it
+  without echo. `TELEGRAM_TOOLS_API_ID` and `TELEGRAM_TOOLS_API_HASH` are used
+  when set in the environment; otherwise `login` asks for them (the hash
+  without echo) and saves them in `<state_dir>/<label>/app.json` (mode 0600).
+- **What the service does**: at first start, the service fetches the chat list
+  and seeds the newest 50 messages of chats active in the last 30 days, a few
+  at a time and paced to avoid flood limits. After that, every update is stored
+  in the mirror as it arrives, the chat list is refreshed every 30 minutes, and
+  gaps in message history are filled. Supergroups are listed but not mirrored
+  until the sync list tools come; channels are listed and mirrored only when
+  `channels` is turned on.
+- **Where it logs**: on macOS, the service writes its log to the file under
+  `~/Library/Logs/io.github.craft-agent.telegram-tools/<label>.log` that
+  `service install` prints. On Linux, it logs to the systemd user journal
+  (`journalctl --user -u <unit>` as `service status` shows); run
+  `loginctl enable-linger` to keep the service running after you log out.
+- **Service updates and restarts**: `service install` records this package's
+  executable path, so run `service install` again after updating the package or
+  changing `keep_disappearing` or `channels`. The service restarts after a
+  failure a minute later, but stays down after Telegram ends the session.
+- **One connection per label**: Telegram can revoke an auth key that connects
+  from two places at once. `login`, `logout` and `remove` refuse while the
+  service runs; stop it first (`service uninstall`, or stop foreground `sync`).
+- **Logging out and removing**: `logout` ends the session at Telegram and keeps
+  the mirror, removing only the session storage. `remove` uninstalls the
+  service and permanently deletes the label's directory. If Telegram cannot be
+  reached, the session is removed locally; end the session in Telegram under
+  Settings → Devices.
+- **Device sessions**: a new login shows on your other devices. Telegram ends
+  a session unused for the period set under Settings → Privacy and Security →
+  "If away for"; then log in again. `telegram_account_read` tells an agent
+  which step a label needs.
 
 ### Unofficial, and what Telegram's terms say
 
