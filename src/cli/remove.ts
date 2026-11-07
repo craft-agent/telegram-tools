@@ -2,7 +2,7 @@ import { existsSync } from "node:fs"
 import { isToolError } from "../core"
 import { checkLabel, labelPaths } from "../core/telegram/labels"
 import { removeLabel } from "../core/telegram/removal"
-import { defaultServiceHost, uninstallService } from "../core/telegram/service-host"
+import { defaultServiceHost, removeServiceLog, uninstallService } from "../core/telegram/service-host"
 import { handleCommandError, parseCommandStateDir, parseFlagArgs, printCommandError, usageError } from "./command-args"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, type CommandIo } from "./command-io"
 import { END_SESSION_HINT } from "./logout"
@@ -85,6 +85,7 @@ export async function runRemoveCommand(argv: string[], io: CommandIo): Promise<n
         }
       },
     })
+    await removeServiceLog(SERVICE_ID, label, host)
 
     io.stdout(`Removed "${label}".\n`)
     if (wasLoggedIn) io.stdout(`The session was not ended at Telegram; ${END_SESSION_HINT}.\n`)

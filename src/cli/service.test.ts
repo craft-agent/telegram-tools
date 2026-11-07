@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { readdirSync, readFileSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
 import { PROJECT } from "../project"
 import { fakeHost, harness, type Harness } from "./commands.testing"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, type CommandIo } from "./command-io"
@@ -137,6 +138,22 @@ describe("service uninstall and status", () => {
     const t = setUp()
     expect(await runServiceCommand(["uninstall", "--account", "work", "--state-dir", t.stateDir], t.io)).toBe(EXIT_OK)
     expect(t.out()).toBe('Uninstalled sync service for "work".\n')
+  })
+
+  test("uninstall leaves the service's log in place", async () => {
+    const t = setUp()
+    const home = mkdtempSync(join(tmpdir(), "tg-home-"))
+    try {
+      t.io.serviceHost = fakeHost(home)
+      const log = join(home, "Library", "Logs", SERVICE_ID, "work.log")
+      mkdirSync(dirname(log), { recursive: true })
+      writeFileSync(log, "line\n")
+
+      expect(await runServiceCommand(["uninstall", "--account", "work", "--state-dir", t.stateDir], t.io)).toBe(EXIT_OK)
+      expect(readFileSync(log, "utf8")).toBe("line\n")
+    } finally {
+      rmSync(home, { recursive: true, force: true })
+    }
   })
 
   test("status reports whether it is installed and running", async () => {

@@ -1,11 +1,12 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, rm, stat } from "node:fs/promises"
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join } from "node:path"
 import {
   buildLaunchdPlist,
   installLaunchdService,
   launchdServiceStatus,
+  removeLaunchdServiceLog,
   uninstallLaunchdService,
   xmlEscape,
 } from "./service-launchd"
@@ -21,6 +22,13 @@ const BASE_SPEC: ServiceSpec = {
   program: "/bin/node",
   args: ["sync"],
   path: "/bin",
+}
+
+async function exists(path: string): Promise<boolean> {
+  return stat(path).then(
+    () => true,
+    () => false,
+  )
 }
 
 function createFakeHost(
@@ -189,6 +197,65 @@ describe("service-launchd", () => {
         () => true,
       )
       expect(gone).toBe(true)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("removeLaunchdServiceLog deletes the log and its empty directory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host } = createFakeHost(dir)
+      const { log } = await installLaunchdService({ ...BASE_SPEC, label: "default" }, host)
+      await writeFile(log, "line\n")
+
+      await removeLaunchdServiceLog(ID, "default", host)
+
+      expect(await exists(log)).toBe(false)
+      expect(await exists(dirname(log))).toBe(false)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("removeLaunchdServiceLog leaves another label's log and the directory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host } = createFakeHost(dir)
+      const first = await installLaunchdService({ ...BASE_SPEC, label: "default" }, host)
+      const second = await installLaunchdService({ ...BASE_SPEC, label: "work" }, host)
+      await writeFile(first.log!, "one\n")
+      await writeFile(second.log!, "two\n")
+
+      await removeLaunchdServiceLog(ID, "default", host)
+
+      expect(await exists(first.log!)).toBe(false)
+      expect(await readFile(second.log!, "utf8")).toBe("two\n")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("removeLaunchdServiceLog does not throw when nothing exists", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host } = createFakeHost(dir)
+      await removeLaunchdServiceLog(ID, "default", host)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("uninstallLaunchdService keeps the log", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host } = createFakeHost(dir)
+      const { log } = await installLaunchdService({ ...BASE_SPEC, label: "default" }, host)
+      await writeFile(log, "line\n")
+
+      await uninstallLaunchdService(ID, "default", host)
+
+      expect(await readFile(log, "utf8")).toBe("line\n")
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
