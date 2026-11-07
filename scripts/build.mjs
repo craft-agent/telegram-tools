@@ -17,6 +17,7 @@ await build({
   entryPoints: ["src/cli/main.ts"],
   outfile: "dist/cli.js",
   banner: { js: "#!/usr/bin/env node" },
+  define: { __VERSION__: JSON.stringify(version) },
 })
 
 await build({
