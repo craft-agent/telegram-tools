@@ -42,6 +42,11 @@ describe("chat read: arguments", () => {
     [{ method: "topics", chat: SUPERGROUP, topic: 1 }, "topic does not apply to the topics method"],
     [{ method: "topics", chat: SUPERGROUP, refresh: true }, "refresh does not apply to the topics method"],
     [{ method: "topics", chat: SUPERGROUP, query: "x" }, "query does not apply to the topics method"],
+    [
+      { method: "search", query: "x", topic: 1 },
+      "topic does not apply to the search method; it takes query, chat, after, before, limit, cursor",
+    ],
+    [{ method: "search", query: "x", unread: false }, "unread does not apply to the search method"],
   ])("refuses an argument of the other method %j", async (args, message) => {
     fillSampleChats(t)
     const error = await t.failure(args)
@@ -59,10 +64,21 @@ describe("chat read: arguments", () => {
     const topics = { method: "topics", account: "default", chat: SUPERGROUP, limit: 5 }
     await t.serve({ topics: () => ({ topics: [] }) })
     expect((await t.read(topics)).topics).toEqual([])
+    const search = {
+      method: "search",
+      account: "default",
+      query: "hello",
+      chat: USER,
+      after: "1969-01-01",
+      before: "2020-01-01",
+      limit: 5,
+    }
+    expect((await t.read(search)).messages).toHaveLength(1)
   })
 
   test.each([
     {},
+    { method: "send" },
     { method: "search" },
     { method: "around" },
     { method: "list", extra: 1 },

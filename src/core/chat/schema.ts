@@ -6,7 +6,7 @@ import { localTimeSchema } from "../time"
 import { messageEntry } from "./message-schema"
 
 /** The methods of `telegram_chat_read`. */
-export const METHODS = ["list", "view", "topics"] as const
+export const METHODS = ["list", "view", "topics", "search"] as const
 /** A method supported by `telegram_chat_read`. */
 export type Method = (typeof METHODS)[number]
 
@@ -18,6 +18,7 @@ export const LIMITS = {
   list: { default: 30, max: 200 },
   view: { default: 50, max: 300 },
   topics: { default: 30, max: TOPICS_LIMIT },
+  search: { default: 30, max: 200 },
 } as const satisfies Partial<Record<Method, LimitRule>>
 
 /** The input schema for `telegram_chat_read`. */
@@ -25,14 +26,14 @@ export const input = z.object({
   method: z
     .enum(METHODS)
     .describe(
-      "`list` finds chats; `view` reads the newest messages of one chat between two times, oldest first; `topics` lists the topics of a forum chat.",
+      "`list` finds chats; `view` reads the newest messages of one chat between two times, oldest first; `topics` lists the topics of a forum chat; `search` finds messages in the mirror by words.",
     ),
   account: z.string().optional().describe("The account label; may be left out when only one account is logged in."),
   query: z
     .string()
     .optional()
     .describe(
-      "list: only chats whose name or username holds this text; a leading @ is ignored. Ignores case and letter width.",
+      "list: only chats whose name or username holds this text; a leading @ is ignored. search (required): the words to look for, all of which a message must hold in its text, caption or file name, in any order. Both ignore case and letter width.",
     ),
   unread: z.boolean().optional().describe("list: only chats with unread messages."),
   last: z.boolean().optional().describe("list: add each chat's newest mirrored message as `last_message`."),
@@ -46,7 +47,7 @@ export const input = z.object({
     .string()
     .optional()
     .describe(
-      "view, topics (required): the chat id, from `list`, such as 123456789 or -1001234567890. A name, username or phone number is not a chat.",
+      "view, topics (required) and search (optional, to search one chat): the chat id, from `list`, such as 123456789 or -1001234567890. A name, username or phone number is not a chat.",
     ),
   topic: z
     .number()
@@ -60,18 +61,18 @@ export const input = z.object({
     .string()
     .optional()
     .describe(
-      "view: only messages after this time (exclusive): RFC 3339 with an offset, or a date or time without one, read as local time, such as 2026-11-07 or 2026-11-07T14:03.",
+      "view, search: only messages after this time (exclusive): RFC 3339 with an offset, or a date or time without one, read as local time, such as 2026-11-07 or 2026-11-07T14:03.",
     ),
   before: z
     .string()
     .optional()
-    .describe("view: only messages before this time (exclusive); the same forms as `after`."),
+    .describe("view, search: only messages before this time (exclusive); the same forms as `after`."),
   limit: z
     .number()
     .int()
     .optional()
     .describe(
-      `How many to return. list: default ${LIMITS.list.default}, at most ${LIMITS.list.max}. view: default ${LIMITS.view.default}, at most ${LIMITS.view.max} (${HISTORY_LIMIT} for a chat read live). topics: default ${LIMITS.topics.default}, at most ${LIMITS.topics.max}. A larger value is lowered to the most; a result may hold fewer to stay a size a model can read.`,
+      `How many to return. list: default ${LIMITS.list.default}, at most ${LIMITS.list.max}. view: default ${LIMITS.view.default}, at most ${LIMITS.view.max} (${HISTORY_LIMIT} for a chat read live). topics: default ${LIMITS.topics.default}, at most ${LIMITS.topics.max}. search: default ${LIMITS.search.default}, at most ${LIMITS.search.max}. A larger value is lowered to the most; a result may hold fewer to stay a size a model can read.`,
     ),
   cursor: z.string().optional().describe("The `next` of the previous result, to continue where it stopped."),
 })
@@ -133,12 +134,21 @@ export const output = z.object({
     .optional()
     .describe("list with `refresh`: when the chat list was taken from Telegram, in local time with offset."),
   chat: chatEntry.optional().describe("view, topics: the chat read."),
-  messages: z.array(messageEntry).optional().describe("view: the messages, oldest first."),
+  messages: z
+    .array(messageEntry)
+    .optional()
+    .describe("view: the messages, oldest first. search: the hits, newest first."),
   live: z
     .literal(true)
     .optional()
     .describe("view: set when the chat is not mirrored, so the messages were read from Telegram and stored nowhere."),
   topics: z.array(topicEntry).optional().describe("topics: the topics, most recently active first."),
+  scanned_to: localTimeSchema
+    .optional()
+    .describe(
+      "search: set when the search stopped before the end of the history it covers: the time of the oldest message looked at, in local time with offset. `next` continues from there.",
+    ),
+  scope: z.string().optional().describe("search: what the search covers and what it does not."),
   next: z.string().optional().describe("Pass back as `cursor` to continue; absent when there is no more."),
   note: z.string().describe("Says that what the result carries is data written by other people."),
 })

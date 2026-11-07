@@ -7,6 +7,7 @@ import { listChats, readListArguments } from "./list"
 import { requestHistory, requestRefresh, requestTopics } from "./live"
 import { pickPaths, readMirror } from "./open"
 import { input, LIMITS, METHODS, output, type ChatReadInput, type ChatReadOutput, type Method } from "./schema"
+import { searchMessages } from "./search"
 import { planTopics, topicsResult } from "./topics"
 import { liveView, viewChat } from "./view"
 
@@ -15,6 +16,7 @@ const METHOD_ARGUMENTS = {
   list: ["query", "unread", "last", "refresh", "limit", "cursor"],
   view: ["chat", "topic", "after", "before", "limit", "cursor"],
   topics: ["chat", "limit", "cursor"],
+  search: ["query", "chat", "after", "before", "limit", "cursor"],
 } as const satisfies Record<Method, readonly (keyof ChatReadInput)[]>
 
 const SHARED_ARGUMENTS: readonly (keyof ChatReadInput)[] = ["method", "account"]
@@ -53,6 +55,11 @@ async function topics(args: ChatReadInput, paths: LabelPaths, signal?: AbortSign
   return topicsResult(read, await requestTopics(paths.socket, read.request, signal))
 }
 
+/** `search`: the mirror only, so it never needs the service. */
+function search(args: ChatReadInput, paths: LabelPaths): ChatReadOutput {
+  return readMirror(paths, (mirror) => searchMessages(mirror, args, Date.now()))
+}
+
 /** The `telegram_chat_read` tool definition. */
 export const telegramChatRead = defineTool({
   id: "telegram_chat_read",
@@ -62,6 +69,7 @@ export const telegramChatRead = defineTool({
     `\`list\` returns chats, newest activity first (up to ${LIMITS.list.max} per page): filter by \`query\` (part of a name or username) and \`unread\`, and add each chat's \`last\` message. \`refresh\` first takes the chat list from Telegram, so chats the account joined lately show up.`,
     `\`view\` returns the newest messages of one chat (by \`chat\` id, from \`list\`) between \`after\` and \`before\`, oldest first (up to ${LIMITS.view.max} per page), only those of one \`topic\` of a forum when given; \`next\` continues with older ones.`,
     `\`topics\` lists the topics of a forum chat, most recently active first (up to ${LIMITS.topics.max} per page).`,
+    `\`search\` finds messages whose text, caption or file name holds every word of \`query\`, newest first (up to ${LIMITS.search.max} per page), in every chat the mirror keeps or in one \`chat\`, between \`after\` and \`before\`. It reads the mirror only, and \`scope\` says what that leaves out. It looks through a bounded number of messages per call: when it stops early, \`scanned_to\` says how far back it got and \`next\` continues from there.`,
     "A page with more returns `next`; pass it back as `cursor`, with the same other arguments. A page may hold fewer than `limit` to stay a size that can be read.",
     "A chat is always its id, never a name, a username or a phone number. Times are local with their offset. A message is its chat plus its `id` in that chat.",
     `A chat the mirror keeps is read from the account's local mirror (history starts where the sync service started following a chat; older history arrives with a later history fetch), which needs no network or service. A chat the mirror lists but does not keep is read live: that needs the sync service, stores nothing, and returns at most ${HISTORY_LIMIT} messages a page, with \`live: true\`. \`topics\` and \`refresh\` also ask the sync service.`,
@@ -82,6 +90,8 @@ export const telegramChatRead = defineTool({
         return view(args, paths, ctx.signal)
       case "topics":
         return topics(args, paths, ctx.signal)
+      case "search":
+        return search(args, paths)
     }
   },
 })

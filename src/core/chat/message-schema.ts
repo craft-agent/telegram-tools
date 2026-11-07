@@ -59,6 +59,8 @@ export const OMITTABLE_FIELDS = ["earlier_versions", "reactions", "links", "medi
  */
 export const messageEntry = z.object({
   id: z.number().int().describe("The message's id in its chat."),
+  chat: z.string().optional().describe("search: the id of the chat the message is in."),
+  chat_name: z.string().optional().describe("search: the name of that chat, when it has one."),
   time: localTimeSchema.describe("When it was sent, in local time with offset."),
   from: z
     .string()
