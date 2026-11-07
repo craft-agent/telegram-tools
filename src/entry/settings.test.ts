@@ -1,7 +1,13 @@
 import { describe, expect, test } from "bun:test"
 import { PROJECT } from "../project"
 import type { EntryProfile } from "./profile"
-import { parseServiceSettings, parseSettings, parseToolSettings, settingVariables } from "./settings"
+import {
+  forwardedVariables,
+  parseServiceSettings,
+  parseSettings,
+  parseToolSettings,
+  settingVariables,
+} from "./settings"
 import { failure, profile } from "./settings.testing"
 
 const parse = (argv: string[], env: Record<string, string | undefined> = {}) => parseSettings(argv, env, profile)
@@ -24,6 +30,16 @@ describe("settingVariables", () => {
 
   test("uses the package's own prefix by default", () => {
     expect(settingVariables()).toEqual(settingVariables({ ...profile, envPrefix: PROJECT.envPrefix }))
+  })
+})
+
+describe("forwardedVariables", () => {
+  test("lists the settings' variables, then the tool variables", () => {
+    expect(forwardedVariables(profile, ["XDG_STATE_HOME"])).toEqual([...settingVariables(profile), "XDG_STATE_HOME"])
+  })
+
+  test("uses the package's own prefix and toolVariables by default", () => {
+    expect(forwardedVariables()).toEqual([...settingVariables(), ...PROJECT.toolVariables])
   })
 })
 
