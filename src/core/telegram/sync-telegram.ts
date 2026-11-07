@@ -1,5 +1,6 @@
 import type { TelegramClient } from "@mtcute/core/client.js"
 import type { AppCredentials } from "./app"
+import type { FreezableStorage } from "./client"
 
 /**
  * The part of mtcute's client the sync service uses, so a fake can stand in
@@ -19,7 +20,8 @@ export type SyncTelegram = Pick<
   | "onHistoryRead"
   | "onConnectionState"
   | "onError"
->
+> &
+  FreezableStorage
 
 /** Builds the client for the label's session with the app's credentials; it does not connect until it is used. */
 export type OpenClient = (app: AppCredentials) => SyncTelegram

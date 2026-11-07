@@ -18,6 +18,12 @@ export type TelegramClientSettings = {
   log: (line: string) => void
 }
 
+/** A client's hold on its session storage. */
+export type FreezableStorage = {
+  /** Makes every later write to the session storage throw, so the persisted update state stops where it is. */
+  freezeStorage(): void
+}
+
 /** The language Telegram is told the client speaks. */
 const LANGUAGE_CODE = "en"
 
@@ -30,12 +36,13 @@ const LANGUAGE_CODE = "en"
  * (a call may still pass `floodSleepThreshold`), while internal server errors
  * are retried as mtcute does by default.
  */
-export function createTelegramClient(settings: TelegramClientSettings): TelegramClient {
+export function createTelegramClient(settings: TelegramClientSettings): TelegramClient & FreezableStorage {
   const { storagePath, apiId, apiHash, device, log } = settings
-  return new TelegramClient({
+  const storage = new TelegramStorage(storagePath)
+  const client = new TelegramClient({
     apiId,
     apiHash,
-    storage: new TelegramStorage(storagePath),
+    storage,
     crypto: new WasmCryptoProvider(),
     transport: new TcpTransport(),
     platform: createPlatform(log),
@@ -49,4 +56,5 @@ export function createTelegramClient(settings: TelegramClientSettings): Telegram
     updates: { catchUp: true },
     network: { middlewares: networkMiddlewares.basic({ floodWaiter: { maxWait: 0 } }) },
   })
+  return Object.assign(client, { freezeStorage: () => storage.freeze() })
 }

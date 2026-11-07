@@ -71,6 +71,50 @@ describe("runSync stopping", () => {
     expectNothingLeft()
   })
 
+  describe("when the stop does not wait for a slow start", () => {
+    const unhandled: unknown[] = []
+    const onUnhandled = (reason: unknown) => void unhandled.push(reason)
+
+    beforeEach(() => {
+      unhandled.length = 0
+      process.on("unhandledRejection", onUnhandled)
+    })
+
+    afterEach(() => {
+      process.off("unhandledRejection", onUnhandled)
+    })
+
+    test("a stop during a slow connect leaves no socket and no unhandled rejection", async () => {
+      fixture.client.holdConnect()
+      const { stop, outcome } = fixture.start({ stopWaitMs: 0 })
+      await eventually(() => fixture.client.argsOf("connect").length === 1)
+
+      stop()
+
+      expect(await outcome).toEqual({ exitCode: 0, status: "stopped" })
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(existsSync(fixture.paths.socket)).toBe(false)
+      expect(unhandled).toEqual([])
+    })
+
+    test("a stop while the socket is being opened still closes it, and rejects nothing", async () => {
+      const startUpdatesLoop = fixture.client.startUpdatesLoop.bind(fixture.client)
+      let stopRun = () => {}
+      fixture.client.startUpdatesLoop = async () => {
+        await startUpdatesLoop()
+        setImmediate(() => stopRun())
+      }
+      const { stop, outcome } = fixture.start({ stopWaitMs: 0 })
+      stopRun = stop
+
+      expect(await outcome).toEqual({ exitCode: 0, status: "stopped" })
+      await eventually(() => !existsSync(fixture.paths.socket))
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(existsSync(fixture.paths.socket)).toBe(false)
+      expect(unhandled).toEqual([])
+    })
+  })
+
   test("a client that never finishes being destroyed does not hold the end back", async () => {
     fixture.client.destroy = () => new Promise(() => {})
     const { stop, outcome } = await fixture.running({ stopWaitMs: 100 })
@@ -145,6 +189,33 @@ describe("runSync when it cannot go on", () => {
     expect(fixture.meta()).toMatchObject({ status: "failed", error: NOT_WRITABLE })
     expect(fixture.logs.filter((line) => line === NOT_WRITABLE)).toHaveLength(1)
     expectNothingLeft()
+  })
+
+  test("a mirror write failure freezes the session storage before the handler returns", async () => {
+    const order: string[] = []
+    const freezeStorage = fixture.client.freezeStorage.bind(fixture.client)
+    fixture.client.freezeStorage = () => {
+      order.push("freeze")
+      freezeStorage()
+    }
+    const { outcome } = await fixture.running()
+    fixture.seed((mirror) => mirror.exec("DROP TABLE messages"))
+
+    order.push("handler entered")
+    fixture.client.onNewMessage.emit(aliceMessage(1))
+    order.push("handler returned")
+
+    expect((await outcome).status).toBe("failed")
+    expect(order).toEqual(["handler entered", "freeze", "handler returned"])
+  })
+
+  test("a mirror that cannot be written by the upkeep freezes the session storage too", async () => {
+    const { outcome } = await fixture.running({ heartbeatEveryMs: 50 })
+
+    fixture.seed((mirror) => mirror.exec("DROP TABLE meta"))
+
+    expect((await outcome).status).toBe("failed")
+    expect(fixture.client.argsOf("freezeStorage")).toHaveLength(1)
   })
 
   test("a mirror that cannot be written by the upkeep fails the run too", async () => {

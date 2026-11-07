@@ -17,7 +17,8 @@ function newEmitter<E>(): E {
 }
 
 /** The client's methods the fake records and can make fail. */
-export type FakeMethod = "connect" | "getMe" | "startUpdatesLoop" | "iterDialogs" | "getHistory" | "destroy"
+export type FakeMethod =
+  "connect" | "getMe" | "startUpdatesLoop" | "iterDialogs" | "getHistory" | "destroy" | "freezeStorage"
 
 /** One call the service made: the method and its arguments. */
 export type FakeCall = { method: FakeMethod; arg?: unknown }
@@ -138,6 +139,9 @@ export function createFakeSyncClient(): FakeSyncClient {
         .sort((a, b) => b.id - a.id)
         .slice(0, params.limit ?? 100)
       return Object.assign(found, { total: found.length })
+    },
+    freezeStorage() {
+      record("freezeStorage")
     },
     async destroy() {
       client.destroyed = true

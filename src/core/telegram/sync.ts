@@ -35,6 +35,8 @@ const NOT_LOGGED_IN: SyncOutcome = { exitCode: 0, status: "not logged in" }
 type Session = {
   client?: SyncTelegram
   server?: ServiceServer
+  /** The socket being opened, which may settle after the run has shut down. */
+  serverStarting?: Promise<ServiceServer>
   /** The start-up, which settles once the service runs or has ended. */
   starting?: Promise<void>
   housekeeping?: Promise<void>
@@ -109,11 +111,12 @@ async function start(run: Run, session: Session): Promise<void> {
 
   await client.startUpdatesLoop()
   if (ending.settled) return
-  session.server = await serveService(
+  session.serverStarting = serveService(
     paths.socket,
     { status: async () => ({ connected: watch.connected, since: watch.since, account }) },
     { onError: (error, method) => log(`request failed: ${method} (${errorLabel(error)})`) },
   )
+  session.server = await session.serverStarting
   if (ending.settled) return
   writing(() => recordStatus(mirror, SYNC_STATUS.running, null, settings.now()))
   log("connected")
@@ -128,8 +131,11 @@ async function shutDown(run: Run, session: Session): Promise<void> {
   const { stopWaitMs } = settings
   receiver.halt()
   if (session.server) await settledOrTimeout(session.server.close(), stopWaitMs)
+  // A socket still being opened is closed when it is ready, even after the wait below has given up on it.
+  const lateClose = session.server ? undefined : session.serverStarting?.then((server) => server.close())
+  lateClose?.catch(() => {})
   if (session.client) await settledOrTimeout(session.client.destroy(), stopWaitMs)
-  await settledOrTimeout(Promise.all([session.starting, session.housekeeping]), stopWaitMs)
+  await settledOrTimeout(Promise.all([session.starting, session.housekeeping, lateClose]), stopWaitMs)
 }
 
 /** Everything from recording the start to the outcome, with the mirror open and the app's credentials read. */
@@ -138,6 +144,13 @@ async function syncWithMirror(mirror: Mirror, paths: LabelPaths, app: AppCredent
   const ending = new Ending()
   const watch = new ConnectionWatch(settings.now)
   const coverage = new Coverage(mirror, watch, settings.gapAfterMs, startedAt)
+  const session: Session = {}
+  let frozen = false
+  const freezeStorage = () => {
+    if (frozen) return
+    frozen = true
+    session.client?.freezeStorage()
+  }
   const receiver = new Receiver({
     mirror,
     now: settings.now,
@@ -145,10 +158,17 @@ async function syncWithMirror(mirror: Mirror, paths: LabelPaths, app: AppCredent
     channels: settings.channels,
     coverage,
     log: settings.log,
-    onStorageFailure: () => ending.end({ kind: "storage" }),
+    onStorageFailure: () => {
+      // Before the handler returns: mtcute has moved its update state past this update and saves it after the handler.
+      freezeStorage()
+      ending.end({ kind: "storage" })
+    },
   })
   const run: Run = { mirror, paths, app, settings, ending, receiver, watch, coverage }
-  const session: Session = {}
+  // A storage failure from elsewhere (the upkeep) freezes the session storage too, as soon as the run is known to end.
+  void ending.promise.then((ended) => {
+    if (ended.kind === "storage") freezeStorage()
+  })
   const stopListening = onAbort(settings.signal, () => ending.end({ kind: "stop" }))
   try {
     writing(() => recordStart(mirror, startedAt))
