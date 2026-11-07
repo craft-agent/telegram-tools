@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { floodWait, rpcError } from "./login.testing"
 import { failureOf } from "./service.testing"
 import { REFRESH_REUSE_MS } from "./sync-chat-refresh"
-import { FORUM, forumTopic, request, seedListedChats } from "./sync-requests.testing"
+import { FORUM, KEPT, forumTopic, request, seedListedChats } from "./sync-requests.testing"
 import { eventually, syncFixture, type SyncFixture } from "./sync.testing"
 
 let fixture: SyncFixture
@@ -15,8 +15,19 @@ beforeEach(() => {
 
 afterEach(() => fixture.close())
 
-/** The three requests that call Telegram, by the client method each makes. */
+/** The requests that call Telegram, by the client method each makes. */
 const CALLS = [
+  {
+    name: "a read around a message",
+    method: "getHistory",
+    send: () => request(fixture, "around", { chat: FORUM, id: 5, before_count: 1, after_count: 1 }),
+  },
+  {
+    name: "a topic read around a message",
+    method: "searchMessages",
+    send: () => request(fixture, "around", { chat: FORUM, id: 5, before_count: 1, after_count: 1, topic: 3 }),
+  },
+  { name: "a history fetch", method: "getHistory", send: () => request(fixture, "fetch", { chat: KEPT, pages: 2 }) },
   { name: "a live read", method: "getHistory", send: () => request(fixture, "history", { chat: FORUM, limit: 5 }) },
   {
     name: "a topic read",

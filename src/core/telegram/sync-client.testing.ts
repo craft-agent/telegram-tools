@@ -37,6 +37,22 @@ const EMITTERS = ["onNewMessage", "onEditMessage", "onDeleteMessage", "onHistory
 /** How many listeners each emitter had at a moment. */
 export type ListenerCounts = Record<(typeof EMITTERS)[number], number>
 
+/**
+ * The page Telegram gives out of `messages` for its paging arguments: newest
+ * first, starting below `offsetId` (exclusive; none means the newest), moved
+ * by `addOffset` messages (a negative one up over newer messages, to the
+ * newest at most), at most `limit` long.
+ */
+function windowOf(
+  messages: Message[],
+  { offsetId = 0, addOffset = 0, limit = 100 }: { offsetId?: number; addOffset?: number; limit?: number },
+): Message[] {
+  const newestFirst = [...messages].sort((a, b) => b.id - a.id)
+  const below = offsetId > 0 ? newestFirst.findIndex((message) => message.id < offsetId) : 0
+  const start = Math.max(0, (below === -1 ? newestFirst.length : below) + addOffset)
+  return newestFirst.slice(start, start + limit)
+}
+
 /** A fake mtcute client for the sync service, with the scripting and the record of a test. */
 export type FakeSyncClient = SyncTelegram & {
   /** Every call the service made, in order. */
@@ -164,21 +180,31 @@ export function createFakeSyncClient(): FakeSyncClient {
       await passGate("iterDialogs")
       yield* dialogs
     },
-    async getHistory(chat: unknown, params: { limit?: number; minId?: number } = {}) {
+    async getHistory(
+      chat: unknown,
+      params: { limit?: number; minId?: number; offset?: { id: number }; addOffset?: number } = {},
+    ) {
       record("getHistory", { chat, ...params })
       await passGate("getHistory")
-      const found = (history.get(Number(chat)) ?? [])
-        .filter((message) => message.id > (params.minId ?? 0))
-        .sort((a, b) => b.id - a.id)
-        .slice(0, params.limit ?? 100)
+      const found = windowOf(
+        (history.get(Number(chat)) ?? []).filter((message) => message.id > (params.minId ?? 0)),
+        { ...params, offsetId: params.offset?.id },
+      )
       return Object.assign(found, { total: found.length })
     },
-    async searchMessages(params: { chatId?: unknown; threadId?: number; limit?: number }) {
+    async searchMessages(params: {
+      chatId?: unknown
+      threadId?: number
+      limit?: number
+      offset?: number
+      addOffset?: number
+    }) {
       record("searchMessages", params)
       await passGate("searchMessages")
-      const found = (threads.get(`${Number(params.chatId)}:${params.threadId}`) ?? [])
-        .sort((a, b) => b.id - a.id)
-        .slice(0, params.limit ?? 100)
+      const found = windowOf(threads.get(`${Number(params.chatId)}:${params.threadId}`) ?? [], {
+        ...params,
+        offsetId: params.offset,
+      })
       return Object.assign(found, { total: found.length })
     },
     async getForumTopics(chat: unknown, params: { limit?: number; offset?: { topic: number } } = {}) {

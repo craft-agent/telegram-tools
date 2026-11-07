@@ -34,18 +34,22 @@ function contents(): string {
 
 const dataVersion = () => rowsOf(reader, "PRAGMA data_version")[0]
 
-test("reading a chat or its topics live writes nothing to the mirror and marks nothing read", async () => {
+test("reading a chat, a message's surroundings or the topics live writes nothing to the mirror and marks nothing read", async () => {
   const before = { contents: contents(), version: dataVersion() }
   const callsBefore = fixture.client.calls.length
 
   await request(fixture, "history", { chat: FORUM, limit: 10 })
   await request(fixture, "history", { chat: FORUM, limit: 10, topic: 7 })
   await request(fixture, "topics", { chat: FORUM, limit: 10 })
+  await request(fixture, "around", { chat: FORUM, id: 1, before_count: 1, after_count: 1 })
+  await request(fixture, "around", { chat: FORUM, id: 2, before_count: 1, after_count: 1, topic: 7 })
 
   expect({ contents: contents(), version: dataVersion() }).toEqual(before)
   expect(fixture.client.calls.slice(callsBefore).map((call) => call.method)).toEqual([
     "getHistory",
     "searchMessages",
     "getForumTopics",
+    "getHistory",
+    "searchMessages",
   ])
 })

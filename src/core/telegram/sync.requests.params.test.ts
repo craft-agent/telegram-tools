@@ -85,6 +85,62 @@ describe("topics parameters", () => {
   }
 })
 
+describe("around parameters", () => {
+  const ok = { chat: FORUM, id: 5, before_count: 2, after_count: 3 }
+  const bad: [string, unknown][] = [
+    ["no parameters", undefined],
+    ["no chat", { id: 5, before_count: 2, after_count: 3 }],
+    ["a chat that is a number", { ...ok, chat: 123 }],
+    ["no id", { chat: FORUM, before_count: 2, after_count: 3 }],
+    ["an id of 0", { ...ok, id: 0 }],
+    ["an id past what Telegram numbers", { ...ok, id: INT32_MAX + 1 }],
+    ["an id with a fraction", { ...ok, id: 1.5 }],
+    ["an id as text", { ...ok, id: "5" }],
+    ["no before_count", { chat: FORUM, id: 5, after_count: 3 }],
+    ["a negative before_count", { ...ok, before_count: -1 }],
+    ["a before_count over the most", { ...ok, before_count: 51 }],
+    ["a before_count with a fraction", { ...ok, before_count: 0.5 }],
+    ["a null before_count", { ...ok, before_count: null }],
+    ["no after_count", { chat: FORUM, id: 5, before_count: 2 }],
+    ["a negative after_count", { ...ok, after_count: -1 }],
+    ["an after_count over the most", { ...ok, after_count: 51 }],
+    ["an after_count as text", { ...ok, after_count: "1" }],
+    ["a topic of 0", { ...ok, topic: 0 }],
+    ["a topic as text", { ...ok, topic: "1" }],
+    ["a field it does not take", { ...ok, limit: 3 }],
+  ]
+
+  for (const [name, params] of bad) {
+    test(`refuses ${name}`, async () => {
+      expect(await refusal("around", params)).toMatchObject({ code: "invalid_argument" })
+      expect(telegramCalls()).toEqual([])
+    })
+  }
+})
+
+describe("fetch parameters", () => {
+  const ok = { chat: KEPT, pages: 2 }
+  const bad: [string, unknown][] = [
+    ["no parameters", undefined],
+    ["no chat", { pages: 2 }],
+    ["an empty chat", { ...ok, chat: "" }],
+    ["no pages", { chat: KEPT }],
+    ["0 pages", { ...ok, pages: 0 }],
+    ["more pages than the most", { ...ok, pages: 6 }],
+    ["pages with a fraction", { ...ok, pages: 1.5 }],
+    ["pages as text", { ...ok, pages: "2" }],
+    ["null pages", { ...ok, pages: null }],
+    ["a field it does not take", { ...ok, limit: 100 }],
+  ]
+
+  for (const [name, params] of bad) {
+    test(`refuses ${name}`, async () => {
+      expect(await refusal("fetch", params)).toMatchObject({ code: "invalid_argument" })
+      expect(telegramCalls()).toEqual([])
+    })
+  }
+})
+
 describe("refresh parameters", () => {
   for (const [name, params] of [
     ["a field", { force: true }],
@@ -108,6 +164,32 @@ describe("the chat a request names", () => {
       code: "invalid_argument",
       message: "This chat is mirrored; read it from the mirror.",
     })
+    expect(telegramCalls()).toEqual([])
+  })
+
+  test("a chat the mirror does not list is not found for a read around a message and for a fetch", async () => {
+    expect(await refusal("around", { chat: UNLISTED, id: 5, before_count: 1, after_count: 1 })).toMatchObject({
+      code: "not_found",
+    })
+    expect(await refusal("fetch", { chat: UNLISTED, pages: 1 })).toMatchObject({ code: "not_found" })
+    expect(telegramCalls()).toEqual([])
+  })
+
+  test("a chat the mirror keeps is read from the mirror, not around a message live", async () => {
+    expect(await refusal("around", { chat: KEPT, id: 5, before_count: 1, after_count: 1 })).toMatchObject({
+      code: "invalid_argument",
+      message: "This chat is mirrored; read it from the mirror.",
+    })
+    expect(telegramCalls()).toEqual([])
+  })
+
+  test("a chat the mirror does not keep has no history to fetch into it", async () => {
+    for (const chat of [FORUM, PLAIN]) {
+      expect(await refusal("fetch", { chat, pages: 1 })).toMatchObject({
+        code: "invalid_argument",
+        message: "This chat is not mirrored; read it live with view.",
+      })
+    }
     expect(telegramCalls()).toEqual([])
   })
 
