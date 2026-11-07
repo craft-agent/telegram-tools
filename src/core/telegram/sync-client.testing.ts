@@ -1,5 +1,5 @@
 import { createRequire } from "node:module"
-import type { ConnectionState, Dialog, Message, User } from "@mtcute/core"
+import type { ConnectionState, Dialog, ForumTopic, Message, User } from "@mtcute/core"
 import { fakeAccount } from "./login.testing"
 import type { SyncTelegram } from "./sync-telegram"
 
@@ -18,7 +18,15 @@ function newEmitter<E>(): E {
 
 /** The client's methods the fake records and can make fail. */
 export type FakeMethod =
-  "connect" | "getMe" | "startUpdatesLoop" | "iterDialogs" | "getHistory" | "destroy" | "freezeStorage"
+  | "connect"
+  | "getMe"
+  | "startUpdatesLoop"
+  | "iterDialogs"
+  | "getHistory"
+  | "searchMessages"
+  | "getForumTopics"
+  | "destroy"
+  | "freezeStorage"
 
 /** One call the service made: the method and its arguments. */
 export type FakeCall = { method: FakeMethod; arg?: unknown }
@@ -51,6 +59,12 @@ export type FakeSyncClient = SyncTelegram & {
   setDialogs(...dialogs: Dialog[]): void
   /** Sets the messages `getHistory` has for a chat, by its marked id. */
   setHistory(chat: number | string, ...messages: Message[]): void
+  /** Sets the messages `searchMessages` has for a forum topic of a chat, by the chat's marked id. */
+  setThread(chat: number | string, topic: number, ...messages: Message[]): void
+  /** Sets the topics `getForumTopics` lists for a chat, most recently active first. */
+  setTopics(chat: number | string, ...topics: ForumTopic[]): void
+  /** Makes calls of a method wait until the returned function is called (or forever, if it never is). */
+  hold(method: FakeMethod): () => void
   /** The connection goes down. */
   drop(): void
   /** The connection comes back, as the client reports it. */
@@ -62,6 +76,9 @@ export function createFakeSyncClient(): FakeSyncClient {
   const calls: FakeCall[] = []
   const failures = new Map<FakeMethod, Error[]>()
   const history = new Map<number, Message[]>()
+  const threads = new Map<string, Message[]>()
+  const topicLists = new Map<number, ForumTopic[]>()
+  const gates = new Map<FakeMethod, Promise<void>>()
   let dialogs: Dialog[] = []
   let me: User = fakeAccount()
   let holdingConnect = false
@@ -85,6 +102,9 @@ export function createFakeSyncClient(): FakeSyncClient {
     if (error) throw error
   }
 
+  /** Waits while a test holds the method. */
+  const passGate = async (method: FakeMethod): Promise<void> => void (await gates.get(method))
+
   const state = (value: ConnectionState) => emitters.onConnectionState.emit(value)
 
   const client = {
@@ -101,6 +121,17 @@ export function createFakeSyncClient(): FakeSyncClient {
     holdConnect: () => void (holdingConnect = true),
     setDialogs: (...list: Dialog[]) => void (dialogs = list),
     setHistory: (chat: number | string, ...messages: Message[]) => void history.set(Number(chat), messages),
+    setThread: (chat: number | string, topic: number, ...messages: Message[]) =>
+      void threads.set(`${Number(chat)}:${topic}`, messages),
+    setTopics: (chat: number | string, ...list: ForumTopic[]) => void topicLists.set(Number(chat), list),
+    hold(method: FakeMethod) {
+      let release = () => {}
+      gates.set(method, new Promise<void>((resolve) => (release = resolve)))
+      return () => {
+        gates.delete(method)
+        release()
+      }
+    },
     drop: () => state("offline"),
     regain() {
       state("connecting")
@@ -130,15 +161,43 @@ export function createFakeSyncClient(): FakeSyncClient {
     },
     async *iterDialogs(params?: unknown) {
       record("iterDialogs", params)
+      await passGate("iterDialogs")
       yield* dialogs
     },
     async getHistory(chat: unknown, params: { limit?: number; minId?: number } = {}) {
       record("getHistory", { chat, ...params })
+      await passGate("getHistory")
       const found = (history.get(Number(chat)) ?? [])
         .filter((message) => message.id > (params.minId ?? 0))
         .sort((a, b) => b.id - a.id)
         .slice(0, params.limit ?? 100)
       return Object.assign(found, { total: found.length })
+    },
+    async searchMessages(params: { chatId?: unknown; threadId?: number; limit?: number }) {
+      record("searchMessages", params)
+      await passGate("searchMessages")
+      const found = (threads.get(`${Number(params.chatId)}:${params.threadId}`) ?? [])
+        .sort((a, b) => b.id - a.id)
+        .slice(0, params.limit ?? 100)
+      return Object.assign(found, { total: found.length })
+    },
+    async getForumTopics(chat: unknown, params: { limit?: number; offset?: { topic: number } } = {}) {
+      record("getForumTopics", { chat, ...params })
+      await passGate("getForumTopics")
+      const all = topicLists.get(Number(chat)) ?? []
+      const after = params.offset?.topic ? all.findIndex((topic) => topic.id === params.offset?.topic) + 1 : 0
+      const found = all.slice(after, after + (params.limit ?? 100))
+      const last = found.at(-1)
+      // As mtcute pages: from the newest message of the last topic.
+      const newestDate = (topic: ForumTopic) => {
+        try {
+          return topic.lastMessage.raw.date
+        } catch {
+          return topic.raw.date
+        }
+      }
+      const next = last && { date: newestDate(last), id: last.raw.topMessage, topic: last.raw.id }
+      return Object.assign(found, { total: all.length, next })
     },
     freezeStorage() {
       record("freezeStorage")
