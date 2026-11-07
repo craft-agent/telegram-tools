@@ -1,4 +1,5 @@
 import type { Mirror } from "../telegram/mirror"
+import type { MessageInput } from "../telegram/mirror-input"
 import type { ChatRow } from "../telegram/mirror-rows"
 import { findChats } from "./chat-rows"
 import { placeholders } from "./sql"
@@ -16,7 +17,7 @@ export type StoredMessage = {
   from_me: number
   sender: string | null
   sender_name: string | null
-  kind: "message" | "service"
+  kind: MessageInput["kind"]
   body: string | null
   entities: string | null
   media: string | null
