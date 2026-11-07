@@ -50,7 +50,8 @@ describe("runLogin", () => {
 
     expect(code).toBe(EXIT_OK)
     expect(t.out()).toContain("Telegram > Settings > Devices")
-    expect(t.out()).toMatch(/\x1b\[4[07]m/)
+    expect(t.out()).toContain("--phone")
+    expect(t.out()).toContain("\x1b[38;5;232m\x1b[48;5;231m▀")
     expect(t.out()).not.toContain(QR_URL)
     expect(t.out()).toContain(`Logged in as ${NAME}.`)
     expect(t.out()).toContain(`${PROJECT.cli} service install --account default`)
@@ -62,6 +63,48 @@ describe("runLogin", () => {
     expect(t.built[0]?.device.model).toBe(`${PROJECT.name} (unofficial)`)
     expect(t.built[0]?.device.appVersion).toBe("0.0.0-dev")
     expect(t.built[0]?.device.systemVersion).toMatch(/\S+ \S+/)
+  })
+
+  describe("a refreshed QR code", () => {
+    const SECOND_URL = "tg://login?token=def"
+
+    function refreshingLogin(t: Harness) {
+      t.client.script("getMe", NOT_LOGGED_IN).script("signInQr", (params: { onUrlUpdated: (url: string) => void }) => {
+        params.onUrlUpdated(QR_URL)
+        params.onUrlUpdated(SECOND_URL)
+        return fakeAccount()
+      })
+    }
+
+    test("replaces the first drawing in place on a terminal, under the instruction printed once", async () => {
+      const t = setUp({ isTTY: true })
+      refreshingLogin(t)
+
+      expect(await runLogin(["--state-dir", t.stateDir], t.io)).toBe(EXIT_OK)
+
+      const [first = "", rest = ""] = t.out().split(/\x1b\[\d+F\x1b\[0J/)
+      const drawing = first.slice(first.indexOf("\n\n") + 2)
+      const lines = drawing.split("\n").length - 1
+      expect(first.startsWith("On your phone")).toBe(true)
+      expect(lines).toBeGreaterThan(0)
+      expect(t.out()).toContain(`${drawing}\x1b[${lines}F\x1b[0J`)
+      expect(rest.startsWith("\x1b[38;5;")).toBe(true)
+      expect(rest).not.toContain("On your phone")
+      expect(t.out()).not.toContain(QR_URL)
+      expect(t.out()).not.toContain(SECOND_URL)
+    })
+
+    test("prints each block below the last without a terminal", async () => {
+      const t = setUp({ isTTY: false })
+      refreshingLogin(t)
+
+      expect(await runLogin(["--state-dir", t.stateDir], t.io)).toBe(EXIT_OK)
+
+      expect(t.out()).not.toMatch(/\x1b\[\d*F/)
+      expect(t.out().split("On your phone")).toHaveLength(3)
+      expect(t.out()).not.toContain(QR_URL)
+      expect(t.out()).not.toContain(SECOND_URL)
+    })
   })
 
   test("takes the label from --account", async () => {

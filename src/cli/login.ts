@@ -1,4 +1,3 @@
-import { renderANSI } from "uqr"
 import { ToolError, isToolError } from "../core"
 import { parseApiHash, parseApiId, readApp, writeApp, type AppCredentials } from "../core/telegram/app"
 import { DEFAULT_LABEL, checkLabel, ensureLabelDir, labelPaths, type LabelPaths } from "../core/telegram/labels"
@@ -18,16 +17,15 @@ import { PROJECT } from "../project"
 import { handleCommandError, parseCommandStateDir, parseFlagArgs, usageError } from "./command-args"
 import { EXIT_OK, type CommandIo } from "./command-io"
 import { askHidden, askLine, isTerminal } from "./prompts"
+import { drawQr } from "./qr"
 import { openCommandClient } from "./telegram-client"
 
 const SYNC_RUNNING = "The sync service for this label is running; stop it first (service uninstall, or stop sync)."
-const SCAN_INSTRUCTION = "On your phone, open Telegram > Settings > Devices > Link Desktop Device, and scan this code:"
+const SCAN_INSTRUCTION =
+  "On your phone, open Telegram > Settings > Devices > Link Desktop Device,\nand scan this code (or log in with --phone instead):"
 const APP_INSTRUCTION =
   "Create an app at https://my.telegram.org (API development tools) to get an api_id and api_hash."
 const TELETHON_PROMPT = "Telethon string session: "
-
-/** Light modules around the code, which a scanner needs; uqr's ANSI renderer paints them white on any theme. */
-const QR_BORDER = 2
 
 type LoginMode = "qr" | "phone" | "telethon"
 
@@ -80,14 +78,27 @@ async function telethonSession(io: CommandIo): Promise<string> {
   return text
 }
 
+/**
+ * Prints the QR code under the instruction. On a terminal, a later code replaces the drawing before it in
+ * place (the cursor moves up over it and clears from there), so the instruction is printed once; otherwise
+ * each code is printed with the instruction below the last.
+ */
+function qrPrinter(io: CommandIo): (url: string) => void {
+  const inPlace = io.isTTY ?? Boolean(process.stdout.isTTY)
+  let drawnLines = 0
+  return (url) => {
+    const drawing = `${drawQr(url)}\n`
+    io.stdout(drawnLines > 0 && inPlace ? `\x1b[${drawnLines}F\x1b[0J${drawing}` : `${SCAN_INSTRUCTION}\n\n${drawing}`)
+    drawnLines = drawing.split("\n").length - 1
+  }
+}
+
 function loginIo(io: CommandIo): LoginIo {
   return {
     ask: (prompt) => askLine(io, prompt),
     askHidden: (prompt) => askHidden(io, prompt),
     say: (line) => io.stdout(`${line}\n`),
-    showQr(url) {
-      io.stdout(`${SCAN_INSTRUCTION}\n\n${renderANSI(url, { border: QR_BORDER })}\n`)
-    },
+    showQr: qrPrinter(io),
     signal: io.signal ?? new AbortController().signal,
   }
 }
