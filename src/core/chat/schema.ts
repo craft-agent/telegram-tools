@@ -1,12 +1,12 @@
 import { z } from "zod"
 import type { LimitRule } from "../pages"
 import { CHAT_KINDS } from "../telegram/mirror-input"
-import { HISTORY_LIMIT, TOPICS_LIMIT } from "../telegram/service-requests"
+import { AROUND_LIMIT, HISTORY_LIMIT, TOPICS_LIMIT } from "../telegram/service-requests"
 import { localTimeSchema } from "../time"
 import { messageEntry } from "./message-schema"
 
 /** The methods of `telegram_chat_read`. */
-export const METHODS = ["list", "view", "topics", "search"] as const
+export const METHODS = ["list", "view", "topics", "search", "around"] as const
 /** A method supported by `telegram_chat_read`. */
 export type Method = (typeof METHODS)[number]
 
@@ -21,12 +21,15 @@ export const LIMITS = {
   search: { default: 30, max: 200 },
 } as const satisfies Partial<Record<Method, LimitRule>>
 
+/** The default and the largest number of messages `around` returns on each side of the one it is given. */
+export const AROUND_COUNT = { default: 5, max: AROUND_LIMIT } as const satisfies LimitRule
+
 /** The input schema for `telegram_chat_read`. */
 export const input = z.object({
   method: z
     .enum(METHODS)
     .describe(
-      "`list` finds chats; `view` reads the newest messages of one chat between two times, oldest first; `topics` lists the topics of a forum chat; `search` finds messages in the mirror by words.",
+      "`list` finds chats; `view` reads the newest messages of one chat between two times, oldest first; `topics` lists the topics of a forum chat; `search` finds messages in the mirror by words; `around` reads the messages around one.",
     ),
   account: z.string().optional().describe("The account label; may be left out when only one account is logged in."),
   query: z
@@ -47,7 +50,7 @@ export const input = z.object({
     .string()
     .optional()
     .describe(
-      "view, topics (required) and search (optional, to search one chat): the chat id, from `list`, such as 123456789 or -1001234567890. A name, username or phone number is not a chat.",
+      "view, topics, around (required) and search (optional, to search one chat): the chat id, from `list`, such as 123456789 or -1001234567890. A name, username or phone number is not a chat.",
     ),
   topic: z
     .number()
@@ -55,7 +58,7 @@ export const input = z.object({
     .positive()
     .optional()
     .describe(
-      `view: only messages of this topic of a forum chat (ids from \`topics\`); the General topic is ${GENERAL_TOPIC}. Refused for a chat without topics.`,
+      `view, around: only messages of this topic of a forum chat (ids from \`topics\`); the General topic is ${GENERAL_TOPIC}. Refused for a chat without topics.`,
     ),
   after: z
     .string()
@@ -75,6 +78,21 @@ export const input = z.object({
       `How many to return. list: default ${LIMITS.list.default}, at most ${LIMITS.list.max}. view: default ${LIMITS.view.default}, at most ${LIMITS.view.max} (${HISTORY_LIMIT} for a chat read live). topics: default ${LIMITS.topics.default}, at most ${LIMITS.topics.max}. search: default ${LIMITS.search.default}, at most ${LIMITS.search.max}. A larger value is lowered to the most; a result may hold fewer to stay a size a model can read.`,
     ),
   cursor: z.string().optional().describe("The `next` of the previous result, to continue where it stopped."),
+  id: z.number().int().positive().optional().describe("around (required): the id of the message to read around."),
+  before_count: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      `around: how many older messages to return, default ${AROUND_COUNT.default}, at most ${AROUND_COUNT.max}; 0 asks for none.`,
+    ),
+  after_count: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      `around: how many newer messages to return, default ${AROUND_COUNT.default}, at most ${AROUND_COUNT.max}; 0 asks for none.`,
+    ),
 })
 
 /** The parsed input to `telegram_chat_read`. */
@@ -133,16 +151,33 @@ export const output = z.object({
   refreshed_at: localTimeSchema
     .optional()
     .describe("list with `refresh`: when the chat list was taken from Telegram, in local time with offset."),
-  chat: chatEntry.optional().describe("view, topics: the chat read."),
+  chat: chatEntry.optional().describe("view, topics, around: the chat read."),
   messages: z
     .array(messageEntry)
     .optional()
-    .describe("view: the messages, oldest first. search: the hits, newest first."),
+    .describe("view, around: the messages, oldest first. search: the hits, newest first."),
   live: z
     .literal(true)
     .optional()
-    .describe("view: set when the chat is not mirrored, so the messages were read from Telegram and stored nowhere."),
+    .describe(
+      "view, around: set when the chat is not mirrored, so the messages were read from Telegram and stored nowhere.",
+    ),
   topics: z.array(topicEntry).optional().describe("topics: the topics, most recently active first."),
+  anchor: z.number().int().optional().describe("around: the id of the message read around, among `messages`."),
+  trimmed_before: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      "around: how many older messages were left out, farthest first, to keep the result a size that can be read.",
+    ),
+  trimmed_after: z
+    .number()
+    .int()
+    .optional()
+    .describe(
+      "around: how many newer messages were left out, farthest first, to keep the result a size that can be read.",
+    ),
   scanned_to: localTimeSchema
     .optional()
     .describe(

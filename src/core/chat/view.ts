@@ -9,10 +9,10 @@ import { fingerprint } from "./filter"
 import { storedMessage } from "./live"
 import { messageEntries } from "./message"
 import { cuttableMessage } from "./message-cut"
-import { liveMessages, MESSAGE_COLUMNS, type StoredMessage } from "./message-rows"
+import { inTopic, liveMessages, MESSAGE_COLUMNS, type StoredMessage } from "./message-rows"
 import { DATA_NOTE } from "./message-schema"
 import { olderThan, rangeConditions, readRange } from "./range"
-import { GENERAL_TOPIC, LIMITS, type ChatReadInput, type ChatReadOutput } from "./schema"
+import { LIMITS, type ChatReadInput, type ChatReadOutput } from "./schema"
 
 /**
  * Where a page of messages stops: the id of its oldest message, the chat it was
@@ -91,8 +91,9 @@ export function viewChat(
   const where = ["chat = ?", ...bounds.conditions, shown.condition]
   const params: (string | number)[] = [chat.id, ...bounds.params, ...shown.params]
   if (args.topic !== undefined) {
-    where.push(args.topic === GENERAL_TOPIC ? "(topic IS NULL OR topic = ?)" : "topic = ?")
-    params.push(args.topic)
+    const topic = inTopic(args.topic)
+    where.push(topic.condition)
+    params.push(...topic.params)
   }
   if (older) {
     const keyset = olderThan(older.id)

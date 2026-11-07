@@ -3,6 +3,8 @@ import { toJson } from "../telegram/mirror-rows"
 import { callService } from "../telegram/service"
 import {
   SERVICE_REQUESTS,
+  type AroundParams,
+  type AroundResult,
   type HistoryParams,
   type HistoryResult,
   type RefreshResult,
@@ -25,6 +27,11 @@ export function requestHistory(socket: string, params: HistoryParams, signal?: A
 /** A forum's topics, read live. */
 export function requestTopics(socket: string, params: TopicsParams, signal?: AbortSignal): Promise<TopicsResult> {
   return callService<TopicsResult>(socket, SERVICE_REQUESTS.topics, params, { effect: "read", signal })
+}
+
+/** A live read of the messages around one, in a chat the mirror does not keep. */
+export function requestAround(socket: string, params: AroundParams, signal?: AbortSignal): Promise<AroundResult> {
+  return callService<AroundResult>(socket, SERVICE_REQUESTS.around, params, { effect: "read", signal })
 }
 
 /** The chat list taken from Telegram into the mirror. */

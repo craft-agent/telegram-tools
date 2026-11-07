@@ -47,6 +47,12 @@ describe("chat read: arguments", () => {
       "topic does not apply to the search method; it takes query, chat, after, before, limit, cursor",
     ],
     [{ method: "search", query: "x", unread: false }, "unread does not apply to the search method"],
+    [
+      { method: "around", chat: USER, id: 1, limit: 5 },
+      "limit does not apply to the around method; it takes chat, id, before_count, after_count, topic",
+    ],
+    [{ method: "view", chat: USER, before_count: 1 }, "before_count does not apply to the view method"],
+    [{ method: "topics", chat: SUPERGROUP, id: 1 }, "id does not apply to the topics method"],
   ])("refuses an argument of the other method %j", async (args, message) => {
     fillSampleChats(t)
     const error = await t.failure(args)
@@ -74,6 +80,8 @@ describe("chat read: arguments", () => {
       limit: 5,
     }
     expect((await t.read(search)).messages).toHaveLength(1)
+    const around = { method: "around", account: "default", chat: USER, id: 1, before_count: 1, after_count: 1 }
+    expect((await t.read(around)).anchor).toBe(1)
   })
 
   test.each([

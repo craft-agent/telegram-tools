@@ -2,6 +2,7 @@ import type { Mirror } from "../telegram/mirror"
 import type { MessageInput } from "../telegram/mirror-input"
 import type { ChatRow } from "../telegram/mirror-rows"
 import { findChats } from "./chat-rows"
+import { GENERAL_TOPIC } from "./schema"
 import { placeholders } from "./sql"
 
 /** The columns of `messages` that a message entry is built from. */
@@ -40,6 +41,17 @@ export type StoredMessage = {
  */
 export function liveMessages(now: number): { condition: string; params: number[] } {
   return { condition: "(expires IS NULL OR expires > ? OR kept = 1)", params: [now] }
+}
+
+/**
+ * The SQL condition on `messages` for the messages of forum topic `topic`; the
+ * General topic's messages are stored with no topic.
+ */
+export function inTopic(topic: number): { condition: string; params: number[] } {
+  return {
+    condition: topic === GENERAL_TOPIC ? "(topic IS NULL OR topic = ?)" : "topic = ?",
+    params: [topic],
+  }
 }
 
 /** A JSON column, read; null when it is empty or does not parse. */
