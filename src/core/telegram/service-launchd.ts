@@ -1,4 +1,4 @@
-import { chmod, mkdir, stat, unlink, writeFile } from "node:fs/promises"
+import { chmod, mkdir, rmdir, stat, unlink, writeFile } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import {
   checkServiceSpecControlChars,
@@ -124,6 +124,24 @@ export async function uninstallLaunchdService(id: string, label: string, host: S
     await unlink(plistPath)
   } catch (err: unknown) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+  }
+}
+
+/** Deletes the launchd agent's log on macOS, and its directory when no other label's log is left. */
+export async function removeLaunchdServiceLog(id: string, label: string, host: ServiceHost): Promise<void> {
+  const { logDir, logPath } = launchdPaths(id, label, host.home)
+
+  try {
+    await unlink(logPath)
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err
+  }
+
+  try {
+    await rmdir(logDir)
+  } catch (err: unknown) {
+    const code = (err as NodeJS.ErrnoException).code
+    if (code !== "ENOENT" && code !== "ENOTEMPTY" && code !== "EEXIST") throw err
   }
 }
 

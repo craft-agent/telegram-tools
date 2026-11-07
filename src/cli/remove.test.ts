@@ -1,16 +1,33 @@
 import { afterEach, describe, expect, test } from "bun:test"
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { dirname, join } from "node:path"
 import { listLabels } from "../core/telegram/labels"
 import { PROJECT } from "../project"
 import { fakeHost, harness, type Harness } from "./commands.testing"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, type CommandIo } from "./command-io"
 import { runRemoveCommand } from "./remove"
+import { SERVICE_ID } from "./service"
 
 let open: Harness[] = []
+let homes: string[] = []
 
 afterEach(() => {
   for (const t of open) t.close()
   open = []
+  for (const home of homes) rmSync(home, { recursive: true, force: true })
+  homes = []
 })
+
+/** A fresh home directory holding the service's log file for `label`. */
+function makeLog(label: string): { home: string; log: string } {
+  const home = mkdtempSync(join(tmpdir(), "tg-home-"))
+  homes.push(home)
+  const log = join(home, "Library", "Logs", SERVICE_ID, `${label}.log`)
+  mkdirSync(dirname(log), { recursive: true })
+  writeFileSync(log, "line\n")
+  return { home, log }
+}
 
 function setUp(overrides: Partial<CommandIo> = {}, loggedIn = false): Harness {
   const t = harness(overrides)
@@ -72,15 +89,28 @@ describe("runRemoveCommand", () => {
     expect(t.out()).toContain("end the session in Telegram under Settings → Devices")
   })
 
+  test("deletes the service's log and its directory", async () => {
+    const t = setUp({ isTTY: false })
+    const { home, log } = makeLog("work")
+    t.io.serviceHost = fakeHost(home)
+
+    expect(await runRemoveCommand(["--account", "work", "--yes", "--state-dir", t.stateDir], t.io)).toBe(EXIT_OK)
+    expect(existsSync(log)).toBe(false)
+    expect(existsSync(dirname(log))).toBe(false)
+    expect(await listLabels(t.stateDir)).toEqual([])
+  })
+
   test("deletes nothing when the service cannot be uninstalled", async () => {
     const t = setUp({ isTTY: false })
-    t.io.serviceHost = fakeHost(t.stateDir, {
+    const { home, log } = makeLog("work")
+    t.io.serviceHost = fakeHost(home, {
       run: async () => ({ code: 1, stdout: "", stderr: "launchctl bootout: Operation not permitted" }),
     })
 
     expect(await runRemoveCommand(["--account", "work", "--yes", "--state-dir", t.stateDir], t.io)).toBe(EXIT_FAILED)
     expect(t.err()).toContain("launchctl")
     expect(await listLabels(t.stateDir)).toEqual(["work"])
+    expect(existsSync(log)).toBe(true)
   })
 
   test("goes on where services are not supported", async () => {

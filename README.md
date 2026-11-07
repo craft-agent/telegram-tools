@@ -327,9 +327,10 @@ one `default`), and every command takes `--state-dir` like the tools.
   service runs; stop it first (`service uninstall`, or stop foreground `sync`).
 - **Logging out and removing**: `logout` ends the session at Telegram and keeps
   the mirror, removing only the session storage. `remove` uninstalls the
-  service and permanently deletes the label's directory. If Telegram cannot be
-  reached, the session is removed locally; end the session in Telegram under
-  Settings → Devices.
+  service and permanently deletes the label's directory, and on macOS the
+  service's log too (`service uninstall` keeps it); on Linux the journal keeps
+  the service's entries. If Telegram cannot be reached, the session is removed
+  locally; end the session in Telegram under Settings → Devices.
 - **Device sessions**: a new login shows on your other devices. Telegram ends
   a session unused for the period set under Settings → Privacy and Security →
   "If away for"; then log in again. `telegram_account_read` tells an agent

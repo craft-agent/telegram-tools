@@ -1,5 +1,10 @@
 import { ToolError } from "../errors"
-import { installLaunchdService, launchdServiceStatus, uninstallLaunchdService } from "./service-launchd"
+import {
+  installLaunchdService,
+  launchdServiceStatus,
+  removeLaunchdServiceLog,
+  uninstallLaunchdService,
+} from "./service-launchd"
 import { installSystemdService, systemdServiceStatus, uninstallSystemdService } from "./service-systemd"
 import { defaultServiceHost, type ServiceHost, type ServiceSpec, type ServiceStatus } from "./service-types"
 
@@ -46,6 +51,23 @@ export async function uninstallService(
     return uninstallLaunchdService(id, label, host)
   }
   return uninstallSystemdService(id, label, host)
+}
+
+/**
+ * Deletes the sync service's log for one label.
+ *
+ * Only macOS keeps a log file per label; Linux logs to the user journal, which
+ * cannot be pruned per unit, and other platforms never had a service, so there
+ * the call does nothing.
+ */
+export async function removeServiceLog(
+  id: string,
+  label: string,
+  host: ServiceHost = defaultServiceHost(),
+): Promise<void> {
+  if (host.platform === "darwin") {
+    await removeLaunchdServiceLog(id, label, host)
+  }
 }
 
 /**

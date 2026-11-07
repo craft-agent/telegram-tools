@@ -3,6 +3,7 @@ import { ToolError } from "../errors"
 import {
   defaultServiceHost,
   installService,
+  removeServiceLog,
   serviceStatus,
   uninstallService,
   type ServiceHost,
@@ -39,6 +40,22 @@ describe("service dispatcher", () => {
 
     const statusError = await serviceStatus(spec.id, spec.label, host).catch((e: unknown) => e)
     expect((statusError as ToolError).code).toBe("invalid_argument")
+  })
+
+  test("removeServiceLog does nothing on Linux and unsupported platforms", async () => {
+    for (const platform of ["linux", "win32"] as const) {
+      const ran: string[][] = []
+      const host: ServiceHost = {
+        platform,
+        home: "/nonexistent/home",
+        uid: 0,
+        env: {},
+        run: async (argv) => (ran.push(argv), { code: 0, stdout: "", stderr: "" }),
+      }
+
+      await removeServiceLog(spec.id, spec.label, host)
+      expect(ran).toEqual([])
+    }
   })
 
   test("mapProgramError masks phone numbers and truncates to 300 characters", () => {
