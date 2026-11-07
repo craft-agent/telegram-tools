@@ -7,6 +7,7 @@ import { PRIVATE_NOTE, type MessageEntry } from "./message-schema"
 import {
   loadRelated,
   messageKey,
+  pageTexts,
   readJson,
   readList,
   type MessageRef,
@@ -148,13 +149,16 @@ function entryOf(parsed: Parsed, related: Related, now: number): MessageEntry {
 /**
  * The entries for stored messages, in the order given. The names of the chats
  * and senders, the earlier versions and the replied-to texts of all of them
- * are read in a few queries. `now` decides which timed messages have expired
- * (only kept ones can still be shown) and which replied-to texts may be shown.
+ * are read in a few queries; a replied-to text is taken from `rows` themselves
+ * first, then from the mirror, so rows the mirror does not hold (a live read)
+ * still find it. `now` decides which timed messages have expired (only kept
+ * ones can still be shown) and which replied-to texts may be shown.
  */
 export function messageEntries(mirror: Mirror, rows: readonly StoredMessage[], now: number): MessageEntry[] {
   const parsed = rows.map(parse)
   const named = parsed.flatMap(({ row, forward }) => [row.sender, forward?.from].filter((id) => id != null))
   const replies = parsed.flatMap((item) => repliedRef(item) ?? [])
-  const related = loadRelated(mirror, rows, named, replies, now)
+  const loaded = loadRelated(mirror, rows, named, replies, now)
+  const related: Related = { ...loaded, replied: new Map([...loaded.replied, ...pageTexts(rows, now)]) }
   return parsed.map((item) => entryOf(item, related, now))
 }

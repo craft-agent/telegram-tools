@@ -3,7 +3,7 @@ import { existsSync, mkdirSync, rmSync, statSync } from "node:fs"
 import { labelPaths } from "../telegram/labels"
 import { openMirrorForWrite } from "../telegram/mirror"
 import { MIRROR_VERSION } from "../telegram/mirror-schema"
-import { GROUP, USER, makeTempDir } from "../telegram/mirror.testing"
+import { GROUP, SUPERGROUP, USER, makeTempDir } from "../telegram/mirror.testing"
 import { invoke } from "../tool"
 import { telegramChatRead } from "./read"
 import { createChatFixture, fillSampleChats, type ChatFixture } from "./read.testing"
@@ -14,7 +14,8 @@ beforeEach(() => {
   t = createChatFixture()
 })
 
-afterEach(() => {
+afterEach(async () => {
+  await t.stopServices()
   t.close()
 })
 
@@ -22,16 +23,25 @@ describe("chat read: arguments", () => {
   test.each([
     [
       { method: "list", chat: USER },
-      "chat does not apply to the list method; it takes query, unread, last, limit, cursor",
+      "chat does not apply to the list method; it takes query, unread, last, refresh, limit, cursor",
     ],
     [{ method: "list", after: "2026-11-07" }, "after does not apply to the list method"],
     [{ method: "list", before: "2026-11-07" }, "before does not apply to the list method"],
+    [{ method: "list", topic: 5 }, "topic does not apply to the list method"],
     [
       { method: "view", chat: USER, query: "x" },
-      "query does not apply to the view method; it takes chat, after, before, limit, cursor",
+      "query does not apply to the view method; it takes chat, topic, after, before, limit, cursor",
     ],
     [{ method: "view", chat: USER, unread: false }, "unread does not apply to the view method"],
     [{ method: "view", chat: USER, last: false }, "last does not apply to the view method"],
+    [{ method: "view", chat: USER, refresh: false }, "refresh does not apply to the view method"],
+    [
+      { method: "topics", chat: SUPERGROUP, after: "2026-11-07" },
+      "after does not apply to the topics method; it takes chat, limit, cursor",
+    ],
+    [{ method: "topics", chat: SUPERGROUP, topic: 1 }, "topic does not apply to the topics method"],
+    [{ method: "topics", chat: SUPERGROUP, refresh: true }, "refresh does not apply to the topics method"],
+    [{ method: "topics", chat: SUPERGROUP, query: "x" }, "query does not apply to the topics method"],
   ])("refuses an argument of the other method %j", async (args, message) => {
     fillSampleChats(t)
     const error = await t.failure(args)
@@ -39,12 +49,16 @@ describe("chat read: arguments", () => {
     expect(error.message).toContain(message)
   })
 
-  test("takes the arguments of its own method, and account for both", async () => {
+  test("takes the arguments of its own method, and account for all", async () => {
     fillSampleChats(t)
-    const list = { method: "list", account: "default", query: "a", unread: true, last: true, limit: 5 }
+    const list = { method: "list", account: "default", query: "a", unread: true, last: true, refresh: false, limit: 5 }
     expect((await t.read(list)).chats).toBeDefined()
     const view = { method: "view", account: "default", chat: USER, after: "2026-01-01", before: "2999-01-01", limit: 5 }
     expect((await t.read(view)).messages).toBeDefined()
+    t.follow({ id: SUPERGROUP, kind: "supergroup", name: "Dev Forum", username: null, forum: true })
+    const topics = { method: "topics", account: "default", chat: SUPERGROUP, limit: 5 }
+    await t.serve({ topics: () => ({ topics: [] }) })
+    expect((await t.read(topics)).topics).toEqual([])
   })
 
   test.each([
@@ -55,6 +69,10 @@ describe("chat read: arguments", () => {
     { method: "list", unread: "yes" },
     { method: "list", limit: "5" },
     { method: "view", chat: 5 },
+    { method: "view", chat: USER, topic: 0 },
+    { method: "view", chat: USER, topic: 1.5 },
+    { method: "view", chat: USER, topic: "1" },
+    { method: "list", refresh: "yes" },
   ])("refuses invalid arguments %j", async (args) => {
     expect((await t.failure(args)).code).toBe("invalid_argument")
   })

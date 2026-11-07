@@ -9,6 +9,9 @@ import { placeholders } from "./sql"
 /** The most characters of a chat's name a result carries; a longer title is cut and says so. */
 export const MAX_NAME_LENGTH = 1000
 
+/** What a call that names a topic, or lists topics, says of a chat that is not a forum. */
+export const NO_TOPICS_MESSAGE = "This chat has no topics."
+
 /** A chat id: Telegram's signed id, such as `123456789` or `-1001234567890`. */
 const CHAT_ID_PATTERN = /^-?\d+$/
 

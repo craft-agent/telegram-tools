@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { CHANNEL, GROUP, OTHER_USER, SUPERGROUP, USER } from "../telegram/mirror.testing"
+import { GROUP, OTHER_USER, USER } from "../telegram/mirror.testing"
 import { formatLocalTime } from "../time"
-import { at, createChatFixture, fillSampleChats, outgoing, type ChatFixture } from "./read.testing"
+import { at, createChatFixture, outgoing, type ChatFixture } from "./read.testing"
 
 let t: ChatFixture
 
@@ -197,15 +197,6 @@ describe("chat read: view arguments", () => {
       const error = await t.failure({ method: "view", chat })
       expect(error.code).toBe("invalid_argument")
       expect(error.message).toContain("chat must be a chat id")
-    }
-  })
-
-  test("a chat the mirror knows and does not keep is refused until live reads exist", async () => {
-    fillSampleChats(t)
-    for (const chat of [SUPERGROUP, CHANNEL]) {
-      const error = await t.failure({ method: "view", chat })
-      expect(error.code).toBe("invalid_argument")
-      expect(error.message).toBe("This chat is not mirrored; reading it live is not available yet.")
     }
   })
 

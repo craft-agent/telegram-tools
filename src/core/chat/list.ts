@@ -73,6 +73,21 @@ function addLastMessages(mirror: Mirror, chats: readonly ChatRow[], entries: Cha
 }
 
 /**
+ * The `list` method's arguments, checked: refuses a bad `limit` or a cursor
+ * made under other filters, so a caller can check them before asking the
+ * service anything.
+ */
+export function readListArguments(args: Pick<ChatReadInput, "query" | "unread" | "limit" | "cursor">) {
+  const limit = clampLimit(args.limit, LIMITS.list, "limit")
+  const query = foldQuery(args.query)
+  const unreadOnly = args.unread === true
+  const after = args.cursor === undefined ? undefined : readCursor(args.cursor, "cursor", listCursor)
+  const filter = fingerprint(query, unreadOnly)
+  if (after && after.filter !== filter) throw notACursor("cursor")
+  return { limit, query, unreadOnly, after, filter }
+}
+
+/**
  * The `list` method: chats newest activity first, a chat with none last,
  * optionally those whose name or username holds `query`, or that have unread
  * messages, each with its last message on request. Pages by a keyset cursor
@@ -84,12 +99,7 @@ export function listChats(
   args: Pick<ChatReadInput, "query" | "unread" | "last" | "limit" | "cursor">,
   now: number,
 ): ChatReadOutput {
-  const limit = clampLimit(args.limit, LIMITS.list, "limit")
-  const query = foldQuery(args.query)
-  const unreadOnly = args.unread === true
-  const after = args.cursor === undefined ? undefined : readCursor(args.cursor, "cursor", listCursor)
-  const filter = fingerprint(query, unreadOnly)
-  if (after && after.filter !== filter) throw notACursor("cursor")
+  const { limit, query, unreadOnly, after, filter } = readListArguments(args)
   let chats = (mirror.prepare("SELECT * FROM chats").all() as ChatRow[]).sort((a, b) =>
     byActivity(positionOf(a), positionOf(b)),
   )

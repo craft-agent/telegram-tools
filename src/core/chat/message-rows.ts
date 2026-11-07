@@ -119,6 +119,21 @@ function loadTexts(mirror: Mirror, wanted: IdsByChat, now: number): Map<string, 
   return texts
 }
 
+/**
+ * The text of the messages among `rows` that a read may show at `now`, by
+ * `messageKey`, as `loadTexts` finds them in the mirror. A kept message whose
+ * timer ran out is left to the mirror, which knows it is kept.
+ */
+export function pageTexts(rows: readonly StoredMessage[], now: number): Map<string, RepliedText> {
+  const texts = new Map<string, RepliedText>()
+  for (const row of rows) {
+    if (row.body === null || (row.expires !== null && row.expires <= now)) continue
+    const isPrivate = row.expires !== null || row.view_once === 1 || (row.self_destruct ?? 0) > 0
+    texts.set(messageKey(row.chat, row.id), { text: row.body, private: isPrivate })
+  }
+  return texts
+}
+
 /** A message of some chat, by its chat and its id in it. */
 export type MessageRef = { chat: string; id: number }
 

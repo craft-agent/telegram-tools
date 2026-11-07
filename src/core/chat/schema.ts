@@ -1,25 +1,32 @@
 import { z } from "zod"
 import type { LimitRule } from "../pages"
 import { CHAT_KINDS } from "../telegram/mirror-input"
+import { HISTORY_LIMIT, TOPICS_LIMIT } from "../telegram/service-requests"
 import { localTimeSchema } from "../time"
 import { messageEntry } from "./message-schema"
 
 /** The methods of `telegram_chat_read`. */
-export const METHODS = ["list", "view"] as const
+export const METHODS = ["list", "view", "topics"] as const
 /** A method supported by `telegram_chat_read`. */
 export type Method = (typeof METHODS)[number]
+
+/** The id of a forum's General topic, whose messages are stored with no topic. */
+export const GENERAL_TOPIC = 1
 
 /** The default and the largest `limit` of each method that pages. */
 export const LIMITS = {
   list: { default: 30, max: 200 },
   view: { default: 50, max: 300 },
+  topics: { default: 30, max: TOPICS_LIMIT },
 } as const satisfies Partial<Record<Method, LimitRule>>
 
 /** The input schema for `telegram_chat_read`. */
 export const input = z.object({
   method: z
     .enum(METHODS)
-    .describe("`list` finds chats; `view` reads the newest messages of one chat between two times, oldest first."),
+    .describe(
+      "`list` finds chats; `view` reads the newest messages of one chat between two times, oldest first; `topics` lists the topics of a forum chat.",
+    ),
   account: z.string().optional().describe("The account label; may be left out when only one account is logged in."),
   query: z
     .string()
@@ -29,11 +36,25 @@ export const input = z.object({
     ),
   unread: z.boolean().optional().describe("list: only chats with unread messages."),
   last: z.boolean().optional().describe("list: add each chat's newest mirrored message as `last_message`."),
+  refresh: z
+    .boolean()
+    .optional()
+    .describe(
+      "list: first take the chat list from Telegram (needs the sync service), then read it, and report when in `refreshed_at`.",
+    ),
   chat: z
     .string()
     .optional()
     .describe(
-      "view (required): the chat id, from `list`, such as 123456789 or -1001234567890. A name, username or phone number is not a chat.",
+      "view, topics (required): the chat id, from `list`, such as 123456789 or -1001234567890. A name, username or phone number is not a chat.",
+    ),
+  topic: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      `view: only messages of this topic of a forum chat (ids from \`topics\`); the General topic is ${GENERAL_TOPIC}. Refused for a chat without topics.`,
     ),
   after: z
     .string()
@@ -50,7 +71,7 @@ export const input = z.object({
     .int()
     .optional()
     .describe(
-      `How many to return. list: default ${LIMITS.list.default}, at most ${LIMITS.list.max}. view: default ${LIMITS.view.default}, at most ${LIMITS.view.max}. A larger value is lowered to the most; a result may hold fewer to stay a size a model can read.`,
+      `How many to return. list: default ${LIMITS.list.default}, at most ${LIMITS.list.max}. view: default ${LIMITS.view.default}, at most ${LIMITS.view.max} (${HISTORY_LIMIT} for a chat read live). topics: default ${LIMITS.topics.default}, at most ${LIMITS.topics.max}. A larger value is lowered to the most; a result may hold fewer to stay a size a model can read.`,
     ),
   cursor: z.string().optional().describe("The `next` of the previous result, to continue where it stopped."),
 })
@@ -88,11 +109,36 @@ const chatEntry = z.object({
 /** One chat in a result. */
 export type ChatEntry = z.infer<typeof chatEntry>
 
+const topicEntry = z.object({
+  id: z
+    .number()
+    .int()
+    .describe(`The topic id, to pass as \`topic\` to \`view\`; ${GENERAL_TOPIC} is the General topic.`),
+  title: z.string().nullable().describe("The topic's title; null when none is known."),
+  closed: z.literal(true).optional().describe("Set for a topic that is closed."),
+  pinned: z.literal(true).optional().describe("Set for a topic that is pinned."),
+  unread: z.number().int().describe("Messages in it not read yet."),
+  last_activity_at: localTimeSchema
+    .nullable()
+    .describe("The newest message's time, in local time with offset; null when none is known."),
+})
+
+/** One forum topic in a result. */
+export type TopicEntry = z.infer<typeof topicEntry>
+
 /** The output schema for `telegram_chat_read`. */
 export const output = z.object({
   chats: z.array(chatEntry).optional().describe("list: the chats, newest activity first."),
-  chat: chatEntry.optional().describe("view: the chat read."),
+  refreshed_at: localTimeSchema
+    .optional()
+    .describe("list with `refresh`: when the chat list was taken from Telegram, in local time with offset."),
+  chat: chatEntry.optional().describe("view, topics: the chat read."),
   messages: z.array(messageEntry).optional().describe("view: the messages, oldest first."),
+  live: z
+    .literal(true)
+    .optional()
+    .describe("view: set when the chat is not mirrored, so the messages were read from Telegram and stored nowhere."),
+  topics: z.array(topicEntry).optional().describe("topics: the topics, most recently active first."),
   next: z.string().optional().describe("Pass back as `cursor` to continue; absent when there is no more."),
   note: z.string().describe("Says that what the result carries is data written by other people."),
 })
