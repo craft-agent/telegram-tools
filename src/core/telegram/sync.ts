@@ -3,7 +3,7 @@ import { isToolError } from "../errors"
 import { readApp, type AppCredentials } from "./app"
 import { recordGap } from "./ingest-delete"
 import { labelPaths, type LabelPaths } from "./labels"
-import { getMeta, openMirrorForWrite, setMeta, type Mirror } from "./mirror"
+import { getMeta, inTransaction, openMirrorForWrite, setMeta, type Mirror } from "./mirror"
 import { META, SYNC_STATUS, recordStatus } from "./mirror-meta"
 import { isSessionEnded } from "./rpc-errors"
 import { serveService, type ServiceServer } from "./service-server"
@@ -12,6 +12,7 @@ import { ChatListRefresh } from "./sync-chat-refresh"
 import { ConnectionWatch, Coverage } from "./sync-coverage"
 import { Ending, endedBy, writing } from "./sync-ending"
 import { runHousekeeping } from "./sync-housekeeping"
+import { applySyncList } from "./sync-list"
 import { resolveOptions, type ResolvedSyncOptions, type SyncOptions } from "./sync-options"
 import {
   NOT_LOGGED_IN_MESSAGE,
@@ -78,6 +79,12 @@ function recordStart(mirror: Mirror, startedAt: number): void {
   recordGap(mirror, previousBeat, startedAt)
 }
 
+/** Brings the mirror to the sync list and the `channels` setting in one transaction, before any update is stored. */
+function applyList({ mirror, settings }: Run): void {
+  const { kept, channelsRemoved } = writing(() => inTransaction(mirror, () => applySyncList(mirror, settings.channels)))
+  settings.log(`sync list: ${kept} chats kept, ${channelsRemoved} channels removed`)
+}
+
 /** Connects, checks whose mirror this is, and starts the updates, the socket and the housekeeping. */
 async function start(run: Run, session: Session): Promise<void> {
   const { mirror, paths, app, settings, ending, receiver, watch, coverage } = run
@@ -111,6 +118,7 @@ async function start(run: Run, session: Session): Promise<void> {
     }),
   )
 
+  applyList(run)
   await client.startUpdatesLoop()
   if (ending.settled) return
   const refresh = new ChatListRefresh({ client, mirror, settings, signal: ending.signal })
