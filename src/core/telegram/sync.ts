@@ -8,6 +8,7 @@ import { META, SYNC_STATUS, recordStatus } from "./mirror-meta"
 import { isSessionEnded } from "./rpc-errors"
 import { serveService, type ServiceServer } from "./service-server"
 import { LOCK_HELD_REASON, acquireSyncLock } from "./sync-lock"
+import { ChatListRefresh } from "./sync-chat-refresh"
 import { ConnectionWatch, Coverage } from "./sync-coverage"
 import { Ending, endedBy, writing } from "./sync-ending"
 import { runHousekeeping } from "./sync-housekeeping"
@@ -22,6 +23,7 @@ import {
   type SyncOutcome,
 } from "./sync-outcome"
 import { Receiver } from "./sync-receive"
+import { syncRequestHandlers } from "./sync-requests"
 import type { SyncTelegram } from "./sync-telegram"
 import { onAbort, settledOrTimeout } from "./sync-wait"
 
@@ -111,18 +113,33 @@ async function start(run: Run, session: Session): Promise<void> {
 
   await client.startUpdatesLoop()
   if (ending.settled) return
+  const refresh = new ChatListRefresh({ client, mirror, settings, signal: ending.signal })
+  const requests = syncRequestHandlers({
+    client,
+    mirror,
+    settings,
+    signal: ending.signal,
+    refresh,
+    endSession: () => ending.end({ kind: "session-ended" }),
+  })
   session.serverStarting = serveService(
     paths.socket,
-    { status: async () => ({ connected: watch.connected, since: watch.since, account }) },
+    { status: async () => ({ connected: watch.connected, since: watch.since, account }), ...requests },
     { onError: (error, method) => log(`request failed: ${method} (${errorLabel(error)})`) },
   )
   session.server = await session.serverStarting
   if (ending.settled) return
   writing(() => recordStatus(mirror, SYNC_STATUS.running, null, settings.now()))
   log("connected")
-  session.housekeeping = runHousekeeping({ client, mirror, settings, signal: ending.signal, coverage, watch }).catch(
-    (error) => ending.end(endedBy(error)),
-  )
+  session.housekeeping = runHousekeeping({
+    client,
+    mirror,
+    settings,
+    signal: ending.signal,
+    coverage,
+    watch,
+    refresh,
+  }).catch((error) => ending.end(endedBy(error)))
 }
 
 /** Closes what the run started: stops storing, closes the socket, destroys the client, and waits for the upkeep to end. */

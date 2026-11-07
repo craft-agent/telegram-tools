@@ -2,14 +2,17 @@ import { expireMessages, purge } from "./ingest-delete"
 import { inTransaction, setMeta } from "./mirror"
 import { META } from "./mirror-meta"
 import type { ConnectionWatch, Coverage } from "./sync-coverage"
+import type { ChatListRefresh } from "./sync-chat-refresh"
 import { ConnectionLost, writing } from "./sync-ending"
 import { seedRound, type BackgroundContext, type SeedTries } from "./sync-fetch"
-import { refreshChats } from "./sync-refresh"
 import { onAbort, realPause } from "./sync-wait"
 
+/** What the housekeeping upkeep needs of the run. */
 export type HousekeepingContext = BackgroundContext & {
   coverage: Coverage
   watch: ConnectionWatch
+  /** Runs the chat list refresh, which the `refresh` request shares. */
+  refresh: ChatListRefresh
 }
 
 /**
@@ -51,7 +54,7 @@ async function rounds(ctx: HousekeepingContext): Promise<void> {
       nextPurge = now + settings.purgeEveryMs
     }
     if (now >= nextRefresh) {
-      const refreshed = await refreshChats(ctx)
+      const refreshed = await ctx.refresh.round()
       nextRefresh = settings.now() + (refreshed ? settings.refreshEveryMs : settings.refreshRetryMs)
     }
     const seeded = await seedRound(ctx, tries)

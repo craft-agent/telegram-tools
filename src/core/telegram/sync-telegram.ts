@@ -14,6 +14,8 @@ export type SyncTelegram = Pick<
   | "destroy"
   | "iterDialogs"
   | "getHistory"
+  | "searchMessages"
+  | "getForumTopics"
   | "onNewMessage"
   | "onEditMessage"
   | "onDeleteMessage"
