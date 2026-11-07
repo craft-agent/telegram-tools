@@ -6,6 +6,7 @@ import { storeMessage } from "../telegram/ingest-messages"
 import { labelPaths } from "../telegram/labels"
 import { inTransaction, openMirrorForWrite, type Mirror } from "../telegram/mirror"
 import type { ChatInput, MessageInput } from "../telegram/mirror-input"
+import { serveService, type ServiceServer } from "../telegram/service-server"
 import {
   CHANNEL,
   GROUP,
@@ -28,6 +29,9 @@ export const MINUTE = 60_000
 /** The time of the `n`th message of a test: one a minute, the first at `NOW`. */
 export const at = (n: number) => NOW + n * MINUTE
 
+/** The requests a scripted service received, in order. */
+export type ServiceCalls = { method: string; params: unknown }[]
+
 /** A linked label with a mirror a test fills through the ingest functions, and the tool to read it. */
 export type ChatFixture = {
   stateDir: string
@@ -46,6 +50,10 @@ export type ChatFixture = {
   read(args: unknown): Promise<z.output<typeof output>>
   /** The error a call throws. */
   failure(args: unknown): Promise<ToolError>
+  /** Serves this label's socket as the sync service would, each method answered by `answers`; resolves with the requests it receives. */
+  serve(answers: Record<string, (params: unknown) => unknown>): Promise<ServiceCalls>
+  /** Stops every service `serve` started. */
+  stopServices(): Promise<void>
   /** Closes the test's own writing connection, as when the sync service has stopped. */
   closeMirror(): void
   /** Removes the state directory. */
@@ -67,6 +75,7 @@ export function createChatFixture(): ChatFixture {
     if (open) mirror.close()
     open = false
   }
+  const servers: ServiceServer[] = []
   return {
     stateDir,
     mirror,
@@ -98,12 +107,34 @@ export function createChatFixture(): ChatFixture {
       }
       throw new Error("Expected the call to fail")
     },
+    async serve(answers) {
+      const calls: ServiceCalls = []
+      const handlers = Object.fromEntries(
+        Object.entries(answers).map(([method, answer]) => [
+          method,
+          async (params: unknown) => {
+            calls.push({ method, params })
+            return answer(params)
+          },
+        ]),
+      )
+      servers.push(await serveService(paths.socket, handlers))
+      return calls
+    },
+    async stopServices() {
+      await Promise.all(servers.splice(0).map((server) => server.close()))
+    },
     closeMirror,
     close() {
       closeMirror()
       rmSync(stateDir, { recursive: true, force: true })
     },
   }
+}
+
+/** A message of a live read in `SUPERGROUP`'s chat, as the service returns it. */
+export function liveMessage(overrides: Partial<MessageInput> = {}): MessageInput {
+  return messageInput({ chat: SUPERGROUP, ...overrides })
 }
 
 /** A message from the user's own account in `USER`'s chat: no sender, as Telegram gives it. */
