@@ -7,6 +7,7 @@ import { openMirrorForWrite, setMeta } from "../telegram/mirror"
 import { META } from "../telegram/mirror-meta"
 import { MIRROR_VERSION } from "../telegram/mirror-schema"
 import { NOW, makeTempDir } from "../telegram/mirror.testing"
+import { formatLocalTime } from "../time"
 import { annotations, invoke } from "../tool"
 import { telegramAccountRead } from "./read"
 
@@ -163,9 +164,11 @@ describe("account read: service health", () => {
     expect(account?.service).toBe(status)
     expect(account?.action).toBeNull()
     expect(account?.hint).toBeNull()
-    expect(account?.connected_at).toBe(new Date(NOW).toISOString())
-    expect(account?.last_received_at).toBe(new Date(NOW - 1000).toISOString())
-    expect(account?.refreshed_at).toBe(new Date(NOW - 2000).toISOString())
+    expect(account?.connected_at).toBe(formatLocalTime(NOW))
+    expect(account?.last_received_at).toBe(formatLocalTime(NOW - 1000))
+    expect(account?.refreshed_at).toBe(formatLocalTime(NOW - 2000))
+    expect(account?.connected_at).toMatch(/\.\d{3}[+-]\d{2}:\d{2}$/)
+    expect(Date.parse(account?.connected_at ?? "")).toBe(NOW)
   })
 
   test.each(["running", "starting"])("%s with a dead lock is not running", async (status) => {

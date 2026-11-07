@@ -23,10 +23,13 @@ export type BackgroundContext = {
 /** How many times each chat was tried for seeding; a chat that was seeded counts as tried out. */
 export type SeedTries = Map<string, number>
 
+const SECOND_MS = 1000
+
 /** A fetched message as the mirror takes it, with the topic it created or edited. */
 type Fetched = { message: MessageInput; topic: TopicInput | null }
 
-async function pace({ settings, signal }: BackgroundContext): Promise<void> {
+/** Waits the random pause that keeps fetches apart (`paceMs`), cut short when `signal` aborts. */
+export async function pace({ settings, signal }: Pick<BackgroundContext, "settings" | "signal">): Promise<void> {
   const [shortest, longest] = settings.paceMs
   await waitThrough(settings.pause, shortest + Math.random() * (longest - shortest), signal)
 }
@@ -48,7 +51,7 @@ export async function failedCall(ctx: BackgroundContext, error: unknown, what: s
     return false
   }
   log(`${what}: flood wait of ${seconds} seconds`)
-  await waitThrough(pause, seconds * 1000, ctx.signal)
+  await waitThrough(pause, seconds * SECOND_MS, ctx.signal)
   return true
 }
 
@@ -95,7 +98,7 @@ function readFetched(chat: string, messages: Message[]): Fetched[] {
  * one to the chat's `unread`, which is right for a pushed message but not for
  * one fetched after the dialog list gave the count, so that is undone.
  */
-function storeFetched(ctx: BackgroundContext, chat: string, messages: Message[]): number {
+export function storeFetched(ctx: BackgroundContext, chat: string, messages: Message[]): number {
   const { mirror, settings } = ctx
   const fetched = readFetched(chat, messages)
   return writing(() =>

@@ -5,6 +5,7 @@ import { labelPaths, listLabels, pickLabel, type LabelPaths } from "../telegram/
 import { getMeta, MIRROR_VERSION_REFUSALS, openMirrorForRead } from "../telegram/mirror"
 import { META, SYNC_STATUS } from "../telegram/mirror-meta"
 import { lockHolder } from "../telegram/sync-lock"
+import { formatLocalTime, localTimeSchema } from "../time"
 import { defineTool } from "../tool"
 
 const input = z.object({
@@ -17,9 +18,13 @@ const account = z.object({
   service: z
     .enum(["running", "starting", "stopped", "failed", "not running", "never run"])
     .describe("The recorded sync service state, corrected for a service process that is no longer alive."),
-  connected_at: z.iso.datetime().nullable().describe("When the service last connected to Telegram, in UTC."),
-  last_received_at: z.iso.datetime().nullable().describe("When a message was last received, in UTC."),
-  refreshed_at: z.iso.datetime().nullable().describe("When the chat list was last refreshed, in UTC."),
+  connected_at: localTimeSchema
+    .nullable()
+    .describe("When the service last connected to Telegram, in local time with offset."),
+  last_received_at: localTimeSchema.nullable().describe("When a message was last received, in local time with offset."),
+  refreshed_at: localTimeSchema
+    .nullable()
+    .describe("When the chat list was last refreshed, in local time with offset."),
   chats: z
     .number()
     .int()
@@ -58,7 +63,7 @@ const output = z.object({
 function timestamp(value: string | undefined): string | null {
   if (value === undefined || value.trim() === "") return null
   const date = new Date(Number(value))
-  return Number.isFinite(date.getTime()) ? date.toISOString() : null
+  return Number.isFinite(date.getTime()) ? formatLocalTime(date.getTime()) : null
 }
 
 const UNREADABLE_MIRROR = "the mirror cannot be read"
