@@ -287,8 +287,24 @@ Every entry point takes the same settings:
 
 - **What the mirror keeps depends on the kind of chat.** Private chats, bots,
   basic groups and Saved Messages are mirrored always; supergroups while on
-  the sync list; channels only with the `channels` setting on; forum topics as
-  topics.
+  the sync list; channels while on it with the `channels` setting on; forum
+  topics as topics.
+- **The sync list names the supergroups and channels the mirror keeps**, at
+  most 30. They are the chats a user chooses: a busy supergroup or channel
+  would fill the mirror and the model's reads with text nobody asked for, so
+  none is kept until it is added. The list lives in the mirror, and the
+  service is its only writer, as of everything else there: adding and removing
+  are requests to the service, which applies the list again at every start. A
+  chat added is seeded with its newest messages, as a new chat is, and kept
+  current after; a chat removed loses its mirrored messages and earlier
+  versions and can still be read live, because the mirror holds only what it
+  keeps current. A history fetch checks the list when it writes, so a chat
+  removed during one stores nothing.
+- **With `channels` off no channel is anywhere.** The service lists none,
+  reads none, keeps none and takes none onto the sync list, and at start it
+  deletes every channel the mirror has, with its messages, earlier versions,
+  topics and place on the sync list. Turning the setting on again lists them
+  again; the ones to keep are added again.
 - **A chat is Telegram's signed chat id as a string**, such as `"123456789"`
   for a user or a bot, `"-4567"` for a basic group, or `"-1001234567890"` for
   a supergroup or channel. Chat ids are strings because a supergroup id has
@@ -322,7 +338,9 @@ Every entry point takes the same settings:
   files kept as they arrive.
 - **Channels never bring sponsored messages.** None is fetched or shown:
   advertisements are text nobody in the chat chose, and keeping them out
-  avoids untrusted prompts reaching the model.
+  avoids untrusted prompts reaching the model. They come only from a request
+  of their own, which nothing sends; history, search and updates never carry
+  them.
 - **Every read opens the mirror read-only and needs no service**, so reading
   works while the service is down and can never change what was received.
   Reads of chats the mirror does not keep are requests to the service and
