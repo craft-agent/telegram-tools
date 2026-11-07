@@ -184,13 +184,16 @@ Where a write is asked about, and where it is not:
 Every entry point takes the same settings. A flag wins over its environment
 variable, and an option or setting wins over the variable too.
 
-| Setting         | Flag              | Variable                       | Meaning                                                                       |
-| --------------- | ----------------- | ------------------------------ | ----------------------------------------------------------------------------- |
-| `toolsets`      | `--toolsets`      | `TELEGRAM_TOOLS_TOOLSETS`      | the toolsets that are on, or `all`; default those `src/project.ts` names      |
-| `read_only`     | `--read-only`     | `TELEGRAM_TOOLS_READ_ONLY`     | registers no tool that writes; wins over every other setting                  |
-| `tools`         | `--tools`         | `TELEGRAM_TOOLS_TOOLS`         | single tools to add by ID, whatever their toolset                             |
-| `exclude_tools` | `--exclude-tools` | `TELEGRAM_TOOLS_EXCLUDE_TOOLS` | single tools to remove by ID; wins over `tools` and `toolsets`                |
-| `confirm`       | `--confirm`       | `TELEGRAM_TOOLS_CONFIRM`       | MCP server only: `harness` (default) or `elicitation`, as the conventions say |
+| Setting             | Flag                  | Variable                           | Meaning                                                                       |
+| ------------------- | --------------------- | ---------------------------------- | ----------------------------------------------------------------------------- |
+| `toolsets`          | `--toolsets`          | `TELEGRAM_TOOLS_TOOLSETS`          | the toolsets that are on, or `all`; default those `src/project.ts` names      |
+| `read_only`         | `--read-only`         | `TELEGRAM_TOOLS_READ_ONLY`         | registers no tool that writes; wins over every other setting                  |
+| `tools`             | `--tools`             | `TELEGRAM_TOOLS_TOOLS`             | single tools to add by ID, whatever their toolset                             |
+| `exclude_tools`     | `--exclude-tools`     | `TELEGRAM_TOOLS_EXCLUDE_TOOLS`     | single tools to remove by ID; wins over `tools` and `toolsets`                |
+| `confirm`           | `--confirm`           | `TELEGRAM_TOOLS_CONFIRM`           | MCP server only: `harness` (default) or `elicitation`, as the conventions say |
+| `state_dir`         | `--state-dir`         | `TELEGRAM_TOOLS_STATE_DIR`         | where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`     |
+| `keep_disappearing` | `--keep-disappearing` | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | keep disappearing and view-once messages for the user; off by default         |
+| `channels`          | `--channels`          | `TELEGRAM_TOOLS_CHANNELS`          | list, read, mirror and send to channels; off by default, see below            |
 
 Lists are comma-separated in a flag or a variable. Where each harness reads them:
 
@@ -232,6 +235,44 @@ Lists are comma-separated in a flag or a variable. Where each harness reads them
   args = ["-y", "@craftsamo/telegram-tools@<version>", "--read-only"]
   env_vars = ["TELEGRAM_TOOLS_TOOLSETS"]
   ```
+
+### Accounts and the sync service
+
+The tools log in as a device of the user's own account through
+[mtcute](https://mtcute.dev), with an `api_id` and `api_hash` you register at
+[my.telegram.org](https://my.telegram.org). They never read another client's
+data.
+
+- **Each logged-in session has a label**, 1 to 24 lowercase letters, digits and
+  `_` (`default` when logging in names none). A tool's `account` argument picks
+  the label; leave it out when only one session is logged in.
+- **Each label keeps its state in one directory**, `<state_dir>/<label>/` (mode
+  700): the session and the app credentials, mtcute's storage, the mirror, the
+  service's socket, and short-lived copies of files in transit. `state_dir`
+  defaults to `$XDG_STATE_HOME/telegram-tools`, or
+  `~/.local/state/telegram-tools`. Keep it out of shared backups: the session
+  reads and sends as you.
+- **A sync service holds each label's only connection** and keeps the mirror,
+  and the read tools read only the mirror. History starts when the service
+  starts following a chat.
+- **A new login is shown to your other devices**, and Telegram ends sessions
+  unused for the period set under the account's settings.
+
+### Unofficial, and what Telegram's terms say
+
+The package is not made or endorsed by Telegram. You register your own app
+([API terms §2.1](https://core.telegram.org/api/terms)), and the package and the
+device name the service logs in as identify it as unofficial (§2.2, §2.3).
+
+- **Telegram's terms forbid using platform data for AI.**
+  [§1.5](https://core.telegram.org/api/terms) forbids using data from the
+  platform to train or deploy AI, and a broad reading covers an agent reading
+  your own chats. Unofficial clients are watched and abuse can freeze or ban
+  the account.
+- **`keep_disappearing` and `channels` are off by default.** Keeping
+  disappearing messages goes against §1.4, and showing channels without
+  sponsored messages goes against §3.3, which is why both are off. Whoever turns
+  either setting on accepts that risk.
 
 ## Layout
 
