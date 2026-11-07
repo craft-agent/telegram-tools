@@ -97,6 +97,25 @@ describe("openMirrorForWrite", () => {
     expect(version(second)).toBe(MIRROR_VERSION)
   })
 
+  test("migrates a mirror of version 1 to the current one, which only a writer does, keeping its messages", () => {
+    const raw = new DatabaseSync(path)
+    raw.exec(MIGRATIONS[0]!)
+    raw.exec("INSERT INTO chats (id, kind, updated) VALUES ('1', 'user', 0)")
+    raw.exec("INSERT INTO messages (chat, id, ts, received) VALUES ('1', 7, 5, 5)")
+    raw.exec("PRAGMA user_version = 1")
+    raw.close()
+    const refused = errorOf(() => openMirrorForRead(path))
+    expect(isToolError(refused) && refused.code).toBe("upstream_error")
+    expect(refused.message).toContain("older version")
+    const mirror = tracked(openMirrorForWrite(path))
+    expect(version(mirror)).toBe(MIRROR_VERSION)
+    expect(columnOf(mirror, "SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'messages_time'")).toEqual([
+      "messages_time",
+    ])
+    expect(columnOf(mirror, "SELECT id FROM messages")).toEqual([7])
+    tracked(openMirrorForRead(path))
+  })
+
   test("refuses a mirror of a newer version and leaves it untouched", () => {
     writeNewerMirror()
     const before = statSync(path).size

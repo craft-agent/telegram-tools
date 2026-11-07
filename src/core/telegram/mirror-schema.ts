@@ -1,5 +1,5 @@
 /** The schema version a current mirror has: the number of `MIGRATIONS`. */
-export const MIRROR_VERSION = 1
+export const MIRROR_VERSION = 2
 
 /**
  * `MIGRATIONS[i]` takes a mirror from version `i` to `i + 1`; entry 0 creates
@@ -102,4 +102,6 @@ CREATE TABLE meta (
   value TEXT
 );
 `,
+  // Entry 1 serves a search across every chat, which reads messages in time order.
+  "CREATE INDEX messages_time ON messages (ts, chat, id);",
 ]
