@@ -20,6 +20,8 @@ class SettingsFlagsTest(unittest.TestCase):
             self.flags(
                 toolsets=["things", "widgets"],
                 read_only=True,
+                keep_disappearing=True,
+                channels=True,
                 tools=["demo_thing_read"],
                 exclude_tools=["demo_widget_update", "demo_gadget_edit"],
             ),
@@ -27,6 +29,8 @@ class SettingsFlagsTest(unittest.TestCase):
                 "--toolsets",
                 "things,widgets",
                 "--read-only",
+                "--keep-disappearing",
+                "--channels",
                 "--tools",
                 "demo_thing_read",
                 "--exclude-tools",
@@ -39,7 +43,17 @@ class SettingsFlagsTest(unittest.TestCase):
         self.assertEqual(self.flags(toolsets=["all"]), ["--toolsets", "all"])
 
     def test_false_and_empty_settings_give_no_flag(self) -> None:
-        self.assertEqual(self.flags(toolsets=[], read_only=False, tools=[], exclude_tools=[]), [])
+        self.assertEqual(
+            self.flags(
+                toolsets=[],
+                read_only=False,
+                keep_disappearing=False,
+                channels=False,
+                tools=[],
+                exclude_tools=[],
+            ),
+            [],
+        )
 
     def test_state_dir_flag(self) -> None:
         self.assertEqual(
@@ -60,6 +74,10 @@ class SettingsFlagsTest(unittest.TestCase):
             {"toolsets": "things"},
             {"toolsets": 3},
             {"read_only": "true"},
+            {"keep_disappearing": "true"},
+            {"keep_disappearing": 1},
+            {"channels": "true"},
+            {"channels": 0},
             {"tools": "demo_thing_read"},
             {"exclude_tools": [1]},
             {"state_dir": 123},

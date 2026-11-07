@@ -53,11 +53,16 @@ def settings_flags(ctx: PluginContext) -> list[str]:
     elif toolsets is not None and (names := _names("toolsets", toolsets)):
         flags += ["--toolsets", names]
 
-    read_only = ctx.get_config("read_only")
-    if read_only is not None and not isinstance(read_only, bool):
-        raise SettingsError('setting "read_only" must be true or false')
-    if read_only:
-        flags.append("--read-only")
+    for key, flag in (
+        ("read_only", "--read-only"),
+        ("keep_disappearing", "--keep-disappearing"),
+        ("channels", "--channels"),
+    ):
+        value = ctx.get_config(key)
+        if value is not None and not isinstance(value, bool):
+            raise SettingsError(f'setting "{key}" must be true or false')
+        if value:
+            flags.append(flag)
 
     for key, flag in (("tools", "--tools"), ("exclude_tools", "--exclude-tools")):
         value = ctx.get_config(key)
