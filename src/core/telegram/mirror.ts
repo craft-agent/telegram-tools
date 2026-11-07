@@ -16,6 +16,8 @@ const NOT_SYNCED = "Nothing has been received for this account yet: its sync ser
 const TOO_NEW = "This mirror was written by a newer version of these tools; update them."
 const TOO_OLD =
   "This mirror is from an older version of these tools; restart the account's sync service to bring it up to date."
+/** The messages of the errors that refuse a mirror for its schema version, newer or older than the code. */
+export const MIRROR_VERSION_REFUSALS: ReadonlySet<string> = new Set([TOO_NEW, TOO_OLD])
 
 function schemaVersion(mirror: Mirror): number {
   const row = mirror.prepare("PRAGMA user_version").get() as { user_version: number }

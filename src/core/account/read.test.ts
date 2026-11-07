@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { spawn, type ChildProcess } from "node:child_process"
-import { existsSync, mkdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs"
+import { chmodSync, existsSync, mkdirSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs"
 import { ToolError } from "../errors"
 import { labelPaths } from "../telegram/labels"
 import { openMirrorForWrite, setMeta } from "../telegram/mirror"
@@ -225,21 +225,124 @@ describe("account read: service health", () => {
   })
 
   test("a newer mirror reports the refusal and restart action", async () => {
-    label()
+    const paths = label()
     mirrorMeta({}, "default", MIRROR_VERSION + 1)
     const [account] = (await read()).accounts
     expect(account?.service).toBe("failed")
     expect(account?.error).toContain("newer version")
     expect(account?.action).toBe("start_service")
+    expect(existsSync(`${paths.mirror}-wal`)).toBe(false)
+    expect(existsSync(`${paths.mirror}-shm`)).toBe(false)
   })
 
   test("an uninitialized mirror is treated as never run", async () => {
-    label()
+    const paths = label()
     mirrorMeta({}, "default", 0)
     const [account] = (await read()).accounts
     expect(account?.service).toBe("never run")
     expect(account?.error).toBeNull()
     expect(account?.action).toBe("start_service")
+    expect(existsSync(`${paths.mirror}-wal`)).toBe(false)
+    expect(existsSync(`${paths.mirror}-shm`)).toBe(false)
+  })
+
+  test("an initialized mirror with no recorded status reports never run", async () => {
+    const paths = label()
+    openMirrorForWrite(paths.mirror).close()
+
+    const [account] = (await read()).accounts
+    expect(account).toEqual({
+      label: "default",
+      login: "logged in",
+      service: "never run",
+      connected_at: null,
+      last_received_at: null,
+      refreshed_at: null,
+      chats: 0,
+      followed: 0,
+      messages: 0,
+      error: null,
+      action: "start_service",
+      hint: "Start the sync service to receive messages for this account.",
+    })
+    expect(existsSync(`${paths.mirror}-wal`)).toBe(false)
+    expect(existsSync(`${paths.mirror}-shm`)).toBe(false)
+  })
+
+  const isRoot = typeof process.getuid === "function" && process.getuid() === 0
+  test.skipIf(isRoot)("an unreadable mirror reports the failure without failing other labels", async () => {
+    const broken = label("broken")
+    writeFileSync(broken.mirror, "placeholder")
+    chmodSync(broken.mirror, 0)
+
+    const healthy = label("healthy")
+    mirrorMeta({ [META.status]: "stopped" }, "healthy")
+
+    try {
+      const { accounts } = await read()
+      expect(accounts).toEqual([
+        {
+          label: "broken",
+          login: "logged in",
+          service: "failed",
+          connected_at: null,
+          last_received_at: null,
+          refreshed_at: null,
+          chats: null,
+          followed: null,
+          messages: null,
+          error: "the mirror cannot be read",
+          action: "check_service",
+          hint: "Check the sync service's status and log to find why it failed.",
+        },
+        expect.objectContaining({
+          label: "healthy",
+          service: "stopped",
+          action: "start_service",
+        }),
+      ])
+      expect(existsSync(`${broken.mirror}-wal`)).toBe(false)
+      expect(existsSync(`${broken.mirror}-shm`)).toBe(false)
+      expect(existsSync(`${healthy.mirror}-wal`)).toBe(false)
+      expect(existsSync(`${healthy.mirror}-shm`)).toBe(false)
+    } finally {
+      chmodSync(broken.mirror, 0o600)
+    }
+  })
+
+  test("a file that is not SQLite reports the failure without failing other labels", async () => {
+    const corrupt = label("corrupt")
+    writeFileSync(corrupt.mirror, "this is not a sqlite database\n")
+
+    const healthy = label("healthy")
+    mirrorMeta({ [META.status]: "stopped" }, "healthy")
+
+    const { accounts } = await read()
+    expect(accounts).toEqual([
+      {
+        label: "corrupt",
+        login: "logged in",
+        service: "failed",
+        connected_at: null,
+        last_received_at: null,
+        refreshed_at: null,
+        chats: null,
+        followed: null,
+        messages: null,
+        error: "the mirror cannot be read",
+        action: "check_service",
+        hint: "Check the sync service's status and log to find why it failed.",
+      },
+      expect.objectContaining({
+        label: "healthy",
+        service: "stopped",
+        action: "start_service",
+      }),
+    ])
+    expect(existsSync(`${corrupt.mirror}-wal`)).toBe(false)
+    expect(existsSync(`${corrupt.mirror}-shm`)).toBe(false)
+    expect(existsSync(`${healthy.mirror}-wal`)).toBe(false)
+    expect(existsSync(`${healthy.mirror}-shm`)).toBe(false)
   })
 
   test("reports chat, followed chat, and message counts from the mirror", async () => {

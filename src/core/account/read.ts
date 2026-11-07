@@ -2,7 +2,7 @@ import { existsSync, statSync } from "node:fs"
 import { z } from "zod"
 import { ToolError } from "../errors"
 import { labelPaths, listLabels, pickLabel, type LabelPaths } from "../telegram/labels"
-import { getMeta, openMirrorForRead } from "../telegram/mirror"
+import { getMeta, MIRROR_VERSION_REFUSALS, openMirrorForRead } from "../telegram/mirror"
 import { META, SYNC_STATUS } from "../telegram/mirror-meta"
 import { lockHolder } from "../telegram/sync-lock"
 import { defineTool } from "../tool"
@@ -61,20 +61,30 @@ function timestamp(value: string | undefined): string | null {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null
 }
 
+const UNREADABLE_MIRROR = "the mirror cannot be read"
+const CHECK_SERVICE_HINT = "Check the sync service's status and log to find why it failed."
+
+function isVersionRefusal(error: unknown): error is ToolError {
+  return error instanceof ToolError && error.code === "upstream_error" && MIRROR_VERSION_REFUSALS.has(error.message)
+}
+
 function nextStep(result: Account, mirrorRefused: boolean): void {
-  if (result.login === "not logged in") {
+  if (mirrorRefused) {
+    result.action = "start_service"
+    result.hint =
+      "Restart the sync service to bring the mirror up to date; update the tools first if the mirror is newer."
+  } else if (result.error === UNREADABLE_MIRROR) {
+    result.action = "check_service"
+    result.hint = CHECK_SERVICE_HINT
+  } else if (result.login === "not logged in") {
     result.action = "log_in"
     result.hint = "Log in to this account."
   } else if (result.login === "logged out") {
     result.action = "log_in"
     result.hint = "Telegram ended this session; log in again."
-  } else if (mirrorRefused) {
-    result.action = "start_service"
-    result.hint =
-      "Restart the sync service to bring the mirror up to date; update the tools first if the mirror is newer."
   } else if (result.service === "failed") {
     result.action = "check_service"
-    result.hint = "Check the sync service's status and log to find why it failed."
+    result.hint = CHECK_SERVICE_HINT
   } else if (result.service !== "running" && result.service !== "starting") {
     result.action = "start_service"
     result.hint = "Start the sync service to receive messages for this account."
@@ -113,8 +123,12 @@ function readAccount(paths: LabelPaths): Account {
         } else if (status === SYNC_STATUS.running || status === SYNC_STATUS.starting) {
           const holder = lockHolder(paths.syncLock)
           result.service = holder !== undefined ? status : "not running"
+        } else if (status === SYNC_STATUS.failed) {
+          result.service = "failed"
+        } else if (status === SYNC_STATUS.stopped) {
+          result.service = "stopped"
         } else {
-          result.service = status === SYNC_STATUS.failed ? "failed" : "stopped"
+          result.service = "never run"
         }
         result.connected_at = timestamp(meta[META.connectedAt])
         result.last_received_at = timestamp(meta[META.lastReceivedAt])
@@ -133,11 +147,21 @@ function readAccount(paths: LabelPaths): Account {
         mirror.close()
       }
     } catch (error) {
-      if (!(error instanceof ToolError) || (error.code !== "upstream_error" && error.code !== "not_found")) throw error
-      if (error.code === "upstream_error") {
+      if (isVersionRefusal(error)) {
         result.service = "failed"
         result.error = error.message
         mirrorRefused = true
+      } else if (error instanceof ToolError && error.code === "not_found") {
+        // The mirror has not been initialized yet (user_version = 0).
+      } else {
+        result.service = "failed"
+        result.error = UNREADABLE_MIRROR
+        result.connected_at = null
+        result.last_received_at = null
+        result.refreshed_at = null
+        result.chats = null
+        result.followed = null
+        result.messages = null
       }
     }
   }
