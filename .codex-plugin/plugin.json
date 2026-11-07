@@ -1,0 +1,30 @@
+{
+  "name": "telegram-tools",
+  "version": "0.0.0",
+  "description": "Unofficial Telegram tools for coding agents: chats, messages, received files and sends.",
+  "author": {
+    "name": "craftsamo",
+    "url": "https://github.com/craft-agent"
+  },
+  "homepage": "https://github.com/craft-agent/telegram-tools#readme",
+  "repository": "https://github.com/craft-agent/telegram-tools",
+  "license": "MIT",
+  "skills": "./skills",
+  "mcpServers": {
+    "telegram-tools": {
+      "command": "node",
+      "args": ["dist/mcp.js"],
+      "cwd": ".",
+      "env_vars": [
+        "TELEGRAM_TOOLS_TOOLSETS",
+        "TELEGRAM_TOOLS_READ_ONLY",
+        "TELEGRAM_TOOLS_TOOLS",
+        "TELEGRAM_TOOLS_EXCLUDE_TOOLS",
+        "TELEGRAM_TOOLS_CONFIRM",
+        "TELEGRAM_TOOLS_STATE_DIR",
+        "TELEGRAM_TOOLS_KEEP_DISAPPEARING",
+        "TELEGRAM_TOOLS_CHANNELS"
+      ]
+    }
+  }
+}
