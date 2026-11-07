@@ -10,6 +10,14 @@ const BUSY_TIMEOUT_MS = 5_000
 /** The name every nested transaction's savepoint takes: SQLite releases and rolls back to the innermost one with a name. */
 const SAVEPOINT = "mtcute_nested"
 
+/** What a write through a frozen storage throws. */
+export class StorageFrozenError extends Error {
+  constructor() {
+    super("The session storage is frozen; it takes no more writes.")
+    this.name = "StorageFrozenError"
+  }
+}
+
 type AnyFunction = (...args: any[]) => any
 
 /**
@@ -52,9 +60,10 @@ function toRow(row: Record<string, SQLOutputValue>): Record<string, unknown> {
 }
 
 /** Exposes a prepared statement as mtcute calls it: positional parameters, no result from `run`, `undefined` from `get` when no row matches. */
-function wrapStatement(statement: StatementSync): ISqliteStatement {
+function wrapStatement(statement: StatementSync, guardWrite: () => void): ISqliteStatement {
   return {
     run: (...params) => {
+      guardWrite()
       statement.run(...(params as SQLInputValue[]))
     },
     get: (...params) => {
@@ -74,8 +83,23 @@ function wrapStatement(statement: StatementSync): ISqliteStatement {
  * existing file keeps its mode.
  */
 export class NodeSqliteStorageDriver extends BaseSqliteStorageDriver {
+  private frozen = false
+
   constructor(readonly path: string) {
     super()
+  }
+
+  /**
+   * From now on every write through this driver (a statement's `run`, `exec`,
+   * and so a transaction that writes) throws `StorageFrozenError`; reads keep
+   * working. It cannot be undone.
+   */
+  freeze(): void {
+    this.frozen = true
+  }
+
+  private guardWrite = (): void => {
+    if (this.frozen) throw new StorageFrozenError()
   }
 
   _createDatabase(): ISqliteDatabase {
@@ -90,8 +114,9 @@ export class NodeSqliteStorageDriver extends BaseSqliteStorageDriver {
     }
     return {
       transaction: (fn) => transaction(db, fn),
-      prepare: (sql) => wrapStatement(db.prepare(sql)),
+      prepare: (sql) => wrapStatement(db.prepare(sql), this.guardWrite),
       exec: (sql) => {
+        this.guardWrite()
         db.exec(sql)
       },
       close: () => {
@@ -106,7 +131,20 @@ export class NodeSqliteStorageDriver extends BaseSqliteStorageDriver {
  * state) in the SQLite file at `path`, on `NodeSqliteStorageDriver`.
  */
 export class TelegramStorage extends BaseSqliteStorage {
+  private readonly sqliteDriver: NodeSqliteStorageDriver
+
   constructor(readonly path: string) {
-    super(new NodeSqliteStorageDriver(path))
+    const driver = new NodeSqliteStorageDriver(path)
+    super(driver)
+    this.sqliteDriver = driver
+  }
+
+  /**
+   * Makes every later write to the session file throw `StorageFrozenError`,
+   * so that mtcute's save of the update state fails and the persisted state
+   * stays where the last complete save left it. Reads keep working.
+   */
+  freeze(): void {
+    this.sqliteDriver.freeze()
   }
 }

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { StorageManager, TelegramStorageManager, type ICorePlatform } from "@mtcute/core"
 import { LogManager } from "@mtcute/core/utils.js"
-import { NodeSqliteStorageDriver, TelegramStorage } from "./storage"
+import { NodeSqliteStorageDriver, StorageFrozenError, TelegramStorage } from "./storage"
 
 const OWNER_ONLY = 0o600
 const DC = 2
@@ -171,6 +171,45 @@ describe("statements", () => {
     const db = new NodeSqliteStorageDriver(path)._createDatabase()
     db.close()
     expect(() => db.close()).not.toThrow()
+  })
+})
+
+describe("freezing", () => {
+  test("every write through a frozen driver throws StorageFrozenError, and reads keep working", () => {
+    const driver = new NodeSqliteStorageDriver(path)
+    const db = driver._createDatabase()
+    db.exec("create table t (n integer primary key)")
+    const insert = db.prepare<[number]>("insert into t (n) values (?)")
+    insert.run(1)
+
+    driver.freeze()
+
+    expect(() => insert.run(2)).toThrow(StorageFrozenError)
+    expect(() => db.exec("insert into t (n) values (3)")).toThrow(StorageFrozenError)
+    expect(() => db.transaction(() => insert.run(4))()).toThrow(StorageFrozenError)
+    expect(db.prepare("select n from t order by n").all()).toEqual([{ n: 1 }])
+    expect(db.prepare<[number]>("select n from t where n = ?").get(1)).toEqual({ n: 1 })
+    db.close()
+  })
+
+  test("a frozen storage fails the save of the update state and keeps the one saved before", async () => {
+    const first = await open()
+    const [pts, qts, date, seq] = UPDATES_STATE
+    await first.telegram.updates.setPts(pts)
+    await first.telegram.updates.setQts(qts)
+    await first.telegram.updates.setDate(date)
+    await first.telegram.updates.setSeq(seq)
+    await first.mt.save()
+
+    first.storage.freeze()
+    await first.telegram.updates.setPts(pts + 10)
+
+    await expect(first.mt.save()).rejects.toThrow(StorageFrozenError)
+    await first.mt.destroy()
+
+    const second = await open()
+    expect(await second.telegram.updates.getState()).toEqual(UPDATES_STATE)
+    await second.close()
   })
 })
 
