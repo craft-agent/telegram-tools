@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { PROJECT } from "../project"
 import type { EntryProfile } from "./profile"
-import { parseSettings, parseToolSettings } from "./settings"
+import { parseServiceSettings, parseSettings, parseToolSettings } from "./settings"
 import { failure, profile } from "./settings.testing"
 
 const parse = (argv: string[], env: Record<string, string | undefined> = {}) => parseSettings(argv, env, profile)
@@ -199,6 +199,54 @@ describe("parseSettings", () => {
     const none: EntryProfile = { name: "demo-tools", envPrefix: "DEMO", toolsets: { names: [], defaults: [] } }
     expect(failure(() => parseSettings(["--toolsets", "alpha"], {}, none)).message).toContain("no toolsets are defined")
     expect(parseSettings(["--toolsets", "all"], {}, none).toolsets).toBe("all")
+  })
+})
+
+describe("keep_disappearing and channels", () => {
+  test("are absent unless set", () => {
+    expect(parse([])).not.toHaveProperty("keep_disappearing")
+    expect(parse([])).not.toHaveProperty("channels")
+  })
+
+  test("read from the flags, the environment, and the flag wins", () => {
+    expect(parse(["--keep-disappearing", "--channels"])).toMatchObject({ keep_disappearing: true, channels: true })
+    expect(parse([], { DEMO_KEEP_DISAPPEARING: "1", DEMO_CHANNELS: "true" })).toMatchObject({
+      keep_disappearing: true,
+      channels: true,
+    })
+    expect(parse([], { DEMO_CHANNELS: "0" }).channels).toBe(false)
+    expect(parse(["--channels"], { DEMO_CHANNELS: "0" }).channels).toBe(true)
+  })
+
+  test("a bad environment value is rejected, naming the variable; a value after the flag is too", () => {
+    expect(failure(() => parse([], { DEMO_CHANNELS: "yes" })).message).toContain("DEMO_CHANNELS")
+    expect(failure(() => parse(["--channels=1"])).message).toContain("--channels")
+  })
+
+  test("parseToolSettings reads them too", () => {
+    expect(parseTool(["--channels"], { DEMO_KEEP_DISAPPEARING: "true" })).toMatchObject({
+      keep_disappearing: true,
+      channels: true,
+    })
+  })
+})
+
+describe("parseServiceSettings", () => {
+  const parseService = (argv: string[], env: Record<string, string | undefined> = {}) =>
+    parseServiceSettings(argv, env, profile)
+
+  test("gives the state directory and both booleans, off by default", () => {
+    expect(parseService([])).toEqual({ state_dir: expect.any(String), keep_disappearing: false, channels: false })
+    expect(parseService(["--state-dir=/s", "--channels"], { DEMO_KEEP_DISAPPEARING: "1" })).toEqual({
+      state_dir: "/s",
+      keep_disappearing: true,
+      channels: true,
+    })
+  })
+
+  test("rejects any other settings flag, naming it", () => {
+    expect(failure(() => parseService(["--read-only"])).message).toContain("--read-only")
+    expect(failure(() => parseService(["--nope"])).message).toContain("--nope")
   })
 })
 

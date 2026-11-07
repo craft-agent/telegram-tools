@@ -73,6 +73,21 @@ describe("settingsFromOptions", () => {
     expect(failure(() => fromOptions({ confirm: "harness" })).message).toContain('"confirm"')
   })
 
+  test("reads keep_disappearing and channels from options and the environment", () => {
+    expect(fromOptions({ keep_disappearing: true, channels: false })).toEqual({
+      state_dir: expect.any(String),
+      keep_disappearing: true,
+      channels: false,
+    })
+    expect(fromOptions({}, { DEMO_CHANNELS: "1", DEMO_KEEP_DISAPPEARING: "0" })).toMatchObject({
+      channels: true,
+      keep_disappearing: false,
+    })
+    expect(fromOptions({ channels: false }, { DEMO_CHANNELS: "1" }).channels).toBe(false)
+    expect(failure(() => fromOptions({ channels: "true" })).message).toContain('"channels"')
+    expect(failure(() => fromOptions({ keep_disappearing: 1 })).message).toContain('"keep_disappearing"')
+  })
+
   test("a bad environment variable is rejected only when no option overrides it", () => {
     expect(failure(() => fromOptions({}, { DEMO_READ_ONLY: "yes" })).message).toContain("DEMO_READ_ONLY")
     expect(fromOptions({ read_only: true }, { DEMO_READ_ONLY: "yes" }).read_only).toBe(true)
