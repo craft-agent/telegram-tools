@@ -29,6 +29,11 @@ function fileFacts(media: FileMedia): Draft {
   return { type: media.type, name: media.fileName, mime: media.mimeType, size: media.fileSize }
 }
 
+/** A length in whole seconds: mtcute reads a video's as a fraction, and one that is no length is left out. */
+function wholeSeconds(seconds: number): number | null {
+  return Number.isFinite(seconds) && seconds >= 0 ? Math.round(seconds) : null
+}
+
 function draftOf(media: NonNullable<MessageMedia>): Draft {
   switch (media.type) {
     case "photo":
@@ -36,11 +41,11 @@ function draftOf(media: NonNullable<MessageMedia>): Draft {
     case "document":
       return fileFacts(media)
     case "audio":
-      return { ...fileFacts(media), duration: media.duration, title: media.title }
+      return { ...fileFacts(media), duration: wholeSeconds(media.duration), title: media.title }
     case "voice":
-      return { ...fileFacts(media), duration: media.duration }
+      return { ...fileFacts(media), duration: wholeSeconds(media.duration) }
     case "video":
-      return { ...fileFacts(media), duration: media.duration, width: media.width, height: media.height }
+      return { ...fileFacts(media), duration: wholeSeconds(media.duration), width: media.width, height: media.height }
     case "sticker":
       return { ...fileFacts(media), emoji: media.emoji, width: media.width, height: media.height }
     case "dice":
