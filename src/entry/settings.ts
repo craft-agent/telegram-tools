@@ -185,6 +185,17 @@ function envText(
   return text === undefined || text.trim() === "" ? undefined : { text, source: variable }
 }
 
+/** A setting from the command line when its flag was given, else from its environment variable. */
+function flagOrEnvText(
+  flags: Partial<Record<OptionName, string>>,
+  name: OptionName,
+  env: Record<string, string | undefined>,
+  profile: EntryProfile,
+): SettingText | undefined {
+  const flagged = flags[name]
+  return flagged !== undefined ? { text: flagged, source: OPTIONS[name].flag } : envText(name, env, profile)
+}
+
 /**
  * Reads the settings every entry point takes from its command line and
  * environment (`<envPrefix>_<SETTING>` variables). A flag wins over its
@@ -197,8 +208,7 @@ export function parseSettings(
   profile: EntryProfile = PROJECT_PROFILE,
 ): EntrySettings {
   const flags = readFlags(argv)
-  const value = (name: OptionName): SettingText | undefined =>
-    flags[name] !== undefined ? { text: flags[name], source: OPTIONS[name].flag } : envText(name, env, profile)
+  const value = (name: OptionName): SettingText | undefined => flagOrEnvText(flags, name, env, profile)
 
   const settings: EntrySettings = {
     confirm: "harness",
@@ -259,8 +269,7 @@ export function parseStateDir(
   const other = (Object.keys(flags) as OptionName[]).find((name) => name !== "state_dir")
   if (other !== undefined)
     throw new ToolError("invalid_argument", `Option ${OPTIONS[other].flag} is not available here.`)
-  const given = flags.state_dir !== undefined ? { text: flags.state_dir, source: OPTIONS.state_dir.flag } : undefined
-  return resolveStateDir(given ?? envText("state_dir", env, profile), env, profile)
+  return resolveStateDir(flagOrEnvText(flags, "state_dir", env, profile), env, profile)
 }
 
 /** What the sync service and its service unit take from the command line: the state directory and two booleans. */
@@ -282,8 +291,7 @@ export function parseServiceSettings(
   const other = (Object.keys(flags) as OptionName[]).find((name) => !allowed.includes(name))
   if (other !== undefined)
     throw new ToolError("invalid_argument", `Option ${OPTIONS[other].flag} is not available here.`)
-  const value = (name: OptionName): SettingText | undefined =>
-    flags[name] !== undefined ? { text: flags[name], source: OPTIONS[name].flag } : envText(name, env, profile)
+  const value = (name: OptionName): SettingText | undefined => flagOrEnvText(flags, name, env, profile)
   const on = (name: (typeof SERVICE_OPTION_NAMES)[number]): boolean => {
     const given = value(name)
     return given !== undefined && parseBoolean(given.text, given.source)
@@ -370,19 +378,13 @@ export function settingsFromOptions(
     return text !== undefined ? fromText(text) : undefined
   }
 
-  const stateDirGiven =
-    given.state_dir !== undefined
-      ? { text: directoryOption("state_dir", given.state_dir), source: 'Option "state_dir"' }
-      : envText("state_dir", env, profile)
+  const directoryText = (name: "state_dir" | "download_dir"): SettingText | undefined =>
+    given[name] !== undefined
+      ? { text: directoryOption(name, given[name]), source: `Option "${name}"` }
+      : envText(name, env, profile)
   const settings: RunSettings = {
-    state_dir: resolveStateDir(stateDirGiven, env, profile),
-    download_dir: resolveDownloadDir(
-      given.download_dir !== undefined
-        ? { text: directoryOption("download_dir", given.download_dir), source: 'Option "download_dir"' }
-        : envText("download_dir", env, profile),
-      env,
-      profile,
-    ),
+    state_dir: resolveStateDir(directoryText("state_dir"), env, profile),
+    download_dir: resolveDownloadDir(directoryText("download_dir"), env, profile),
     download_max_mb:
       resolve("download_max_mb", (value) => downloadMaxMb(value, 'Option "download_max_mb"'), downloadMaxMbText) ??
       DEFAULT_DOWNLOAD_MAX_MB,

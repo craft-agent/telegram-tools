@@ -9,6 +9,7 @@ import {
   ToolError,
   type ErrorCode,
   type ErrorDetails,
+  type ToolContext,
   type ToolSpec,
 } from "../core"
 import { errorBody } from "../entry/errors"
@@ -48,18 +49,30 @@ export type CliIo = {
   signal?: AbortSignal
 }
 
+/** What `run` and `target` name: the tool, the working directory and the resolved directory and download settings. */
+type ToolCall = {
+  toolId: string
+  cwd: string
+  stateDir: string
+  downloadDir: string
+  downloadMaxMb: number
+}
+
 type Command =
   | { name: "list"; selected: ToolSpec[] }
-  | {
-      name: "run"
-      toolId: string
-      cwd: string
-      selected: ToolSpec[]
-      stateDir: string
-      downloadDir: string
-      downloadMaxMb: number
-    }
-  | { name: "target"; toolId: string; cwd: string; stateDir: string; downloadDir: string; downloadMaxMb: number }
+  | ({ name: "run"; selected: ToolSpec[] } & ToolCall)
+  | ({ name: "target" } & ToolCall)
+
+function toolContext(command: ToolCall, io: CliIo): ToolContext {
+  return {
+    cwd: command.cwd,
+    ownDir: io.ownDir,
+    stateDir: command.stateDir,
+    downloadDir: command.downloadDir,
+    downloadMaxMb: command.downloadMaxMb,
+    signal: io.signal,
+  }
+}
 
 function usageError(message: string): ToolError {
   return new ToolError("invalid_argument", message)
@@ -163,14 +176,7 @@ async function runTool(command: Extract<Command, { name: "run" }>, io: CliIo): P
   const spec = command.selected.find((candidate) => candidate.id === command.toolId)
   if (!spec) return writeError(io, "invalid_argument", `Unknown tool "${command.toolId}".`)
   try {
-    const result = await invoke(spec, await readArguments(io), {
-      cwd: command.cwd,
-      ownDir: io.ownDir,
-      stateDir: command.stateDir,
-      downloadDir: command.downloadDir,
-      downloadMaxMb: command.downloadMaxMb,
-      signal: io.signal,
-    })
+    const result = await invoke(spec, await readArguments(io), toolContext(command, io))
     writeJson(io, { result })
     return EXIT_OK
   } catch (error) {
@@ -185,14 +191,7 @@ async function targetOf(command: Extract<Command, { name: "target" }>, io: CliIo
   const spec = io.specs.find((candidate) => candidate.id === command.toolId)
   if (!spec) return writeError(io, "invalid_argument", `Unknown tool "${command.toolId}".`)
   try {
-    const resources = await permissionResources(spec, await readArguments(io), {
-      cwd: command.cwd,
-      ownDir: io.ownDir,
-      stateDir: command.stateDir,
-      downloadDir: command.downloadDir,
-      downloadMaxMb: command.downloadMaxMb,
-      signal: io.signal,
-    })
+    const resources = await permissionResources(spec, await readArguments(io), toolContext(command, io))
     writeJson(io, { resources })
     return EXIT_OK
   } catch (error) {
