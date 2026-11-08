@@ -1,3 +1,4 @@
+import { DOWNLOAD_STALL_MS } from "./sync-download"
 import type { OpenClient } from "./sync-telegram"
 import { realPause, type Pause } from "./sync-wait"
 
@@ -81,6 +82,8 @@ export type SyncOptions = {
   fillLimit?: number
   /** The shortest and the longest random pause before a background fetch; 0.5 and 1.5 seconds by default. */
   paceMs?: readonly [number, number]
+  /** How long a download may receive nothing before it stops; 60 seconds by default. */
+  downloadStallMs?: number
 }
 
 /** `SyncOptions` with every default filled in. */
@@ -105,5 +108,6 @@ export function resolveOptions(options: SyncOptions): ResolvedSyncOptions {
     seedAttempts: options.seedAttempts ?? DEFAULT_SEED_ATTEMPTS,
     fillLimit: options.fillLimit ?? DEFAULT_FILL_LIMIT,
     paceMs: options.paceMs ?? DEFAULT_PACE_MS,
+    downloadStallMs: options.downloadStallMs ?? DOWNLOAD_STALL_MS,
   }
 }

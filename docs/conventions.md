@@ -379,6 +379,9 @@ Every entry point takes the same settings:
   A file declaring more is refused before anything is downloaded, and a
   download that passes the limit stops and leaves nothing. Telegram takes
   files of several gigabytes, and the one connection serves every request.
+  A download that receives nothing for 60 seconds stops too: mtcute waits out
+  flood waits and retries failed parts inside a download without end, so the
+  stall limit is what bounds a flood wait there.
 - **Programs and installers are never saved**, judged by the name, the
   declared type and the first bytes, since any one of them can lie. Source
   code is saved as text: it runs only if someone runs it. Animated stickers
