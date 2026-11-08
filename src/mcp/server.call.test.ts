@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { z } from "zod"
 import { ToolError, defineTool } from "../core"
+import { PROJECT } from "../project"
 import {
   call,
   connect,
@@ -170,6 +171,13 @@ describe("calls", () => {
     const { client } = await connect([tool("demo_thing_create", "alpha", "add", calls)], settings())
     await call(client, "demo_thing_create")
     expect(calls[0]!.ctx.signal).toBeInstanceOf(AbortSignal)
+  })
+
+  test("names the program in ctx.programName", async () => {
+    const calls: Call[] = []
+    const { client } = await connect([tool("demo_thing_create", "alpha", "add", calls)], settings())
+    await call(client, "demo_thing_create")
+    expect(calls[0]?.ctx.programName).toBe(PROJECT.name)
   })
 
   test("passes stateDir from settings into ctx.stateDir", async () => {

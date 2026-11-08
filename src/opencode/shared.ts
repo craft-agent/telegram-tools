@@ -3,6 +3,7 @@ import { errorText } from "../entry/errors"
 import { ANY_RESOURCE } from "../entry/permission"
 import { PROJECT_PROFILE, type EntryProfile } from "../entry/profile"
 import { settingsFromOptions } from "../entry/settings"
+import { PROJECT } from "../project"
 import type { PluginOptions } from "./types"
 
 /** What a plugin takes from its surroundings; each has a default, and a test supplies its own. */
@@ -39,19 +40,20 @@ export function needsPermission(spec: Pick<ToolSpec, "class">): boolean {
   return spec.class !== "read"
 }
 
-/** The tools and resolved state and download settings the plugin options (and the environment behind them) select from `specs`. */
+/** The tools, the resolved state and download settings and the program name the plugin options (and the environment behind them) select from `specs`. */
 export function selectedTools(
   specs: ToolSpec[],
   options: PluginOptions | undefined,
   env: Record<string, string | undefined> = process.env,
   profile: EntryProfile = PROJECT_PROFILE,
-): { tools: ToolSpec[]; stateDir: string } & Pick<ToolContext, "downloadDir" | "downloadMaxMb"> {
+): { tools: ToolSpec[]; stateDir: string } & Pick<ToolContext, "downloadDir" | "downloadMaxMb" | "programName"> {
   const settings = settingsFromOptions(options, env, profile)
   return {
     tools: selectTools(specs, settings, profile.toolsets),
     stateDir: settings.state_dir,
     downloadDir: settings.download_dir,
     downloadMaxMb: settings.download_max_mb,
+    programName: PROJECT.name,
   }
 }
 

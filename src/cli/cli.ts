@@ -70,6 +70,7 @@ function toolContext(command: ToolCall, io: CliIo): ToolContext {
     stateDir: command.stateDir,
     downloadDir: command.downloadDir,
     downloadMaxMb: command.downloadMaxMb,
+    programName: PROJECT.name,
     signal: io.signal,
   }
 }

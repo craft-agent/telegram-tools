@@ -92,6 +92,7 @@ export function createServer(specs: ToolSpec[], settings: EntrySettings, options
         stateDir: settings.state_dir,
         downloadDir: settings.download_dir,
         downloadMaxMb: settings.download_max_mb,
+        programName: PROJECT.name,
         signal: extra.signal,
         ...(confirm && { confirm }),
       }

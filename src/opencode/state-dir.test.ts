@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { z } from "zod"
 import { defineTool, type ToolSpec } from "../core"
+import { PROJECT } from "../project"
 import { PROFILE } from "./testing"
 import type { V1ToolContext, V2Context, V2Tool } from "./types"
 import { createV1Server } from "./v1"
@@ -21,12 +22,14 @@ describe("OpenCode state_dir setting", () => {
       async targets(_args, ctx) {
         expect(ctx.downloadDir).toBe("/received")
         expect(ctx.downloadMaxMb).toBe(42)
+        expect(ctx.programName).toBe(PROJECT.name)
         recorder.target = ctx.stateDir
         return ["target-resource"]
       },
       async execute(_args, ctx) {
         expect(ctx.downloadDir).toBe("/received")
         expect(ctx.downloadMaxMb).toBe(42)
+        expect(ctx.programName).toBe(PROJECT.name)
         recorder.execute = ctx.stateDir
         return { ok: true }
       },

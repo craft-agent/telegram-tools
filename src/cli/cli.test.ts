@@ -201,6 +201,26 @@ describe("run", () => {
     expect(run.code).toBe(EXIT_OK)
     expect(captured).toEqual(["/received", 42])
   })
+
+  test("names the program in ctx.programName, for run and for target", async () => {
+    const captured: unknown[] = []
+    const checkTool: ToolSpec = {
+      ...specs[0]!,
+      id: "demo_thing_read",
+      async targets(_args, ctx) {
+        captured.push(ctx.programName)
+        return []
+      },
+      async execute(_args, ctx) {
+        captured.push(ctx.programName)
+        return { tool: "demo_thing_read", cwd: "/x" }
+      },
+    }
+    for (const command of ["run", "target"]) {
+      await cli([command, checkTool.id, "--cwd", "/x"], "", { specs: [checkTool] })
+    }
+    expect(captured).toEqual([PROJECT.name, PROJECT.name])
+  })
 })
 
 describe("usage", () => {
