@@ -33,6 +33,12 @@ export const AROUND_COUNT = { default: 5, max: AROUND_LIMIT } as const satisfies
 /** The default and the largest `pages` of `fetch`. */
 export const FETCH_PAGES = { default: 1, max: FETCH_PAGE_LIMIT } as const satisfies LimitRule
 
+/** The `account` argument of every tool that selects an account. */
+export const accountArgument = z
+  .string()
+  .optional()
+  .describe("The account label; may be left out when only one account is logged in.")
+
 /** The input schema for `telegram_chat_read`. */
 export const input = z.object({
   method: z
@@ -40,7 +46,7 @@ export const input = z.object({
     .describe(
       "`list` finds chats; `view` reads the newest messages of one chat between two times, oldest first; `topics` lists the topics of a forum chat; `search` finds messages in the mirror by words; `around` reads the messages around one; `fetch` adds older history of a mirrored chat to the mirror.",
     ),
-  account: z.string().optional().describe("The account label; may be left out when only one account is logged in."),
+  account: accountArgument,
   query: z
     .string()
     .optional()
@@ -114,7 +120,8 @@ export const input = z.object({
 /** The parsed input to `telegram_chat_read`. */
 export type ChatReadInput = z.output<typeof input>
 
-const nameCut = z
+/** The `name_cut` flag of a result's chat: set when the name was cut to `MAX_NAME_LENGTH`. */
+export const nameCut = z
   .literal(true)
   .optional()
   .describe("Set when the name was longer than the most a result carries and was cut.")
