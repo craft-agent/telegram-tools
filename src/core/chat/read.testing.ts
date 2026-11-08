@@ -70,7 +70,7 @@ export function createChatFixture(): ChatFixture {
   const storeAt = (now: number, message: Partial<MessageInput>, keepDisappearing = false) => {
     inTransaction(mirror, () => storeMessage(mirror, { now, keepDisappearing }, messageInput(message)))
   }
-  const read = (args: unknown) => invoke(telegramChatRead, args, { cwd: stateDir, stateDir })
+  const read = (args: unknown) => invoke(telegramChatRead, args, { cwd: stateDir, stateDir, ...DOWNLOAD_CONTEXT })
   const closeMirror = () => {
     if (open) mirror.close()
     open = false
@@ -160,3 +160,4 @@ export function fillSampleChats(t: Pick<ChatFixture, "known" | "follow" | "store
     { chat: GROUP, id: 3, ts: 2000, sender: USER, body: "hello team" },
   )
 }
+import { DOWNLOAD_CONTEXT } from "../tool.testing"

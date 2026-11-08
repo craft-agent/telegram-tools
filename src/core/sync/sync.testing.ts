@@ -30,7 +30,8 @@ export function createSyncFixture(): SyncFixture {
   const chats = createChatFixture()
   const socket = labelPaths(chats.stateDir, "default").socket
   const droppers: Server[] = []
-  const run: SyncFixture["run"] = (tool, args) => invoke(tool, args, { cwd: chats.stateDir, stateDir: chats.stateDir })
+  const run: SyncFixture["run"] = (tool, args) =>
+    invoke(tool, args, { cwd: chats.stateDir, stateDir: chats.stateDir, ...DOWNLOAD_CONTEXT })
   return {
     ...chats,
     run,
@@ -62,3 +63,4 @@ export function createSyncFixture(): SyncFixture {
     },
   }
 }
+import { DOWNLOAD_CONTEXT } from "../tool.testing"

@@ -39,17 +39,19 @@ export function needsPermission(spec: Pick<ToolSpec, "class">): boolean {
   return spec.class !== "read"
 }
 
-/** The tools and resolved state directory the plugin options (and the environment behind them) select from `specs`. */
+/** The tools and resolved state and download settings the plugin options (and the environment behind them) select from `specs`. */
 export function selectedTools(
   specs: ToolSpec[],
   options: PluginOptions | undefined,
   env: Record<string, string | undefined> = process.env,
   profile: EntryProfile = PROJECT_PROFILE,
-): { tools: ToolSpec[]; stateDir: string } {
+): { tools: ToolSpec[]; stateDir: string } & Pick<ToolContext, "downloadDir" | "downloadMaxMb"> {
   const settings = settingsFromOptions(options, env, profile)
   return {
     tools: selectTools(specs, settings, profile.toolsets),
     stateDir: settings.state_dir,
+    downloadDir: settings.download_dir,
+    downloadMaxMb: settings.download_max_mb,
   }
 }
 

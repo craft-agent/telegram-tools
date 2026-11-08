@@ -90,6 +90,8 @@ export function createServer(specs: ToolSpec[], settings: EntrySettings, options
         cwd: await workingDir(extra.signal),
         ownDir: options.ownDir,
         stateDir: settings.state_dir,
+        downloadDir: settings.download_dir,
+        downloadMaxMb: settings.download_max_mb,
         signal: extra.signal,
         ...(confirm && { confirm }),
       }

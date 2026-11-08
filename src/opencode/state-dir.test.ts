@@ -19,10 +19,14 @@ describe("OpenCode state_dir setting", () => {
       input: z.object({}),
       output: z.object({ ok: z.boolean() }),
       async targets(_args, ctx) {
+        expect(ctx.downloadDir).toBe("/received")
+        expect(ctx.downloadMaxMb).toBe(42)
         recorder.target = ctx.stateDir
         return ["target-resource"]
       },
       async execute(_args, ctx) {
+        expect(ctx.downloadDir).toBe("/received")
+        expect(ctx.downloadMaxMb).toBe(42)
         recorder.execute = ctx.stateDir
         return { ok: true }
       },
@@ -40,7 +44,7 @@ describe("OpenCode state_dir setting", () => {
       }
       const { tool } = await createV1Server([stateTool(recorder)], { profile: PROFILE })(
         {},
-        { state_dir: "/v1/custom/state" },
+        { state_dir: "/v1/custom/state", download_dir: "/received", download_max_mb: 42 },
       )
       await tool.demo_state_tool!.execute({}, context)
       expect(recorder.target).toBe("/v1/custom/state")
@@ -57,7 +61,7 @@ describe("OpenCode state_dir setting", () => {
       }
       const { tool } = await createV1Server([stateTool(recorder)], {
         profile: PROFILE,
-        env: { DEMO_STATE_DIR: "/v1/env/state" },
+        env: { DEMO_STATE_DIR: "/v1/env/state", DEMO_DOWNLOAD_DIR: "/received", DEMO_DOWNLOAD_MAX_MB: "42" },
       })({}, {})
       await tool.demo_state_tool!.execute({}, context)
       expect(recorder.target).toBe("/v1/env/state")
@@ -76,7 +80,7 @@ describe("OpenCode state_dir setting", () => {
       const recorder: { target?: string; execute?: string } = {}
       const tools = new Map<string, V2Tool>()
       const ctx: V2Context = {
-        options: { state_dir: "/v2/custom/state" },
+        options: { state_dir: "/v2/custom/state", download_dir: "/received", download_max_mb: 42 },
         session: {
           async get() {
             return { location: { directory: "/work/project" } }

@@ -71,7 +71,7 @@ describe("defineTool", () => {
       id: "demo_thing_create",
       targets: (args, ctx) => [`${ctx.cwd}:${args.count}`],
     })
-    expect(await given.targets?.({ count: 2 }, { cwd: "/work" })).toEqual(["/work:2"])
+    expect(await given.targets?.({ count: 2 }, { cwd: "/work", ...DOWNLOAD_CONTEXT })).toEqual(["/work:2"])
   })
 
   test("throws a plain Error, not a ToolError", () => {
@@ -173,3 +173,4 @@ describe("JSON schemas", () => {
     expect(schema.required).toEqual(["total"])
   })
 })
+import { DOWNLOAD_CONTEXT } from "./tool.testing"

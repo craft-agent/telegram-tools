@@ -14,7 +14,7 @@ import {
 import { errorBody } from "../entry/errors"
 import { permissionResources } from "../entry/permission"
 import { PROJECT_PROFILE, type EntryProfile } from "../entry/profile"
-import { parseStateDir, parseToolSettings } from "../entry/settings"
+import { downloadSettings, parseStateDir, parseToolSettings } from "../entry/settings"
 import { PROJECT } from "../project"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, type CommandIo } from "./command-io"
 import { runLogin } from "./login"
@@ -50,8 +50,16 @@ export type CliIo = {
 
 type Command =
   | { name: "list"; selected: ToolSpec[] }
-  | { name: "run"; toolId: string; cwd: string; selected: ToolSpec[]; stateDir: string }
-  | { name: "target"; toolId: string; cwd: string; stateDir: string }
+  | {
+      name: "run"
+      toolId: string
+      cwd: string
+      selected: ToolSpec[]
+      stateDir: string
+      downloadDir: string
+      downloadMaxMb: number
+    }
+  | { name: "target"; toolId: string; cwd: string; stateDir: string; downloadDir: string; downloadMaxMb: number }
 
 function usageError(message: string): ToolError {
   return new ToolError("invalid_argument", message)
@@ -95,7 +103,15 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile
   const { cwd, rest } = takeCwd(options)
   if (cwd === undefined) throw usageError(`Command ${name} needs ${CWD_FLAG} <dir>.`)
   if (name === "target") {
-    return { name, toolId, cwd, stateDir: parseStateDir(rest, io.env, profile) }
+    const settings = downloadSettings(undefined, io.env, profile)
+    return {
+      name,
+      toolId,
+      cwd,
+      stateDir: parseStateDir(rest, io.env, profile),
+      downloadDir: settings.download_dir,
+      downloadMaxMb: settings.download_max_mb,
+    }
   }
 
   const settings = parseToolSettings(rest, io.env, profile)
@@ -105,6 +121,8 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile
     cwd,
     selected: selectTools(io.specs, settings, profile.toolsets),
     stateDir: settings.state_dir,
+    downloadDir: settings.download_dir,
+    downloadMaxMb: settings.download_max_mb,
   }
 }
 
@@ -149,6 +167,8 @@ async function runTool(command: Extract<Command, { name: "run" }>, io: CliIo): P
       cwd: command.cwd,
       ownDir: io.ownDir,
       stateDir: command.stateDir,
+      downloadDir: command.downloadDir,
+      downloadMaxMb: command.downloadMaxMb,
       signal: io.signal,
     })
     writeJson(io, { result })
@@ -169,6 +189,8 @@ async function targetOf(command: Extract<Command, { name: "target" }>, io: CliIo
       cwd: command.cwd,
       ownDir: io.ownDir,
       stateDir: command.stateDir,
+      downloadDir: command.downloadDir,
+      downloadMaxMb: command.downloadMaxMb,
       signal: io.signal,
     })
     writeJson(io, { resources })

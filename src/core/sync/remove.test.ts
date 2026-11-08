@@ -32,7 +32,7 @@ describe("sync remove: the tool", () => {
   })
 
   test("names the account it writes to", async () => {
-    const ctx = { cwd: t.stateDir, stateDir: t.stateDir }
+    const ctx = { cwd: t.stateDir, stateDir: t.stateDir, ...DOWNLOAD_CONTEXT }
     expect(await telegramSyncRemove.targets?.({ chats: [SUPERGROUP] }, ctx)).toEqual(["default"])
   })
 
@@ -115,3 +115,4 @@ describe("sync remove: the service", () => {
     expect((await t.fail(telegramSyncRemove, { chats: [SUPERGROUP] })).code).toBe("uncertain")
   })
 })
+import { DOWNLOAD_CONTEXT } from "../tool.testing"

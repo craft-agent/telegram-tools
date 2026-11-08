@@ -1,5 +1,7 @@
 import { ToolError, type ToolSettings, type Toolsets } from "../core"
 import { PROJECT } from "../project"
+import type { GivenDirectory } from "./directory"
+import { resolveDownloadDir } from "./download-dir"
 import { PROJECT_PROFILE, type EntryProfile } from "./profile"
 import { resolveStateDir } from "./state-dir"
 
@@ -7,11 +9,13 @@ import { resolveStateDir } from "./state-dir"
 export type ConfirmMode = "harness" | "elicitation"
 
 /**
- * The settings needed to run tools: tool selection, read-only mode, the resolved state directory and the
+ * The settings needed to run tools: tool selection, read-only mode, the resolved state and download settings and the
  * two the sync service takes (off when absent).
  */
 export type RunSettings = ToolSettings & {
   state_dir: string
+  download_dir: string
+  download_max_mb: number
   /** Whether messages that disappear are kept. */
   keep_disappearing?: boolean
   /** Whether channels are listed and their messages received. */
@@ -24,9 +28,20 @@ const CONFIRM_MODES: readonly ConfirmMode[] = ["harness", "elicitation"]
 const ALL_TOOLSETS = "all"
 const TRUE_VALUES: readonly string[] = ["1", "true"]
 const FALSE_VALUES: readonly string[] = ["0", "false"]
+const DEFAULT_DOWNLOAD_MAX_MB = 100
+const MAX_DOWNLOAD_MB = 2000
 
 type OptionName =
-  "toolsets" | "read_only" | "tools" | "exclude_tools" | "confirm" | "state_dir" | "keep_disappearing" | "channels"
+  | "toolsets"
+  | "read_only"
+  | "tools"
+  | "exclude_tools"
+  | "confirm"
+  | "state_dir"
+  | "download_dir"
+  | "download_max_mb"
+  | "keep_disappearing"
+  | "channels"
 
 /** A setting's command-line flag and the end of its environment variable, which follows the profile's prefix; a boolean flag takes no value. */
 type Option = { flag: string; envSuffix: string; boolean?: true }
@@ -38,6 +53,8 @@ const OPTIONS: Record<OptionName, Option> = {
   exclude_tools: { flag: "--exclude-tools", envSuffix: "EXCLUDE_TOOLS" },
   confirm: { flag: "--confirm", envSuffix: "CONFIRM" },
   state_dir: { flag: "--state-dir", envSuffix: "STATE_DIR" },
+  download_dir: { flag: "--download-dir", envSuffix: "DOWNLOAD_DIR" },
+  download_max_mb: { flag: "--download-max-mb", envSuffix: "DOWNLOAD_MAX_MB" },
   keep_disappearing: { flag: "--keep-disappearing", envSuffix: "KEEP_DISAPPEARING", boolean: true },
   channels: { flag: "--channels", envSuffix: "CHANNELS", boolean: true },
 }
@@ -129,7 +146,34 @@ function parseConfirm(value: string, source: string): ConfirmMode {
 }
 
 /** A setting given as text, and where it came from, for error messages. */
-type SettingText = { text: string; source: string }
+type SettingText = GivenDirectory
+
+function downloadMaxMb(value: unknown, source: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > MAX_DOWNLOAD_MB) {
+    throw new ToolError("invalid_argument", `${source} must be an integer from 1 to ${MAX_DOWNLOAD_MB}.`)
+  }
+  return value
+}
+
+/** `download_max_mb` given as text: digits only, so `1e2` or `0x10` is not read as a number. */
+function downloadMaxMbText({ text, source }: SettingText): number {
+  const trimmed = text.trim()
+  return downloadMaxMb(/^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN, source)
+}
+
+/** The resolved download settings, read by tools rather than the sync service. */
+export function downloadSettings(
+  given: ((name: "download_dir" | "download_max_mb") => SettingText | undefined) | undefined,
+  env: Record<string, string | undefined>,
+  profile: EntryProfile,
+): Pick<RunSettings, "download_dir" | "download_max_mb"> {
+  const value = given ?? ((name) => envText(name, env, profile))
+  const max = value("download_max_mb")
+  return {
+    download_dir: resolveDownloadDir(value("download_dir"), env, profile),
+    download_max_mb: max === undefined ? DEFAULT_DOWNLOAD_MAX_MB : downloadMaxMbText(max),
+  }
+}
 
 function envText(
   name: OptionName,
@@ -159,6 +203,7 @@ export function parseSettings(
   const settings: EntrySettings = {
     confirm: "harness",
     state_dir: resolveStateDir(value("state_dir"), env, profile),
+    ...downloadSettings(value, env, profile),
   }
   const toolsets = value("toolsets")
   if (toolsets) settings.toolsets = checkToolsets(splitList(toolsets.text), toolsets.source, profile.toolsets)
@@ -256,6 +301,8 @@ const TOOL_OPTION_NAMES = [
   "tools",
   "exclude_tools",
   "state_dir",
+  "download_dir",
+  "download_max_mb",
   ...SERVICE_OPTION_NAMES,
 ] as const satisfies readonly OptionName[]
 type ToolOptionName = (typeof TOOL_OPTION_NAMES)[number]
@@ -268,8 +315,8 @@ function optionError(name: string, expected: string): ToolError {
   return new ToolError("invalid_argument", `Option "${name}" must be ${expected}.`)
 }
 
-function stateDirOption(value: unknown): string {
-  if (typeof value !== "string") throw optionError("state_dir", "an absolute path")
+function directoryOption(name: "state_dir" | "download_dir", value: unknown): string {
+  if (typeof value !== "string") throw optionError(name, "an absolute path")
   return value
 }
 
@@ -325,10 +372,20 @@ export function settingsFromOptions(
 
   const stateDirGiven =
     given.state_dir !== undefined
-      ? { text: stateDirOption(given.state_dir), source: 'Option "state_dir"' }
+      ? { text: directoryOption("state_dir", given.state_dir), source: 'Option "state_dir"' }
       : envText("state_dir", env, profile)
   const settings: RunSettings = {
     state_dir: resolveStateDir(stateDirGiven, env, profile),
+    download_dir: resolveDownloadDir(
+      given.download_dir !== undefined
+        ? { text: directoryOption("download_dir", given.download_dir), source: 'Option "download_dir"' }
+        : envText("download_dir", env, profile),
+      env,
+      profile,
+    ),
+    download_max_mb:
+      resolve("download_max_mb", (value) => downloadMaxMb(value, 'Option "download_max_mb"'), downloadMaxMbText) ??
+      DEFAULT_DOWNLOAD_MAX_MB,
   }
   const toolsets = resolve(
     "toolsets",

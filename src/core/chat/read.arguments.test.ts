@@ -128,12 +128,14 @@ describe("chat read: accounts and the mirror", () => {
   test("no account, a label without a mirror and a missing state directory are refused", async () => {
     const stateDir = makeTempDir()
     try {
-      const call = (args: unknown) => invoke(telegramChatRead, args, { cwd: stateDir, stateDir })
+      const call = (args: unknown) => invoke(telegramChatRead, args, { cwd: stateDir, stateDir, ...DOWNLOAD_CONTEXT })
       await expect(call({ method: "list" })).rejects.toMatchObject({ code: "not_found" })
       mkdirSync(labelPaths(stateDir, "default").dir)
       await expect(call({ method: "list" })).rejects.toMatchObject({ code: "not_found" })
       expect(existsSync(labelPaths(stateDir, "default").mirror)).toBe(false)
-      await expect(invoke(telegramChatRead, { method: "list" }, { cwd: stateDir })).rejects.toMatchObject({
+      await expect(
+        invoke(telegramChatRead, { method: "list" }, { cwd: stateDir, ...DOWNLOAD_CONTEXT }),
+      ).rejects.toMatchObject({
         code: "internal_error",
       })
     } finally {
@@ -181,3 +183,4 @@ describe("chat read: accounts and the mirror", () => {
     expect(json).not.toContain(t.stateDir)
   })
 })
+import { DOWNLOAD_CONTEXT } from "../tool.testing"

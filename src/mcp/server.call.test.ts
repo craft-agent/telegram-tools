@@ -176,9 +176,11 @@ describe("calls", () => {
     const calls: Call[] = []
     const { client } = await connect(
       [tool("demo_thing_create", "alpha", "add", calls)],
-      settings({ state_dir: "/custom/state/dir" }),
+      settings({ state_dir: "/custom/state/dir", download_dir: "/custom/downloads", download_max_mb: 42 }),
     )
     await call(client, "demo_thing_create", { count: 1 })
     expect(calls[0]?.ctx.stateDir).toBe("/custom/state/dir")
+    expect(calls[0]?.ctx.downloadDir).toBe("/custom/downloads")
+    expect(calls[0]?.ctx.downloadMaxMb).toBe(42)
   })
 })

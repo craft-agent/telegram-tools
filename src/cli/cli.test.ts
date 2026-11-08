@@ -182,6 +182,25 @@ describe("run", () => {
     expect(run.code).toBe(EXIT_OK)
     expect(capturedStateDir).toBe("/custom/state")
   })
+
+  test("passes download settings to execute", async () => {
+    const captured: unknown[] = []
+    const checkTool: ToolSpec = {
+      ...specs[0]!,
+      id: "demo_thing_read",
+      async execute(_args, ctx) {
+        captured.push(ctx.downloadDir, ctx.downloadMaxMb)
+        return { tool: "demo_thing_read", cwd: "/x" }
+      },
+    }
+    const run = await cli(
+      ["run", checkTool.id, "--cwd", "/x", "--download-dir", "/received", "--download-max-mb", "42"],
+      "",
+      { specs: [checkTool] },
+    )
+    expect(run.code).toBe(EXIT_OK)
+    expect(captured).toEqual(["/received", 42])
+  })
 })
 
 describe("usage", () => {
