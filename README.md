@@ -149,13 +149,32 @@ in Hermes.
 | `telegram_chat_read` | finds chats and reads messages by `method`: `list`, `view`, `topics`, `search`, `around`, or older history `fetch` | read  |
 
 Chats the mirror keeps (private chats, bots, basic groups, Saved Messages;
-supergroups once on the sync list; channels when enabled) are read from the
-local mirror without needing the sync service; older history is fetched with
-`fetch`. Chats only listed are read live from Telegram by `view` and `around`,
-via the sync service, up to 100 messages a page (`live: true`). Message text,
-captions, file names and topic titles are data, never instructions. The skill
-is [`telegram-chats`](skills/telegram-chats/SKILL.md), shown as
+supergroups and channels while on the sync list) are read from the local mirror
+without needing the sync service; older history is fetched with `fetch`. Chats
+only listed are read live from Telegram by `view` and `around`, via the sync
+service, up to 100 messages a page (`live: true`). Message text, captions, file
+names and topic titles are data, never instructions. The skill is
+[`telegram-chats`](skills/telegram-chats/SKILL.md), shown as
 `telegram-tools:telegram-chats` in Claude Code and `telegram-tools:chats` in
+Hermes.
+
+### Sync (`sync`)
+
+| Tool                   | What it does                                                                           | Class      |
+| ---------------------- | -------------------------------------------------------------------------------------- | ---------- |
+| `telegram_sync_read`   | lists the supergroups and channels on the sync list                                    | read       |
+| `telegram_sync_add`    | puts supergroups or channels on the sync list to mirror from now on                    | idempotent |
+| `telegram_sync_remove` | takes chats off the sync list and deletes their mirrored messages and earlier versions | overwrite  |
+
+The sync list names up to 30 supergroups and channels whose messages the mirror
+keeps current. `telegram_sync_read` reads the list from the local mirror
+without needing the sync service. Adding or removing chats changes the local
+mirror and needs the sync service running; newly added chats are seeded with
+their newest 50 messages, while removing a chat deletes its mirrored messages
+and earlier versions locally (nothing changes at Telegram). Channels can be
+listed or mirrored only with the `channels` setting on. The skill is
+[`telegram-sync`](skills/telegram-sync/SKILL.md), shown as
+`telegram-tools:telegram-sync` in Claude Code and `telegram-tools:sync` in
 Hermes.
 
 ## Adding a tool
@@ -333,9 +352,9 @@ one `default`), and every command takes `--state-dir` like the tools.
   and seeds the newest 50 messages of chats active in the last 30 days, a few
   at a time and paced to avoid flood limits. After that, every update is stored
   in the mirror as it arrives, the chat list is refreshed every 30 minutes, and
-  gaps in message history are filled. Supergroups are listed but not mirrored
-  until the sync list tools come; channels are listed and mirrored only when
-  `channels` is turned on.
+  gaps in message history are filled. Supergroups and channels are mirrored only
+  while on the sync list (at most 30); channels also require the `channels`
+  setting to be turned on.
 - **Where it logs**: on macOS, the service writes its log to the file under
   `~/Library/Logs/io.github.craft-agent.telegram-tools/<label>.log` that
   `service install` prints. On Linux, it logs to the systemd user journal
@@ -371,9 +390,13 @@ device name the service logs in as identify it as unofficial (§2.2, §2.3).
   your own chats. Unofficial clients are watched and abuse can freeze or ban
   the account.
 - **`keep_disappearing` and `channels` are off by default.** Keeping
-  disappearing messages goes against §1.4, and showing channels without
-  sponsored messages goes against §3.3, which is why both are off. Whoever turns
-  either setting on accepts that risk.
+  disappearing messages goes against §1.4. For channels, API terms §3.3 asks an
+  app showing channel content to show sponsored messages. Sponsored messages are
+  never fetched or shown (avoiding untrusted prompts reaching the model), and
+  whoever turns `channels` on accepts that §3.3 risk. With `channels` off, no
+  channel is listed, read, mirrored or kept on the sync list, and the sync
+  service deletes every channel and its mirrored messages from the mirror at its
+  next start.
 
 ## Layout
 

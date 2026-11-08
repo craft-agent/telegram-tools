@@ -16,6 +16,10 @@ export const SERVICE_REQUESTS = {
   around: "around",
   /** Older history of a chat the mirror keeps, fetched into the mirror: `FetchParams` → `FetchResult`. */
   fetch: "fetch",
+  /** Supergroups and channels put on the sync list: `SyncChangeParams` → `SyncAddResult`. */
+  sync_add: "sync_add",
+  /** Supergroups and channels taken off the sync list: `SyncChangeParams` → `SyncRemoveResult`. */
+  sync_remove: "sync_remove",
 } as const
 
 /** The most messages one live read returns. */
@@ -114,3 +118,26 @@ export type FetchParams = {
  * `complete` once Telegram has nothing older.
  */
 export type FetchResult = { added: number; pages: number; oldest_ts: number | null; complete: boolean }
+
+/** The most chats on the sync list. */
+export const SYNC_LIST_LIMIT = 30
+
+/** Chats to put on or take off the sync list; the whole call is refused when one of them cannot be. */
+export type SyncChangeParams = {
+  /** 1 to `SYNC_LIST_LIMIT` distinct supergroups or channels the mirror lists. */
+  chats: string[]
+}
+
+/**
+ * What adding changed: the chats now on the list that were not (`added`, to
+ * be seeded within seconds), those that already were (`listed`), and how many
+ * chats the list holds now.
+ */
+export type SyncAddResult = { added: string[]; listed: string[]; size: number }
+
+/**
+ * What removing changed: the chats taken off, their mirrored messages deleted
+ * (`removed`), those that were not on the list (`absent`), and how many chats
+ * the list holds now.
+ */
+export type SyncRemoveResult = { removed: string[]; absent: string[]; size: number }

@@ -1,5 +1,5 @@
 /** The schema version a current mirror has: the number of `MIGRATIONS`. */
-export const MIRROR_VERSION = 2
+export const MIRROR_VERSION = 3
 
 /**
  * `MIGRATIONS[i]` takes a mirror from version `i` to `i + 1`; entry 0 creates
@@ -13,7 +13,10 @@ export const MIRROR_VERSION = 2
  * where and when a message was deleted for everyone, no content, so that a
  * delivery arriving after its delete is dropped; its `chat` is NULL for a
  * delete that named none (private chats and basic groups). `gaps` are the
- * spans the sync service was not watching.
+ * spans the sync service was not watching. `sync_list` holds the supergroups
+ * and channels the user chose to keep: `added` is when a chat was put on the
+ * list and `seeded` when its newest messages were fetched after that, NULL
+ * until then.
  */
 export const MIGRATIONS: readonly string[] = [
   `
@@ -104,4 +107,6 @@ CREATE TABLE meta (
 `,
   // Entry 1 serves a search across every chat, which reads messages in time order.
   "CREATE INDEX messages_time ON messages (ts, chat, id);",
+  // Entry 2 names the supergroups and channels the mirror keeps.
+  "CREATE TABLE sync_list (chat TEXT PRIMARY KEY, added INTEGER NOT NULL, seeded INTEGER);",
 ]

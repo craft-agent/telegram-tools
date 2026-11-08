@@ -19,6 +19,7 @@ import {
 import type { ServiceCall, ServiceHandler } from "./service-server"
 import type { ChatListRefresh } from "./sync-chat-refresh"
 import { pace, storeFetched } from "./sync-fetch"
+import { syncAdd, syncRemove } from "./sync-list-requests"
 import type { ResolvedSyncOptions } from "./sync-options"
 import { errorLabel } from "./sync-outcome"
 import { abortable, cancelled, requestFailure } from "./sync-request-errors"
@@ -305,8 +306,9 @@ async function fetchRequest(
  * checks its parameters first, since they are untrusted JSON. `history`,
  * `topics` and `around` are reads from Telegram that are stored nowhere;
  * `refresh` is the chat list refresh the housekeeping runs, shared with it;
- * `fetch` is the one that writes the mirror, through the path the gap filling
- * uses, one fetch at a time for the whole service.
+ * `fetch` writes the mirror through the path the gap filling uses, one fetch
+ * at a time for the whole service; `sync_add` and `sync_remove` change the
+ * sync list and what the mirror keeps, with no call to Telegram.
  */
 export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, ServiceHandler> {
   const fetches = new RequestQueue()
@@ -316,5 +318,7 @@ export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, Se
     [SERVICE_REQUESTS.refresh]: (params, call) => refresh(ctx, params, call),
     [SERVICE_REQUESTS.around]: (params, call) => around(ctx, params, call),
     [SERVICE_REQUESTS.fetch]: (params, call) => fetchRequest(ctx, fetches, params, call),
+    [SERVICE_REQUESTS.sync_add]: (params) => syncAdd(ctx, params),
+    [SERVICE_REQUESTS.sync_remove]: (params) => syncRemove(ctx, params),
   }
 }

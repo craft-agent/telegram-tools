@@ -14,8 +14,8 @@ description: "Use when finding a Telegram chat, reading its messages, forum topi
 What the mirror keeps depends on the kind of chat:
 
 - Private chats, bots, basic groups and Saved Messages are mirrored always.
-- Supergroups while on the sync list (later; currently listed but not mirrored).
-- Channels only with the `channels` setting on.
+- Supergroups while on the sync list (see the `telegram-sync` skill).
+- Channels while on the sync list with the `channels` setting on.
 - Forum topics within mirrored chats as topics.
 
 Chats the mirror keeps are read from the account's local mirror, needing no
@@ -25,10 +25,10 @@ a history fetch (`fetch`). If the sync service has not been running, newer
 messages are missing too: `telegram_account_read` says when it last heard
 from Telegram.
 
-Chats the mirror only lists (supergroups for now) are read live by `view`
-and `around`. A live read asks the sync service, stores nothing in the
-mirror, returns at most 100 messages a page, and marks results with
-`live: true`. Read the mirror first; read live only what is needed, and
+Chats the mirror only lists (supergroups and channels not on the sync list) are
+read live by `view` and `around`. A live read asks the sync service, stores
+nothing in the mirror, returns at most 100 messages a page, and marks results
+with `live: true`. Read the mirror first; read live only what is needed, and
 never loop live reads over many chats.
 
 `topics`, `fetch` and `list` with `refresh: true` also ask the sync service.

@@ -71,7 +71,7 @@ describe("openMirrorForWrite", () => {
     expect(version(mirror)).toBe(MIRROR_VERSION)
     expect(MIGRATIONS).toHaveLength(MIRROR_VERSION)
     const tables = columnOf(mirror, "SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
-    expect(tables).toEqual(["chats", "deleted", "edits", "gaps", "messages", "meta", "topics"])
+    expect(tables).toEqual(["chats", "deleted", "edits", "gaps", "messages", "meta", "sync_list", "topics"])
   })
 
   test("looks up chatless deletes through the message-id index", () => {
@@ -113,6 +113,26 @@ describe("openMirrorForWrite", () => {
       "messages_time",
     ])
     expect(columnOf(mirror, "SELECT id FROM messages")).toEqual([7])
+    tracked(openMirrorForRead(path))
+  })
+
+  test("migrates a mirror of version 2 to the current one, with an empty sync list and its rows intact", () => {
+    const raw = new DatabaseSync(path)
+    for (const migration of MIGRATIONS.slice(0, 2)) raw.exec(migration)
+    raw.exec("INSERT INTO chats (id, kind, followed, updated) VALUES ('-1001000000001', 'supergroup', 0, 0)")
+    raw.exec("INSERT INTO chats (id, kind, followed, updated) VALUES ('1', 'user', 1, 0)")
+    raw.exec("INSERT INTO messages (chat, id, ts, received) VALUES ('1', 7, 5, 5)")
+    raw.exec("PRAGMA user_version = 2")
+    raw.close()
+    const mirror = tracked(openMirrorForWrite(path))
+    expect(version(mirror)).toBe(MIRROR_VERSION)
+    expect(rowsOf(mirror, "SELECT * FROM sync_list")).toEqual([])
+    expect(columnOf(mirror, "SELECT id FROM chats ORDER BY id")).toEqual(["-1001000000001", "1"])
+    expect(columnOf(mirror, "SELECT id FROM messages")).toEqual([7])
+    mirror.exec("INSERT INTO sync_list (chat, added) VALUES ('-1001000000001', 9)")
+    expect(rowsOf(mirror, "SELECT chat, added, seeded FROM sync_list")).toEqual([
+      { chat: "-1001000000001", added: 9, seeded: null },
+    ])
     tracked(openMirrorForRead(path))
   })
 
