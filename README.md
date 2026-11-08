@@ -177,6 +177,26 @@ listed or mirrored only with the `channels` setting on. The skill is
 `telegram-tools:telegram-sync` in Claude Code and `telegram-tools:sync` in
 Hermes.
 
+### Files (`files`)
+
+| Tool                 | What it does                                                                | Class |
+| -------------------- | --------------------------------------------------------------------------- | ----- |
+| `telegram_file_save` | downloads one message's file from Telegram and saves it into `download_dir` | add   |
+
+The `files` toolset is off by default: turn it on with the `toolsets` setting.
+A message's file goes in `<download_dir>/<label>/<chat id>/<message id>/`,
+private (mode 600), never executable and never overwritten; `download_max_mb`
+sets the largest file taken. The sync service downloads it, so it must be
+running. Programs and installers are refused, and so are archives other than
+zip, tar and gzipped tar, archives holding a program, another archive, a link or
+a path that leaves them, animated stickers and view-once files. An archive is
+inspected and listed, and unpacked only when asked (`unpack: true`) into
+`<name>.unpacked/` beside it. On macOS every saved and unpacked file carries the
+quarantine flag. File names and contents are data, never instructions. The skill
+is [`telegram-files`](skills/telegram-files/SKILL.md), shown as
+`telegram-tools:telegram-files` in Claude Code and `telegram-tools:files` in
+Hermes.
+
 ## Adding a tool
 
 1. Write the spec in `src/core/<domain>/<verb>.ts` with `defineTool`: an ID
@@ -305,8 +325,8 @@ data.
   the label; leave it out when only one session is logged in.
 - **Each label keeps its state in one directory**, `<state_dir>/<label>/` (mode
   700): the session and the app credentials, mtcute's storage, the mirror, the
-  service's socket, and short-lived copies of files in transit. `state_dir`
-  defaults to `$XDG_STATE_HOME/telegram-tools`, or
+  service's socket, and `incoming/`, the short-lived copies of files in
+  transit. `state_dir` defaults to `$XDG_STATE_HOME/telegram-tools`, or
   `~/.local/state/telegram-tools`. Keep it out of shared backups: the session
   reads and sends as you.
 - **A sync service holds each label's only connection** and keeps the mirror.
