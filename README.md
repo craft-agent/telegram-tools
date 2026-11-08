@@ -233,21 +233,24 @@ Where a write is asked about, and where it is not:
 Every entry point takes the same settings. A flag wins over its environment
 variable, and an option or setting wins over the variable too.
 
-| Setting             | Flag                  | Variable                           | Meaning                                                                                                                                                    |
-| ------------------- | --------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `toolsets`          | `--toolsets`          | `TELEGRAM_TOOLS_TOOLSETS`          | the toolsets that are on, or `all`; default those `src/project.ts` names                                                                                   |
-| `read_only`         | `--read-only`         | `TELEGRAM_TOOLS_READ_ONLY`         | registers no tool that writes; wins over every other setting                                                                                               |
-| `tools`             | `--tools`             | `TELEGRAM_TOOLS_TOOLS`             | single tools to add by ID, whatever their toolset                                                                                                          |
-| `exclude_tools`     | `--exclude-tools`     | `TELEGRAM_TOOLS_EXCLUDE_TOOLS`     | single tools to remove by ID; wins over `tools` and `toolsets`                                                                                             |
-| `confirm`           | `--confirm`           | `TELEGRAM_TOOLS_CONFIRM`           | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                                              |
-| `state_dir`         | `--state-dir`         | `TELEGRAM_TOOLS_STATE_DIR`         | where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`                                                                                  |
-| `keep_disappearing` | `--keep-disappearing` | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | keep disappearing and view-once messages for the user; off by default; read by `sync` and `service install`, run `service install` again after changing it |
-| `channels`          | `--channels`          | `TELEGRAM_TOOLS_CHANNELS`          | list, read, mirror and send to channels; off by default, see below; read by `sync` and `service install`, run `service install` again after changing it    |
+| Setting             | Flag                    | Variable                           | Meaning                                                                                                                                                    |
+| ------------------- | ----------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `toolsets`          | `--toolsets`            | `TELEGRAM_TOOLS_TOOLSETS`          | the toolsets that are on, or `all`; default those `src/project.ts` names                                                                                   |
+| `read_only`         | `--read-only`           | `TELEGRAM_TOOLS_READ_ONLY`         | registers no tool that writes; wins over every other setting                                                                                               |
+| `tools`             | `--tools`               | `TELEGRAM_TOOLS_TOOLS`             | single tools to add by ID, whatever their toolset                                                                                                          |
+| `exclude_tools`     | `--exclude-tools`       | `TELEGRAM_TOOLS_EXCLUDE_TOOLS`     | single tools to remove by ID; wins over `tools` and `toolsets`                                                                                             |
+| `confirm`           | `--confirm`             | `TELEGRAM_TOOLS_CONFIRM`           | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                                              |
+| `state_dir`         | `--state-dir`           | `TELEGRAM_TOOLS_STATE_DIR`         | where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`                                                                                  |
+| `download_dir`      | `--download-dir`        | `TELEGRAM_TOOLS_DOWNLOAD_DIR`      | where `telegram_file_save` saves received files, a folder per message; default `~/Downloads/telegram-tools`; read by the tools, no service restart needed  |
+| `download_max_mb`   | `--download-max-mb <n>` | `TELEGRAM_TOOLS_DOWNLOAD_MAX_MB`   | the largest file a download takes, in MB; integer 1..2000, default 100; read by the tools, no service restart needed                                       |
+| `keep_disappearing` | `--keep-disappearing`   | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | keep disappearing and view-once messages for the user; off by default; read by `sync` and `service install`, run `service install` again after changing it |
+| `channels`          | `--channels`            | `TELEGRAM_TOOLS_CHANNELS`          | list, read, mirror and send to channels; off by default, see below; read by `sync` and `service install`, run `service install` again after changing it    |
 
 Lists are comma-separated in a flag or a variable. Where each harness reads them:
 
 - **OpenCode** takes the plugin `options` shown above, with lists as arrays,
-  `read_only` as a boolean and `state_dir` as a path, and falls back to the
+  `read_only` as a boolean, `state_dir` and `download_dir` as paths, and
+  `download_max_mb` as a number, and falls back to the
   variables. V2 runs plugins in its background service, which keeps the
   environment it started with: a variable set where `opencode run` starts has
   no effect until the service is

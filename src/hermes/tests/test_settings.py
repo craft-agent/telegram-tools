@@ -86,6 +86,22 @@ class SettingsFlagsTest(unittest.TestCase):
             with self.subTest(config=config), self.assertRaises(settings.SettingsError):
                 self.flags(**config)
 
+    def test_download_settings_become_flags(self) -> None:
+        self.assertEqual(
+            self.flags(download_dir="~/Downloads/example", download_max_mb=100),
+            ["--download-dir", "~/Downloads/example", "--download-max-mb", "100"],
+        )
+        for value in (1, 2000):
+            self.assertEqual(self.flags(download_max_mb=value), ["--download-max-mb", str(value)])
+
+    def test_invalid_download_settings_refused(self) -> None:
+        for value in (123, True, "", "   ", []):
+            with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "download_dir"):
+                self.flags(download_dir=value)
+        for value in (0, 2001, 1.5, 1.0, "100", "text", True, False, []):
+            with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "download_max_mb"):
+                self.flags(download_max_mb=value)
+
 
 if __name__ == "__main__":
     unittest.main()
