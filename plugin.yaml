@@ -6,6 +6,7 @@ requires_hermes: ">=0.22"
 provides_tools:
   - telegram_account_read
   - telegram_chat_read
+  - telegram_file_save
   - telegram_sync_add
   - telegram_sync_read
   - telegram_sync_remove
