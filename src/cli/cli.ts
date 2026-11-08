@@ -12,6 +12,7 @@ import {
   type ToolContext,
   type ToolSpec,
 } from "../core"
+import { permissionDescription } from "../entry/description"
 import { errorBody } from "../entry/errors"
 import { permissionResources } from "../entry/permission"
 import { PROJECT_PROFILE, type EntryProfile } from "../entry/profile"
@@ -47,6 +48,8 @@ export type CliIo = {
   ownDir?: string
   /** Stops a running tool when it aborts. */
   signal?: AbortSignal
+  /** How long a call's description may take; defaults to DESCRIBE_TIMEOUT_MS. */
+  describeTimeoutMs?: number
 }
 
 /** What `run` and `target` name: the tool, the working directory and the resolved directory and download settings. */
@@ -192,8 +195,13 @@ async function targetOf(command: Extract<Command, { name: "target" }>, io: CliIo
   const spec = io.specs.find((candidate) => candidate.id === command.toolId)
   if (!spec) return writeError(io, "invalid_argument", `Unknown tool "${command.toolId}".`)
   try {
-    const resources = await permissionResources(spec, await readArguments(io), toolContext(command, io))
-    writeJson(io, { resources })
+    const args = await readArguments(io)
+    const ctx = toolContext(command, io)
+    const [resources, description] = await Promise.all([
+      permissionResources(spec, args, ctx),
+      permissionDescription(spec, args, ctx, io.describeTimeoutMs),
+    ])
+    writeJson(io, description === undefined ? { resources } : { resources, description })
     return EXIT_OK
   } catch (error) {
     if (isToolError(error)) return writeError(io, error.code, error.message, error.details)
@@ -220,7 +228,8 @@ const PERSON_COMMANDS: Partial<Record<string, (argv: string[], io: CommandIo) =>
  * The command line of the package, for callers that are not a harness's own
  * plugin: `list` answers with the selected tools, `run` runs one with the
  * arguments on standard input, and `target` answers with what a call would
- * write to (`{"resources": [...]}`). Standard output carries only the JSON document; a
+ * write to (`{"resources": [...]}`), plus a `description` when the tool gives one.
+ * Standard output carries only the JSON document; a
  * mistake in the command line is one line on standard error and `EXIT_USAGE`.
  * `login`, `sync`, `service`, `logout` and `remove` are for a person setting
  * up an account (see `PERSON_COMMANDS`). Resolves to the exit code.
