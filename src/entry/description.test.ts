@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { z } from "zod"
 import type { CallDescription, ToolContext, ToolSpec } from "../core"
-import { approvalPrompt, permissionDescription, visible } from "./description"
+import { approvalPrompt, permissionDescription } from "./description"
+import { visible } from "./visible"
 import { DOWNLOAD_CONTEXT } from "../core/tool.testing"
 
 const CTX: ToolContext = { cwd: "/work", ownDir: "/own", ...DOWNLOAD_CONTEXT }
