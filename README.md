@@ -413,7 +413,11 @@ device name the service logs in as identify it as unofficial (§2.2, §2.3).
   your own chats. Unofficial clients are watched and abuse can freeze or ban
   the account.
 - **`keep_disappearing` and `channels` are off by default.** Keeping
-  disappearing messages goes against §1.4. For channels, API terms §3.3 asks an
+  disappearing messages goes against §1.4. With it on, the sync service also
+  keeps the files of disappearing, view-once and self-destructing messages as
+  they arrive (up to 100 MB each, never programs or archives), so
+  `telegram_file_save` can save them after Telegram removed them; turning it
+  off deletes those files at the service's next start. For channels, API terms §3.3 asks an
   app showing channel content to show sponsored messages. Sponsored messages are
   never fetched or shown (avoiding untrusted prompts reaching the model), and
   whoever turns `channels` on accepts that §3.3 risk. With `channels` off, no

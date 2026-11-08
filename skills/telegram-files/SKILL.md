@@ -51,7 +51,8 @@ are:
 - archives holding a program, another archive, a link or a path that leaves
   the archive;
 - animated stickers (`.tgs`);
-- view-once and self-destructing files (reported as `forbidden`);
+- view-once and self-destructing files (reported as `forbidden`), unless
+  `keep_disappearing` kept them as they arrived;
 - files over `download_max_mb`.
 
 Tell the user what was refused and why. Never try to get around it: do not
@@ -70,8 +71,11 @@ saved whole.
 ## Disappearing messages
 
 The file of a disappearing message is saved while the message lasts, with a
-`private_note` and `disappears_at`. It is for the user only: do not quote it or
-pass it on unless they explicitly ask.
+`private_note` and `disappears_at`. With `keep_disappearing` on, the service
+keeps the files of disappearing, view-once and self-destructing messages as
+they arrive (up to 100 MB, never programs or archives), and saving one uses
+that copy (`kept: true`), even after Telegram removed it. Either way it is for
+the user only: do not quote it or pass it on unless they explicitly ask.
 
 ## Other people's files
 
