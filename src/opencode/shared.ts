@@ -1,9 +1,19 @@
-import { invoke, isToolError, selectTools, type ToolContext, type ToolSpec } from "../core"
+import {
+  ENGLISH,
+  invoke,
+  isToolError,
+  selectTools,
+  type ToolContext,
+  type ToolSpec,
+  type Translations,
+  type Translator,
+} from "../core"
 import { approvalPrompt, type ShownDescription } from "../entry/description"
 import { errorText } from "../entry/errors"
 import { ANY_RESOURCE } from "../entry/permission"
 import { PROJECT_PROFILE, type EntryProfile } from "../entry/profile"
 import { settingsFromOptions } from "../entry/settings"
+import { promptTranslator, promptWords } from "../entry/words"
 import { PROJECT } from "../project"
 import type { PluginOptions } from "./types"
 
@@ -17,6 +27,8 @@ export type PluginDeps = {
   skillsDir?: URL | string
   /** Where the plugin is installed: never a call's working tree. */
   ownDir?: string
+  /** The translations of the tools' words, per language, for the approval prompt; defaults to none, which keeps it in English. */
+  translations?: Translations
 }
 
 /** The resources an "always" answer may persist: all but `*`, which would grant every target. */
@@ -30,11 +42,12 @@ export function permissionMetadata(
   args: unknown,
   resources: string[],
   description?: ShownDescription,
+  t: Translator = ENGLISH,
 ) {
   return {
     arguments: args,
     class: spec.class,
-    message: approvalPrompt(spec.title, resources, description),
+    message: approvalPrompt(t.word(spec.title), resources, description, promptWords(t)),
   }
 }
 
@@ -43,20 +56,28 @@ export function needsPermission(spec: Pick<ToolSpec, "class">): boolean {
   return spec.class !== "read"
 }
 
-/** The tools, the resolved state and download settings and the program name the plugin options (and the environment behind them) select from `specs`. */
+/**
+ * The tools, the resolved state and download settings and the program name the
+ * plugin options (and the environment behind them) select from `specs`, and the
+ * translator of the prompt language they set over the plugin's translations.
+ */
 export function selectedTools(
   specs: ToolSpec[],
   options: PluginOptions | undefined,
-  env: Record<string, string | undefined> = process.env,
-  profile: EntryProfile = PROJECT_PROFILE,
-): { tools: ToolSpec[]; stateDir: string } & Pick<ToolContext, "downloadDir" | "downloadMaxMb" | "programName"> {
-  const settings = settingsFromOptions(options, env, profile)
+  deps: PluginDeps,
+): { tools: ToolSpec[]; stateDir: string; translator: Translator } & Pick<
+  ToolContext,
+  "downloadDir" | "downloadMaxMb" | "programName"
+> {
+  const profile = deps.profile ?? PROJECT_PROFILE
+  const settings = settingsFromOptions(options, deps.env ?? process.env, profile)
   return {
     tools: selectTools(specs, settings, profile.toolsets),
     stateDir: settings.state_dir,
     downloadDir: settings.download_dir,
     downloadMaxMb: settings.download_max_mb,
     programName: PROJECT.name,
+    translator: promptTranslator(deps.translations ?? {}, settings.language),
   }
 }
 
