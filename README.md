@@ -277,6 +277,7 @@ variable, and an option or setting wins over the variable too.
 | `tools`             | `--tools`               | `TELEGRAM_TOOLS_TOOLS`             | single tools to add by ID, whatever their toolset                                                                                                          |
 | `exclude_tools`     | `--exclude-tools`       | `TELEGRAM_TOOLS_EXCLUDE_TOOLS`     | single tools to remove by ID; wins over `tools` and `toolsets`                                                                                             |
 | `confirm`           | `--confirm`             | `TELEGRAM_TOOLS_CONFIRM`           | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                                              |
+| `language`          | `--language`            | `TELEGRAM_TOOLS_LANGUAGE`          | native plugins only: the approval prompt's language, such as `ja`                                                                                          |
 | `state_dir`         | `--state-dir`           | `TELEGRAM_TOOLS_STATE_DIR`         | where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`                                                                                  |
 | `download_dir`      | `--download-dir`        | `TELEGRAM_TOOLS_DOWNLOAD_DIR`      | where `telegram_file_save` saves received files, a folder per message; default `~/Downloads/telegram-tools`; read by the tools, no service restart needed  |
 | `download_max_mb`   | `--download-max-mb <n>` | `TELEGRAM_TOOLS_DOWNLOAD_MAX_MB`   | the largest file a download takes, in MB; integer 1..2000, default 100; read by the tools, no service restart needed                                       |
@@ -305,8 +306,10 @@ Lists are comma-separated in a flag or a variable. Where each harness reads them
           exclude_tools: []
   ```
 
-  The plugin passes its own environment to the command line it runs, so the
-  variables work too. A running gateway keeps the environment it started with;
+  Without a `language` setting, the approval card follows Hermes's own
+  `display.language` (or `HERMES_LANGUAGE`), the language of its approval
+  buttons, and else stays in English. The plugin passes its own environment
+  to the command line it runs, so the variables work too. A running gateway keeps the environment it started with;
   restart it (`hermes gateway restart`) after changing one.
 
 - **Claude Code, Grok Build and Antigravity** start the plugin's server without
@@ -449,6 +452,8 @@ device name the service logs in as identify it as unofficial (§2.2, §2.3).
 - `src/core/` — the tool contract and the tools, free of any harness and of
   the project's names.
 - `src/tools.ts` — the list of every tool, which each entry point registers.
+- `src/words.ts` — the translations of the tools' words, per language, which
+  the native plugins use in their approval prompts.
 - `src/mcp/` — the MCP server, built to `dist/mcp.js` and run by
   `telegram-tools`.
 - `src/opencode/` — the OpenCode plugin, built to `dist/opencode.js`.
