@@ -39,6 +39,36 @@ describe("a disappearing message's file", () => {
   })
 })
 
+describe("a file kept as it arrived", () => {
+  test("is saved with the note that it is for the user only, and says it was kept", async () => {
+    await t.serveFile("secret", { kept: true })
+    const result = await t.save(saveArgs())
+    expect(result.files).toHaveLength(1)
+    expect(result.private_note).toBe(PRIVATE_NOTE)
+    expect(result.kept).toBe(true)
+    expect(result).not.toHaveProperty("disappears_at")
+  })
+
+  test("says when its message disappears, as a disappearing file does", async () => {
+    await t.serveFile("secret", { kept: true, disappears_at: NOW + 60_000 })
+    const result = await t.save(saveArgs())
+    expect(result.kept).toBe(true)
+    expect(result.disappears_at).toBe(formatLocalTime(NOW + 60_000))
+  })
+
+  test("is checked again like any file, and a program it turns out to be is refused", async () => {
+    await t.serveFile(ELF_BYTES, { name: "x.pdf", kept: true })
+    const result = await t.save(saveArgs())
+    expect(result.refused).toHaveLength(1)
+    expect(result.files).toEqual([])
+  })
+
+  test("is not claimed for a file that was not kept", async () => {
+    await t.serveFile("plain")
+    expect(await t.save(saveArgs())).not.toHaveProperty("kept")
+  })
+})
+
 describe("what the service answers with an error", () => {
   test.each([
     ["not_found", "No message 42 in this chat."],
