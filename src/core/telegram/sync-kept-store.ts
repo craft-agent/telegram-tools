@@ -1,13 +1,13 @@
 import { Buffer } from "node:buffer"
 import { randomBytes } from "node:crypto"
 import { constants, type Stats } from "node:fs"
-import { chmod, lstat, mkdir, open, readdir, rename, rm, rmdir } from "node:fs/promises"
+import { lstat, open, readdir, rename, rm, rmdir } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import type { Mirror } from "./mirror"
 import { isCount } from "./mirror-input"
 import type { SavedFile } from "./service-requests"
 import { FILE_MODE, writeAll } from "./sync-download-stream"
-import { DOWNLOADED_FILE_NAME, FOLDER_MODE } from "./sync-incoming"
+import { DOWNLOADED_FILE_NAME, newPrivateFolder, privateFolder } from "./sync-incoming"
 
 /** The facts kept with a kept file: what its message declared, the bytes kept, and when the message disappears. */
 export type KeptMeta = Omit<SavedFile, "path" | "kept">
@@ -70,12 +70,6 @@ async function isPlainFolder(path: string): Promise<boolean> {
   return (await lstatOrUndefined(path))?.isDirectory() === true
 }
 
-/** Makes a folder with mode 700, parents too; the mode is set again because `mkdir`'s is masked by the umask. */
-async function privateFolder(path: string): Promise<void> {
-  await mkdir(path, { recursive: true, mode: FOLDER_MODE })
-  await chmod(path, FOLDER_MODE)
-}
-
 /** The folder of a chat's kept messages, or undefined for an id that cannot name one. */
 function chatFolderOf(kept: string, chat: string): string | undefined {
   return CHAT_FOLDER.test(chat) ? join(kept, chat) : undefined
@@ -98,8 +92,7 @@ export async function createKeptStaging(kept: string, chat: string, id: number):
   if (chatFolder === undefined || target === undefined) throw new Error("not a message that can be kept")
   await privateFolder(chatFolder)
   const dir = join(chatFolder, `.${id}.${randomBytes(STAGING_NAME_BYTES).toString("hex")}.part`)
-  await mkdir(dir, { mode: FOLDER_MODE })
-  await chmod(dir, FOLDER_MODE)
+  await newPrivateFolder(dir)
   return { dir, file: join(dir, DOWNLOADED_FILE_NAME), target }
 }
 

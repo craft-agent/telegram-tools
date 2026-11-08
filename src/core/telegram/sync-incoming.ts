@@ -11,6 +11,18 @@ const FOLDER_NAME_BYTES = 16
 /** The name of every downloaded file inside its folder; the sender's name never reaches the file system. */
 export const DOWNLOADED_FILE_NAME = "file"
 
+/** Makes a folder with mode 700, parents too; the mode is set again because `mkdir`'s is masked by the umask. */
+export async function privateFolder(path: string): Promise<void> {
+  await mkdir(path, { recursive: true, mode: FOLDER_MODE })
+  await chmod(path, FOLDER_MODE)
+}
+
+/** Makes a folder with mode 700 that must not exist yet, its parent being there; the mode is set again because `mkdir`'s is masked by the umask. */
+export async function newPrivateFolder(path: string): Promise<void> {
+  await mkdir(path, { mode: FOLDER_MODE })
+  await chmod(path, FOLDER_MODE)
+}
+
 /** A download's folder under `incoming/`, and the file in it that the bytes go to. */
 export type DownloadFolder = { dir: string; file: string }
 
@@ -41,11 +53,9 @@ export async function clearIncoming(incoming: string): Promise<void> {
  * taken exclusively: one that exists already fails.
  */
 export async function createDownloadFolder(incoming: string): Promise<DownloadFolder> {
-  await mkdir(incoming, { recursive: true, mode: FOLDER_MODE })
-  await chmod(incoming, FOLDER_MODE)
+  await privateFolder(incoming)
   const dir = join(incoming, randomBytes(FOLDER_NAME_BYTES).toString("hex"))
-  await mkdir(dir, { mode: FOLDER_MODE })
-  await chmod(dir, FOLDER_MODE)
+  await newPrivateFolder(dir)
   return { dir, file: join(dir, DOWNLOADED_FILE_NAME) }
 }
 
