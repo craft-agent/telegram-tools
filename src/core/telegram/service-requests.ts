@@ -20,7 +20,7 @@ export const SERVICE_REQUESTS = {
   sync_add: "sync_add",
   /** Supergroups and channels taken off the sync list: `SyncChangeParams` → `SyncRemoveResult`. */
   sync_remove: "sync_remove",
-  /** One message's file taken from Telegram into a fresh folder of the label's `incoming/`: `DownloadParams` → `DownloadResult`. */
+  /** One message's file, kept or taken from Telegram, in a fresh folder of the label's `incoming/`: `DownloadParams` → `DownloadResult`. */
   download: "download",
 } as const
 
@@ -177,8 +177,15 @@ export type DeclaredFile = {
  * label's `incoming/`: `path` is absolute, and `size` is the bytes written.
  * The caller reads that folder and removes it. `disappears_at` (Unix
  * milliseconds) is set when the message disappears by its chat's timer.
+ * `kept` is set when the file is a copy that `keep_disappearing` kept as the
+ * message arrived, served without asking Telegram.
  */
-export type SavedFile = Omit<DeclaredFile, "size"> & { path: string; size: number; disappears_at?: number }
+export type SavedFile = Omit<DeclaredFile, "size"> & {
+  path: string
+  size: number
+  disappears_at?: number
+  kept?: true
+}
 
 /** A file the service did not download, and why; a refusal is an answer, not an error. */
 export type RefusedFile = DeclaredFile & { reason: string }

@@ -250,8 +250,8 @@ Every entry point takes the same settings:
 - **The session and credentials never leave the state directory.** Nothing
   from the session or the app's credentials reaches a result, an error or a
   log, and no tool reads or writes the state directory except through the
-  mirror, the service client, the outbox, the folder the service downloaded
-  into under `incoming/`, and the files under `kept/`. The session stands for the
+  mirror, the service client, the outbox, and the folder the service
+  downloaded into under `incoming/`. The session stands for the
   account itself: whoever holds it reads and sends as the user, on every
   device.
 
@@ -409,9 +409,15 @@ Every entry point takes the same settings:
   meant it to be seen once, unless `keep_disappearing` kept it.
 - **With `keep_disappearing` on, the service keeps their files as they
   arrive**, in the label's `kept/`, at most 100 MB each and never a program or
-  an archive; a file that arrives while the service is down is not kept.
-  Delete for everyone removes the kept file with its message. Saving such a
-  message saves from that copy, through the same checks.
+  an archive, judged again on its bytes once it is in. A file is kept when the
+  service receives its message, live or in the catch-up after a restart; one
+  Telegram has already removed by then is not kept. A kept file lasts as long as its
+  message's row: delete for everyone removes it at once, and the service
+  removes, at every start, any kept file whose message the mirror no longer
+  has. Saving such a message saves from that copy, even once the message has
+  expired at Telegram: the service copies it into a fresh folder under
+  `incoming/`, so the save tool reads `incoming/` only and the same checks
+  apply.
 - **On macOS every saved and unpacked file carries the quarantine flag**, set
   through the runner, so the system checks it before anything opens it as an
   app; elsewhere nothing stands for it.

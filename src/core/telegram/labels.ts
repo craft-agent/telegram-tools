@@ -59,6 +59,11 @@ export type LabelPaths = {
    * download; a tool reads only the folder a download named, and removes it)
    */
   incoming: string
+  /**
+   * `<dir>/kept` (the files `keep_disappearing` kept as they arrived, one
+   * folder per message, `<chat id>/<message id>/`; only the service writes it)
+   */
+  kept: string
   /** `<dir>/sync.lock` */
   syncLock: string
 }
@@ -84,6 +89,7 @@ export function labelPaths(stateDir: string, label: string): LabelPaths {
     socket: join(dir, "sync.sock"),
     outbox: join(dir, "outbox"),
     incoming: join(dir, "incoming"),
+    kept: join(dir, "kept"),
     syncLock: join(dir, "sync.lock"),
   }
   const socketBytes = Buffer.byteLength(paths.socket, "utf8")

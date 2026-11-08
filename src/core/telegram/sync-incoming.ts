@@ -2,8 +2,8 @@ import { randomBytes } from "node:crypto"
 import { chmod, lstat, mkdir, readdir, rm } from "node:fs/promises"
 import { join } from "node:path"
 
-/** The permissions of `incoming/` and of the folder of each download: the owner only. */
-const FOLDER_MODE = 0o700
+/** The permissions of `incoming/`, of the folder of each download and of the folders of kept files: the owner only. */
+export const FOLDER_MODE = 0o700
 
 /** How many random bytes name a download's folder. */
 const FOLDER_NAME_BYTES = 16
