@@ -45,10 +45,14 @@ export type SyncRequestsContext = {
   /** Aborts when the run ends. */
   signal: AbortSignal
   refresh: ChatListRefresh
+  /** Runs the downloads one at a time: the `download` requests and the files kept as they arrive share it. */
+  downloads: RequestQueue
   /** Ends the run, since Telegram ended the session. */
   endSession(): void
   /** Ends the run for a failure of the service's own, such as a mirror that cannot be written. */
   failRun(error: unknown): void
+  /** Removes the kept files of chats whose messages the mirror no longer has. */
+  forgetChats(chats: readonly string[]): void
 }
 
 /** Milliseconds as the Telegram second at or after them. */
@@ -283,12 +287,12 @@ async function fetchRequest(
  * `fetch` writes the mirror through the path the gap filling uses, one fetch
  * at a time for the whole service; `sync_add` and `sync_remove` change the
  * sync list and what the mirror keeps, with no call to Telegram; `download`
- * takes one message's file into the label's `incoming/`, one download at a
- * time and apart from the fetches.
+ * takes one message's file into the label's `incoming/`, from the copy kept as
+ * it arrived or from Telegram, one download at a time (shared with the files
+ * being kept) and apart from the fetches.
  */
 export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, ServiceHandler> {
   const fetches = new RequestQueue()
-  const downloads = new RequestQueue()
   return {
     [SERVICE_REQUESTS.history]: (params, call) => history(ctx, params, call),
     [SERVICE_REQUESTS.topics]: (params, call) => topics(ctx, params, call),
@@ -297,6 +301,6 @@ export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, Se
     [SERVICE_REQUESTS.fetch]: (params, call) => fetchRequest(ctx, fetches, params, call),
     [SERVICE_REQUESTS.sync_add]: (params) => syncAdd(ctx, params),
     [SERVICE_REQUESTS.sync_remove]: (params) => syncRemove(ctx, params),
-    [SERVICE_REQUESTS.download]: (params, call) => downloadRequest(ctx, downloads, params, call),
+    [SERVICE_REQUESTS.download]: (params, call) => downloadRequest(ctx, ctx.downloads, params, call),
   }
 }

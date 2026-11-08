@@ -7,6 +7,7 @@ import { META } from "./mirror-meta"
 import type { DeleteInput, IngestContext, ReadInput } from "./mirror-input"
 import { findChat } from "./mirror-rows"
 import type { Coverage } from "./sync-coverage"
+import type { FileKeeper } from "./sync-keep"
 import { STORAGE_FAILURE_REASON, errorLabel } from "./sync-outcome"
 import { readMessage, writeMessage, type ReadMessage } from "./sync-message"
 import type { SyncTelegram } from "./sync-telegram"
@@ -45,14 +46,20 @@ function countsOf(outcomes: DeleteOutcome[]): string {
  */
 export class Receiver {
   private readonly deps: ReceiverDeps
+  private keeper: FileKeeper | undefined
   private halted = false
 
   constructor(deps: ReceiverDeps) {
     this.deps = deps
   }
 
-  /** Registers the handlers on the client's emitters; call it before the client connects. */
-  attach(client: SyncTelegram): void {
+  /**
+   * Registers the handlers on the client's emitters; call it before the client
+   * connects. `keeper` keeps the files of the disappearing messages that
+   * arrive, when `keepDisappearing` is on.
+   */
+  attach(client: SyncTelegram, keeper: FileKeeper): void {
+    this.keeper = keeper
     client.onNewMessage.add((message) => this.onMessage("message", message))
     client.onEditMessage.add((message) => this.onMessage("edit", message))
     client.onDeleteMessage.add((update) => this.onDelete(update))
@@ -65,17 +72,21 @@ export class Receiver {
   }
 
   private onMessage(label: "message" | "edit", message: Message): void {
-    const { channels } = this.deps
-    this.process<ReadMessage>(
+    const { channels, keepDisappearing } = this.deps
+    const done = this.process<ReadMessage>(
       label,
       () => readMessage(message, channels),
       (read, ctx) => writeMessage(this.deps.mirror, ctx, read, channels),
     )
+    // Only a new message is kept: an edit or a message the mirror had is not.
+    if (keepDisappearing && label === "message" && done?.outcome === "stored") {
+      this.keeper?.keep(message, done.prepared.message)
+    }
   }
 
   private onDelete(update: DeleteMessageUpdate): void {
-    const { mirror, coverage } = this.deps
-    this.process<DeleteInput>(
+    const { mirror, coverage, keepDisappearing } = this.deps
+    const done = this.process<DeleteInput>(
       "delete",
       () => deleteInputOf(update),
       (input, ctx) => {
@@ -85,6 +96,9 @@ export class Receiver {
         return countsOf(deleteMessages(mirror, ctx, input))
       },
     )
+    if (keepDisappearing && done && done.outcome !== SKIPPED) {
+      this.keeper?.forgetMessages(done.prepared.chat, done.prepared.ids)
+    }
   }
 
   private onRead(update: HistoryReadUpdate): void {
@@ -101,21 +115,27 @@ export class Receiver {
   /**
    * Turns the update into `prepared` outside the transaction, so that what
    * fails there is only mtcute's data, then writes it. `store` names the
-   * outcome for the log.
+   * outcome for the log. Resolves with `prepared` and the outcome once it is
+   * written, and with null when the update was not (unreadable, not for the
+   * mirror, or a storage failure).
    */
-  private process<T>(label: string, prepare: () => T | null, store: (prepared: T, ctx: IngestContext) => string): void {
-    if (this.halted) return
+  private process<T>(
+    label: string,
+    prepare: () => T | null,
+    store: (prepared: T, ctx: IngestContext) => string,
+  ): { prepared: T; outcome: string } | null {
+    if (this.halted) return null
     const { mirror, now, keepDisappearing, log } = this.deps
     let prepared: T | null
     try {
       prepared = prepare()
     } catch (error) {
       log(`event: ${label} unreadable (${errorLabel(error)})`)
-      return
+      return null
     }
     if (prepared === null) {
       log(`event: ${label} ${SKIPPED}`)
-      return
+      return null
     }
     let outcome: string
     try {
@@ -127,9 +147,10 @@ export class Receiver {
       })
     } catch {
       this.failStorage()
-      return
+      return null
     }
     log(`event: ${label} ${outcome}`)
+    return { prepared, outcome }
   }
 
   private failStorage(): void {

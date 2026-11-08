@@ -13,6 +13,8 @@ import { ConnectionWatch, Coverage } from "./sync-coverage"
 import { Ending, endedBy, writing } from "./sync-ending"
 import { runHousekeeping } from "./sync-housekeeping"
 import { clearIncoming } from "./sync-incoming"
+import { FileKeeper } from "./sync-keep"
+import { sweepKept } from "./sync-kept-store"
 import { applySyncList } from "./sync-list"
 import { resolveOptions, type ResolvedSyncOptions, type SyncOptions } from "./sync-options"
 import {
@@ -25,6 +27,7 @@ import {
   type SyncOutcome,
 } from "./sync-outcome"
 import { Receiver } from "./sync-receive"
+import { RequestQueue } from "./sync-request-queue"
 import { syncRequestHandlers } from "./sync-requests"
 import type { SyncTelegram } from "./sync-telegram"
 import { onAbort, settledOrTimeout } from "./sync-wait"
@@ -44,6 +47,8 @@ type Session = {
   /** The start-up, which settles once the service runs or has ended. */
   starting?: Promise<void>
   housekeeping?: Promise<void>
+  /** Keeps the files of disappearing messages; its work in the background ends before the run does. */
+  keeper?: FileKeeper
 }
 
 /** What one run works on. */
@@ -56,6 +61,8 @@ type Run = {
   receiver: Receiver
   watch: ConnectionWatch
   coverage: Coverage
+  /** Runs the downloads one at a time, the `download` requests and the files kept as they arrive alike. */
+  downloads: RequestQueue
 }
 
 /** Records how the run ended, as far as the mirror can be written, tells the log, and returns the outcome. */
@@ -88,13 +95,16 @@ function applyList({ mirror, settings }: Run): void {
 
 /** Connects, checks whose mirror this is, and starts the updates, the socket and the housekeeping. */
 async function start(run: Run, session: Session): Promise<void> {
-  const { mirror, paths, app, settings, ending, receiver, watch, coverage } = run
+  const { mirror, paths, app, settings, ending, receiver, watch, coverage, downloads } = run
   const { log } = settings
+  const endSession = () => ending.end({ kind: "session-ended" })
   await clearIncoming(paths.incoming)
   // Before connecting: the catch-up replays what happened while the service was down as soon as the updates start.
   const client = settings.openClient(app)
   session.client = client
-  receiver.attach(client)
+  const keeper = new FileKeeper({ client, mirror, settings, signal: ending.signal, endSession, queue: downloads })
+  session.keeper = keeper
+  receiver.attach(client, keeper)
   client.onConnectionState.add(watch.observe)
   client.onError.add((error) => {
     if (isSessionEnded(error)) ending.end({ kind: "session-ended" })
@@ -121,6 +131,9 @@ async function start(run: Run, session: Session): Promise<void> {
   )
 
   applyList(run)
+  // After the list, whose channels and unlisted chats leave the mirror, and before any file is kept: the sweep removes the leftovers of a copy being written.
+  await sweepKept(paths.kept, mirror, settings.keepDisappearing).catch(() => log("kept files could not be swept"))
+  keeper.begin()
   await client.startUpdatesLoop()
   if (ending.settled) return
   const refresh = new ChatListRefresh({ client, mirror, settings, signal: ending.signal })
@@ -130,8 +143,10 @@ async function start(run: Run, session: Session): Promise<void> {
     settings,
     signal: ending.signal,
     refresh,
-    endSession: () => ending.end({ kind: "session-ended" }),
+    downloads,
+    endSession,
     failRun: (error) => ending.end(endedBy(error)),
+    forgetChats: (chats) => keeper.forgetChats(chats),
   })
   session.serverStarting = serveService(
     paths.socket,
@@ -163,7 +178,10 @@ async function shutDown(run: Run, session: Session): Promise<void> {
   const lateClose = session.server ? undefined : session.serverStarting?.then((server) => server.close())
   lateClose?.catch(() => {})
   if (session.client) await settledOrTimeout(session.client.destroy(), stopWaitMs)
-  await settledOrTimeout(Promise.all([session.starting, session.housekeeping, lateClose]), stopWaitMs)
+  await settledOrTimeout(
+    Promise.all([session.starting, session.housekeeping, lateClose, session.keeper?.idle()]),
+    stopWaitMs,
+  )
 }
 
 /** Everything from recording the start to the outcome, with the mirror open and the app's credentials read. */
@@ -192,7 +210,7 @@ async function syncWithMirror(mirror: Mirror, paths: LabelPaths, app: AppCredent
       ending.end({ kind: "storage" })
     },
   })
-  const run: Run = { mirror, paths, app, settings, ending, receiver, watch, coverage }
+  const run: Run = { mirror, paths, app, settings, ending, receiver, watch, coverage, downloads: new RequestQueue() }
   // A storage failure from elsewhere (the upkeep) freezes the session storage too, as soon as the run is known to end.
   void ending.promise.then((ended) => {
     if (ended.kind === "storage") freezeStorage()

@@ -13,6 +13,8 @@ export type SyncListContext = {
   settings: Pick<ResolvedSyncOptions, "channels" | "now">
   /** Ends the run for a failure of the service's own, such as a mirror that cannot be written. */
   failRun(error: unknown): void
+  /** Removes the kept files of chats whose messages the mirror no longer has. */
+  forgetChats(chats: readonly string[]): void
 }
 
 /** Refuses the whole call unless every chat is one the mirror lists and the sync list can hold. */
@@ -62,13 +64,15 @@ export async function syncAdd(ctx: SyncListContext, raw: unknown): Promise<SyncA
   })
 }
 
-/** Takes chats off the sync list and stops following them, deleting their mirrored messages. */
+/** Takes chats off the sync list and stops following them, deleting their mirrored messages and the files kept of them. */
 export async function syncRemove(ctx: SyncListContext, raw: unknown): Promise<SyncRemoveResult> {
   const { chats } = parseSyncChangeParams(raw)
   expectListable(ctx, chats)
   const { mirror } = ctx
-  return writeList(ctx, () => {
+  const result = writeList(ctx, () => {
     const removed = chats.filter((chat) => unlistChat(mirror, chat))
     return { removed, absent: chats.filter((chat) => !removed.includes(chat)), size: listSize(mirror) }
   })
+  if (result.removed.length > 0) ctx.forgetChats(result.removed)
+  return result
 }

@@ -22,6 +22,7 @@ export type Downloaded = {
   type?: string | null
   kind?: string
   disappears_at?: number
+  kept?: true
 }
 
 /** A linked label with a mirror that lists `USER`'s chat, a download directory, a scripted service and the tool. */
