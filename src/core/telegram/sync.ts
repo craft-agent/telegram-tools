@@ -12,6 +12,7 @@ import { ChatListRefresh } from "./sync-chat-refresh"
 import { ConnectionWatch, Coverage } from "./sync-coverage"
 import { Ending, endedBy, writing } from "./sync-ending"
 import { runHousekeeping } from "./sync-housekeeping"
+import { clearIncoming } from "./sync-incoming"
 import { applySyncList } from "./sync-list"
 import { resolveOptions, type ResolvedSyncOptions, type SyncOptions } from "./sync-options"
 import {
@@ -89,6 +90,7 @@ function applyList({ mirror, settings }: Run): void {
 async function start(run: Run, session: Session): Promise<void> {
   const { mirror, paths, app, settings, ending, receiver, watch, coverage } = run
   const { log } = settings
+  await clearIncoming(paths.incoming)
   // Before connecting: the catch-up replays what happened while the service was down as soon as the updates start.
   const client = settings.openClient(app)
   session.client = client

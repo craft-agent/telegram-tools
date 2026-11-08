@@ -79,6 +79,7 @@ describe("labelPaths", () => {
     expect(paths.mirror).toBe(join(stateDir, "work", "mirror.sqlite"))
     expect(paths.socket).toBe(join(stateDir, "work", "sync.sock"))
     expect(paths.outbox).toBe(join(stateDir, "work", "outbox"))
+    expect(paths.incoming).toBe(join(stateDir, "work", "incoming"))
     expect(paths.syncLock).toBe(join(stateDir, "work", "sync.lock"))
   })
 
