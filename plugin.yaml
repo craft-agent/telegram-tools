@@ -8,6 +8,7 @@ provides_tools:
   - telegram_chat_read
   - telegram_sync_add
   - telegram_sync_read
+  - telegram_sync_remove
 provides_hooks:
   - pre_tool_call
 config_schema:
