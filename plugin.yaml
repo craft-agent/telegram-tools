@@ -38,3 +38,5 @@ config_schema:
   channels:
     type: bool
     description: Lets the mirror list channels; off by default. Read by the sync service.
+  language:
+    description: The language of the approval card, such as ja. Defaults to Hermes's display language, else English.
