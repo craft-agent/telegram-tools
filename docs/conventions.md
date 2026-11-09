@@ -602,13 +602,21 @@ The facts this package's tools add beside the shared `Size`
   `Photo`, `Document`, `Audio`, `Voice message`, `Video` or `Sticker` (another
   kind of media shows as the mirror names it).
 - **`Unpack`** is `Yes` when the call asks to unpack an archive.
+- **`Mirrored messages`** is `Deleted` on a call that takes chats off the sync
+  list, since the mirror then deletes the messages it holds of them and their
+  earlier versions; it comes first. It says no count: the count grows while the
+  service syncs, and the pin of the prompt would then never hold.
+- **`Chats`** is how many chats a call that names several changes; the headline
+  then is the intent, since a count quoted as a headline value reads as a name.
 
 A save pins when the message was last edited, since an edit can replace a file
 and keep its name and size.
 
 Values come from the label's mirror (the chat's own title, never the model's
 account of it). A chat the mirror does not have gives no description, so the
-prompt shows the intent and the target.
+prompt shows the intent and the target. A call that names several chats, or one
+without a title, lists them in its text under `Chat list`, one per line, by
+their title in the mirror and their id.
 
 ## Toolsets
 
