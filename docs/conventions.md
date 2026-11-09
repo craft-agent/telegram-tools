@@ -431,11 +431,33 @@ Every entry point takes the same settings:
 - **A send is one call with one `random_id`**, never repeated by the package.
   A repeat of the same call with the same id is `RANDOM_ID_DUPLICATE`, never a
   second message, whereas a new id would be.
+- **The sync service sends through mtcute's low-level call** with its retries
+  and flood-wait sleeps turned off: its text sender cannot turn them off, and
+  they would repeat the call after a server error or a short flood wait.
+  mtcute still delivers a call again after a reconnect or a session reset,
+  always with the same bytes, so with the same `random_id`.
 - **A send's outcome is never guessed.** A result means Telegram accepted the
-  message. A failure known to happen before anything left throws its code.
-  Everything else throws `uncertain`: the message may have gone out, the mirror
-  cannot tell, and it is checked in the chat before any second send. A resend
-  that guessed wrong reaches the other person twice.
+  message. A failure known to happen before anything left throws its code: the
+  service not running, a chat refused before the call, Telegram refusing the
+  chat, the reply or the text, a flood or slow-mode wait (`rate_limited`, with
+  its seconds). Everything else throws `uncertain`: the message may have gone
+  out, the mirror cannot tell, and it is checked in the chat before any second
+  send. A resend that guessed wrong reaches the other person twice.
+- **A refusal after a reconnect is `uncertain`.** When the connection was
+  re-established while the call was out, an earlier delivery of it may have
+  landed and the refusal may answer the repeat; without a reconnect the
+  refusal stands.
+- **`RANDOM_ID_DUPLICATE` is a send that went out.** It proves an earlier
+  delivery of the same call landed, and no second message exists. The result
+  gives the message's id when the mirror has it, and leaves it out otherwise.
+- **An `uncertain` send carries a hint**: the messages the user sent in that
+  chat since the call began whose text is the same, by id and time, as the
+  mirror has them. It decides nothing; the error stays `uncertain`.
+- **The service records its own send** in the mirror as Telegram returns it,
+  since mtcute does not dispatch a client's own sends back as updates.
+- **A text is at most 4096 characters** after trimming, counted in UTF-16
+  units as Telegram counts them, and goes out exactly as written, never parsed
+  as Markdown or HTML: what the harness showed is what arrives.
 
 ## Toolsets
 
