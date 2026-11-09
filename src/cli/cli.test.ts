@@ -252,8 +252,9 @@ describe("usage", () => {
     [["run", ADD_ID, "--cwd="], "--cwd"],
     [["run", ADD_ID, "--cwd", "/x", "--confirm", "harness"], "--confirm"],
     [["target", ADD_ID], "--cwd"],
-    [["target", ADD_ID, "--cwd", "/x", "--read-only"], "--read-only"],
-    [["target", ADD_ID, "--cwd", "/x", "--toolsets", "all"], "--toolsets"],
+    [["target", ADD_ID, "--cwd", "/x", "--confirm", "harness"], "--confirm"],
+    [["target", ADD_ID, "--cwd", "/x", "--toolsets", "bogus"], "bogus"],
+    [["target", ADD_ID, "--cwd", "/x", "--nope"], "--nope"],
     [["target", ADD_ID, "--cwd", "/x", "--state-dir"], "--state-dir"],
     [["target", ADD_ID, "--cwd", "/x", "--state-dir", "rel/path"], "--state-dir"],
   ])("%j is one line on stderr, exit 2 and nothing on stdout", async (argv, message) => {

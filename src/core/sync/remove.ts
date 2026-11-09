@@ -3,6 +3,7 @@ import { pickPaths } from "../chat/open"
 import { SYNC_LIST_LIMIT } from "../telegram/service-requests"
 import { defineTool } from "../tool"
 import { accountTargets, changeInput, requestSyncRemove, requireChatIds } from "./change"
+import { describeChange } from "./describe"
 import { chatIdsField, limitField, sizeField } from "./schema"
 
 const TOOL_ID = "telegram_sync_remove"
@@ -30,10 +31,16 @@ export const telegramSyncRemove = defineTool({
     "A chat that is not on the list is reported under `absent`, so repeating a call is harmless. If the call ends `uncertain`, check `telegram_sync_read` before trying again.",
   ].join(" "),
   toolset: "sync",
+  intent: "About to remove chats from the sync list",
   class: "overwrite",
   targets: accountTargets,
   input: changeInput,
   output,
+  describe: (args, ctx) =>
+    describeChange(args, ctx, TOOL_ID, {
+      one: "About to remove {chat} from the sync list",
+      facts: [{ label: "Mirrored messages", value: { text: "Deleted" } }],
+    }),
   async execute(args, ctx) {
     const chats = requireChatIds(args.chats, TOOL_ID)
     const paths = await pickPaths(ctx, args.account)

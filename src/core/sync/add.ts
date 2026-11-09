@@ -3,6 +3,7 @@ import { pickPaths } from "../chat/open"
 import { SYNC_LIST_LIMIT } from "../telegram/service-requests"
 import { defineTool } from "../tool"
 import { accountTargets, changeInput, requestSyncAdd, requireChatIds } from "./change"
+import { describeChange } from "./describe"
 import { chatIdsField, limitField, sizeField } from "./schema"
 
 const TOOL_ID = "telegram_sync_add"
@@ -30,10 +31,15 @@ export const telegramSyncAdd = defineTool({
     "A chat already on the list is reported under `listed` and left as it is, so repeating a call is harmless. If the call ends `uncertain`, check `telegram_sync_read` before trying again.",
   ].join(" "),
   toolset: "sync",
+  intent: "About to add chats to the sync list",
   class: "idempotent",
   targets: accountTargets,
   input: changeInput,
   output,
+  describe: (args, ctx) =>
+    describeChange(args, ctx, TOOL_ID, {
+      one: "About to add {chat} to the sync list",
+    }),
   async execute(args, ctx) {
     const chats = requireChatIds(args.chats, TOOL_ID)
     const paths = await pickPaths(ctx, args.account)

@@ -587,6 +587,37 @@ Every entry point takes the same settings:
   units as Telegram counts them, and goes out exactly as written, never parsed
   as Markdown or HTML: what the harness showed is what arrives.
 
+## Approval facts
+
+The facts this package's tools add beside the shared `Size`
+(`src/core/facts.ts`), in the form "Write classes" describes:
+
+- **`Chat`** is the kind of chat a call writes to, as a word of the tool's:
+  `Person`, `Bot`, `Saved Messages`, `Group`, `Supergroup` or `Channel`. It
+  comes first, since sending to a group or a channel is a different answer
+  from sending to one person. Defined in `src/core/chat/facts.ts`.
+- **`Topic`** is the forum topic, by its title in the mirror (else its id).
+- **`Reply to`** is the message replied to, as `message {id}`.
+- **`File`** is the kind of file a save downloads, as a word of the tool's:
+  `Photo`, `Document`, `Audio`, `Voice message`, `Video` or `Sticker` (another
+  kind of media shows as the mirror names it).
+- **`Unpack`** is `Yes` when the call asks to unpack an archive.
+- **`Mirrored messages`** is `Deleted` on a call that takes chats off the sync
+  list, since the mirror then deletes the messages it holds of them and their
+  earlier versions; it comes first. It says no count: the count grows while the
+  service syncs, and the pin of the prompt would then never hold.
+- **`Chats`** is how many chats a call that names several changes; the headline
+  then is the intent, since a count quoted as a headline value reads as a name.
+
+A save pins when the message was last edited, since an edit can replace a file
+and keep its name and size.
+
+Values come from the label's mirror (the chat's own title, never the model's
+account of it). A chat the mirror does not have gives no description, so the
+prompt shows the intent and the target. A call that names several chats, or one
+without a title, lists them in its text under `Chat list`, one per line, by
+their title in the mirror and their id.
+
 ## Toolsets
 
 - **One per domain**: `account`, `chats`, `sync` (which supergroups and
