@@ -1,6 +1,6 @@
 import type { ToolSpec, Translator } from "../core"
-import { DESCRIBE_TIMEOUT_MS, permissionDescription } from "../entry/description"
-import { permissionResources } from "../entry/permission"
+import { DESCRIBE_TIMEOUT_MS } from "../entry/description"
+import { approvalOf } from "../entry/pin"
 import { loadSkills } from "./skills"
 import {
   needsPermission,
@@ -35,6 +35,7 @@ function v2Tool(
     output: spec.output,
     async execute(input: unknown, { sessionID, signal }: V2ToolContext): Promise<V2ToolResult> {
       const directory = await sessionDirectory(ctx, sessionID)
+      let pin: string | undefined
       if (needsPermission(spec)) {
         if (directory === undefined) {
           throw new Error(
@@ -42,10 +43,9 @@ function v2Tool(
           )
         }
         const toolContext = { cwd: directory, ownDir, ...settings, signal }
-        const [resources, description] = await Promise.all([
-          permissionResources(spec, input, toolContext),
-          permissionDescription(spec, input, toolContext, DESCRIBE_TIMEOUT_MS, t),
-        ])
+        const approval = await approvalOf(spec, input, toolContext, DESCRIBE_TIMEOUT_MS, t)
+        const { resources, description } = approval
+        pin = approval.pin
         await ctx.permission.assert({
           action: spec.id,
           resources,
@@ -54,7 +54,7 @@ function v2Tool(
           sessionID,
         })
       }
-      const result = await runTool(spec, input, { cwd: directory ?? process.cwd(), ownDir, ...settings, signal })
+      const result = await runTool(spec, input, { cwd: directory ?? process.cwd(), ownDir, ...settings, signal }, pin)
       return { content: JSON.stringify(result), output: result }
     },
   }
