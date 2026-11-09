@@ -139,4 +139,35 @@ describe("target", () => {
     expect(runEnv.code).toBe(EXIT_OK)
     expect(seenStateDir).toBe("/env/target/state")
   })
+
+  test("accepts the settings flags of run and passes the download settings into context for targets", async () => {
+    let seen: { downloadDir?: string; downloadMaxMb?: number } = {}
+    const checkTool: ToolSpec = {
+      ...specs[1]!,
+      id: "demo_target_download",
+      async targets(_args, ctx) {
+        seen = { downloadDir: ctx.downloadDir, downloadMaxMb: ctx.downloadMaxMb }
+        return [ctx.downloadDir ?? "none"]
+      },
+    }
+    const flagDir = tempDir()
+    const envDir = tempDir()
+    const argv = ["target", "demo_target_download", "--cwd", "/x"]
+    const env = { DEMO_DOWNLOAD_DIR: envDir, DEMO_DOWNLOAD_MAX_MB: "7" }
+
+    const run = await cli([...argv, "--download-dir", flagDir, "--download-max-mb", "3"], "", {
+      specs: [checkTool],
+      env,
+    })
+    expect(run.code).toBe(EXIT_OK)
+    expect(seen).toEqual({ downloadDir: flagDir, downloadMaxMb: 3 })
+    expect(json(run)).toMatchObject({ resources: [flagDir] })
+
+    const runEnv = await cli(argv, "", { specs: [checkTool], env })
+    expect(runEnv.code).toBe(EXIT_OK)
+    expect(seen).toEqual({ downloadDir: envDir, downloadMaxMb: 7 })
+
+    const runSelection = await cli([...argv, "--read-only", "--toolsets", "all"], "", { specs: [checkTool] })
+    expect(runSelection.code).toBe(EXIT_OK)
+  })
 })

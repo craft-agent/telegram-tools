@@ -17,7 +17,7 @@ import {
 import { errorBody } from "../entry/errors"
 import { approvalOf, checkPin } from "../entry/pin"
 import { PROJECT_PROFILE, type EntryProfile } from "../entry/profile"
-import { downloadSettings, parseStateDir, parseToolSettings, promptLanguage } from "../entry/settings"
+import { parseToolSettings, promptLanguage } from "../entry/settings"
 import { visible } from "../entry/visible"
 import { promptTranslator, promptWords } from "../entry/words"
 import { PROJECT } from "../project"
@@ -119,7 +119,7 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile
   if (name !== "run" && name !== "target") {
     const given = name === undefined ? "No command given" : `Unknown command "${name}"`
     throw usageError(
-      `${given}; use list, run <tool-id> --cwd <dir> [${PIN_FLAG} <hex>], target <tool-id> --cwd <dir> [${LANGUAGE_FLAG} <tag>] [${HARNESS_LANGUAGE_FLAG} <tag>], login, sync, service, logout or remove.`,
+      `${given}; use list, run <tool-id> --cwd <dir> [${PIN_FLAG} <hex>] [settings], target <tool-id> --cwd <dir> [${LANGUAGE_FLAG} <tag>] [${HARNESS_LANGUAGE_FLAG} <tag>] [settings], login, sync, service, logout or remove.`,
     )
   }
 
@@ -129,13 +129,13 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile
   if (cwd === undefined) throw usageError(`Command ${name} needs ${CWD_FLAG} <dir>.`)
   if (name === "target") {
     const { value: language, rest: afterLanguage } = takeFlag(rest, LANGUAGE_FLAG)
-    const { value: harnessLanguage, rest: stateFlags } = takeFlag(afterLanguage, HARNESS_LANGUAGE_FLAG)
-    const settings = downloadSettings(undefined, io.env, profile)
+    const { value: harnessLanguage, rest: settingFlags } = takeFlag(afterLanguage, HARNESS_LANGUAGE_FLAG)
+    const settings = parseToolSettings(settingFlags, io.env, profile)
     return {
       name,
       toolId,
       cwd,
-      stateDir: parseStateDir(stateFlags, io.env, profile),
+      stateDir: settings.state_dir,
       downloadDir: settings.download_dir,
       downloadMaxMb: settings.download_max_mb,
       language: promptLanguage(language, io.env, harnessLanguage, profile),
@@ -264,8 +264,10 @@ const PERSON_COMMANDS: Partial<Record<string, (argv: string[], io: CommandIo) =>
  * language) of that description and the resources when there is a description.
  * `target` takes `--language <tag>`, else `<envPrefix>_LANGUAGE`, else `--harness-language <tag>` (the harness's own
  * display language) as the prompt language; none, or one without a table,
- * keeps English. Standard output carries only the JSON document; a
- * mistake in the command line is one line on standard error and `EXIT_USAGE`.
+ * keeps English. `target` also takes the settings flags of `run` (and their
+ * `<envPrefix>_*` variables), so it resolves a call as `run` will. Standard
+ * output carries only the JSON document; a mistake in the command line is one
+ * line on standard error and `EXIT_USAGE`.
  * `login`, `sync`, `service`, `logout` and `remove` are for a person setting
  * up an account (see `PERSON_COMMANDS`). Resolves to the exit code.
  */
