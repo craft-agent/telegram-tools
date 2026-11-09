@@ -5,10 +5,11 @@ import { CHAT_FACT_TRANSLATIONS } from "./core/chat/facts"
 import { FACT_TRANSLATIONS } from "./core/facts"
 import { FILE_TRANSLATIONS } from "./core/file/words"
 import { MESSAGE_TRANSLATIONS } from "./core/message/words"
+import { SYNC_TRANSLATIONS } from "./core/sync/words"
 import { ALL_TOOLS } from "./tools"
 import { ALL_TRANSLATIONS } from "./words"
 
-const TABLES = [FACT_TRANSLATIONS, CHAT_FACT_TRANSLATIONS, MESSAGE_TRANSLATIONS, FILE_TRANSLATIONS]
+const TABLES = [FACT_TRANSLATIONS, CHAT_FACT_TRANSLATIONS, MESSAGE_TRANSLATIONS, FILE_TRANSLATIONS, SYNC_TRANSLATIONS]
 const ja = ALL_TRANSLATIONS.ja!
 
 describe("ALL_TRANSLATIONS", () => {
@@ -18,10 +19,12 @@ describe("ALL_TRANSLATIONS", () => {
     expect(ja).toEqual(Object.assign({}, ...TABLES.map((table) => table.ja)))
   })
 
-  test("translates the title and the intent of every write tool that states an intent", () => {
-    const stating = ALL_TOOLS.filter((tool) => tool.class !== "read" && tool.intent !== undefined)
-    expect(stating.length).toBeGreaterThan(0)
-    for (const tool of stating) {
+  test("gives every write tool an intent and a description, and translates its title and intent", () => {
+    const writes = ALL_TOOLS.filter((tool) => tool.class !== "read")
+    expect(writes.length).toBeGreaterThan(0)
+    for (const tool of writes) {
+      expect(tool.intent).toBeDefined()
+      expect(tool.describe).toBeDefined()
       expect(ja[tool.title]).toBeDefined()
       expect(ja[tool.intent!]).toBeDefined()
     }
