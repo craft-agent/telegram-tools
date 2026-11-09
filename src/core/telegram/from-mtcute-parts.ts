@@ -53,7 +53,7 @@ export function topicOf(message: Message): number | null {
 }
 
 /** The text entities of a message, without the ones mtcute cannot name. */
-export function entitiesOf(message: Message): EntityInfo[] {
+export function entitiesOf(message: Pick<Message, "entities">): EntityInfo[] {
   const entities: EntityInfo[] = []
   for (const entity of message.entities) {
     const { params } = entity
