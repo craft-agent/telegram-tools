@@ -28,6 +28,15 @@ function inputOf(media: tl.TypeMessageMedia, overrides: Partial<tl.RawMessage> =
   return input
 }
 
+function videoOfLength(duration: number): tl.RawMessageMediaDocument {
+  const media = fakeVideoMedia()
+  const attributes = (media.document as tl.RawDocument).attributes
+  const video = attributes.find((attribute) => attribute._ === "documentAttributeVideo")
+  if (video?._ !== "documentAttributeVideo") throw new Error("expected a video attribute")
+  video.duration = duration
+  return media
+}
+
 describe("messageInputOf media files", () => {
   test("a photo keeps its best size and the caption stays the body", () => {
     expect(inputOf(fakePhotoMedia())).toMatchObject({
@@ -70,11 +79,22 @@ describe("messageInputOf media files", () => {
       name: "clip.mp4",
       mime: "video/mp4",
       size: 987_654,
-      duration: 12.5,
+      duration: 13,
       width: 1280,
       height: 720,
       spoiler: true,
     })
+  })
+
+  test("a video's fractional length is rounded to whole seconds", () => {
+    expect(inputOf(videoOfLength(12.48)).media).toMatchObject({ type: "video", duration: 12 })
+    expect(inputOf(videoOfLength(12.5)).media).toMatchObject({ type: "video", duration: 13 })
+  })
+
+  test("a length that is no length is left out", () => {
+    for (const length of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY, -1]) {
+      expect(inputOf(videoOfLength(length)).media).not.toHaveProperty("duration")
+    }
   })
 
   test("a sticker keeps its emoji and dimensions", () => {

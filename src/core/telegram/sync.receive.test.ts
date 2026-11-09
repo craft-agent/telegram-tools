@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { DeleteMessageUpdate, HistoryReadUpdate, type Message } from "@mtcute/core"
+import { DeleteMessageUpdate, HistoryReadUpdate, type Message, type tl } from "@mtcute/core"
 import {
   FAKE_DATE,
   FAKE_IDS,
@@ -18,6 +18,7 @@ import {
   fakeUser,
   messageOf,
 } from "./fake-telegram.testing"
+import { fakeVideoMedia } from "./fake-telegram-media.testing"
 import { chatRow, messageRow, rowsOf } from "./mirror.testing"
 import { START_MS, aliceMessage, syncFixture, type SyncFixture } from "./sync.testing"
 
@@ -55,6 +56,19 @@ describe("the service storing what is pushed", () => {
     expect(fixture.mirror((m) => messageRow(m, FAKE_MARKED.alice, 1))).toMatchObject({ body: "hello", from_me: 0 })
     expect(fixture.meta().last_received_at).toBe(String(START_MS + 500))
     expect(fixture.logs).toContain("event: message stored")
+  })
+
+  test("a video of fractional length is stored with whole seconds", async () => {
+    await startService()
+    const media = fakeVideoMedia()
+    const video = (media.document as tl.RawDocument).attributes.find((a) => a._ === "documentAttributeVideo")
+    if (video?._ !== "documentAttributeVideo") throw new Error("expected a video attribute")
+    video.duration = 12.48
+
+    push(messageOf(fakeMessage({ id: 1, media }), alice))
+
+    const row = fixture.mirror((m) => messageRow(m, FAKE_MARKED.alice, 1))
+    expect(JSON.parse(String(row?.media))).toMatchObject({ type: "video", duration: 12 })
   })
 
   test("an edit replaces the text and keeps the version before it", async () => {
