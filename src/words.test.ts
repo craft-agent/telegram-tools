@@ -3,11 +3,12 @@ import { translator } from "./core"
 import { templatePlaceholders } from "./core/describe"
 import { CHAT_FACT_TRANSLATIONS } from "./core/chat/facts"
 import { FACT_TRANSLATIONS } from "./core/facts"
+import { FILE_TRANSLATIONS } from "./core/file/words"
 import { MESSAGE_TRANSLATIONS } from "./core/message/words"
 import { ALL_TOOLS } from "./tools"
 import { ALL_TRANSLATIONS } from "./words"
 
-const TABLES = [FACT_TRANSLATIONS, CHAT_FACT_TRANSLATIONS, MESSAGE_TRANSLATIONS]
+const TABLES = [FACT_TRANSLATIONS, CHAT_FACT_TRANSLATIONS, MESSAGE_TRANSLATIONS, FILE_TRANSLATIONS]
 const ja = ALL_TRANSLATIONS.ja!
 
 describe("ALL_TRANSLATIONS", () => {

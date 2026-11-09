@@ -1,7 +1,9 @@
 import { ToolError } from "../errors"
 import { cutText } from "../pages"
 import type { Mirror } from "../telegram/mirror"
+import type { MediaInfo } from "../telegram/mirror-input"
 import { findChat, type ChatRow } from "../telegram/mirror-rows"
+import { isRecord } from "../telegram/service-errors"
 import { formatLocalTime } from "../time"
 import type { ChatEntry } from "./schema"
 import { placeholders } from "./sql"
@@ -67,6 +69,24 @@ export function topicTitle(mirror: Mirror, chat: string, topic: number): string 
   const row = mirror.prepare("SELECT title FROM topics WHERE chat = ? AND id = ?").get(chat, topic) as
     { title: string | null } | undefined
   return row?.title ?? undefined
+}
+
+/** The media and the last edit time of a message the mirror has; `undefined` when it has no such message. */
+export function messageMedia(
+  mirror: Mirror,
+  chat: string,
+  id: number,
+): { media: MediaInfo | null; edited: number | null } | undefined {
+  const row = mirror.prepare("SELECT media, edited FROM messages WHERE chat = ? AND id = ?").get(chat, id) as
+    { media: string | null; edited: number | null } | undefined
+  if (!row) return undefined
+  let media: unknown = null
+  try {
+    media = row.media ? JSON.parse(row.media) : null
+  } catch {
+    media = null
+  }
+  return { media: isRecord(media) && typeof media.type === "string" ? (media as MediaInfo) : null, edited: row.edited }
 }
 
 /** The chats with these ids that this mirror has, by id. */
