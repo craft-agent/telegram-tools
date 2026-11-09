@@ -598,6 +598,13 @@ The facts this package's tools add beside the shared `Size`
   from sending to one person. Defined in `src/core/chat/facts.ts`.
 - **`Topic`** is the forum topic, by its title in the mirror (else its id).
 - **`Reply to`** is the message replied to, as `message {id}`.
+- **`File`** is the kind of file a save downloads, as a word of the tool's:
+  `Photo`, `Document`, `Audio`, `Voice message`, `Video` or `Sticker` (another
+  kind of media shows as the mirror names it).
+- **`Unpack`** is `Yes` when the call asks to unpack an archive.
+
+A save pins when the message was last edited, since an edit can replace a file
+and keep its name and size.
 
 Values come from the label's mirror (the chat's own title, never the model's
 account of it). A chat the mirror does not have gives no description, so the
