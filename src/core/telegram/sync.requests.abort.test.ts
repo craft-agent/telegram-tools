@@ -5,6 +5,7 @@ import { NOW, columnOf, createTestMirror, chatInput, followChat, type TestMirror
 import { createFakeSyncClient, type FakeSyncClient } from "./sync-client.testing"
 import { ChatListRefresh } from "./sync-chat-refresh"
 import { resolveOptions } from "./sync-options"
+import { RequestQueue } from "./sync-request-queue"
 import { syncRequestHandlers } from "./sync-requests"
 import { FORUM, KEPT, keptMessage } from "./sync-requests.testing"
 import { eventually } from "./sync.testing"
@@ -35,8 +36,10 @@ beforeEach(() => {
   handlers = syncRequestHandlers({
     ...context,
     refresh: new ChatListRefresh(context),
+    downloads: new RequestQueue(),
     endSession: () => {},
     failRun: () => {},
+    forgetChats: () => {},
   })
 })
 

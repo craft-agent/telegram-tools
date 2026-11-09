@@ -3,7 +3,7 @@ import { ToolError } from "../errors"
 import { messageInputOf } from "./from-mtcute"
 import type { Mirror } from "./mirror"
 import type { MessageInput } from "./mirror-input"
-import { findChat, type ChatRow } from "./mirror-rows"
+import { findChat } from "./mirror-rows"
 import {
   FETCH_PAGE_SIZE,
   SERVICE_REQUESTS,
@@ -19,10 +19,11 @@ import {
 import type { ServiceCall, ServiceHandler } from "./service-server"
 import type { ChatListRefresh } from "./sync-chat-refresh"
 import { pace, storeFetched } from "./sync-fetch"
+import { downloadRequest } from "./sync-download"
 import { syncAdd, syncRemove } from "./sync-list-requests"
 import type { ResolvedSyncOptions } from "./sync-options"
 import { errorLabel } from "./sync-outcome"
-import { abortable, cancelled, requestFailure } from "./sync-request-errors"
+import { listedChat, viaTelegram } from "./sync-request-calls"
 import {
   INT32_MAX,
   expectNoParams,
@@ -44,10 +45,14 @@ export type SyncRequestsContext = {
   /** Aborts when the run ends. */
   signal: AbortSignal
   refresh: ChatListRefresh
+  /** Runs the downloads one at a time: the `download` requests and the files kept as they arrive share it. */
+  downloads: RequestQueue
   /** Ends the run, since Telegram ended the session. */
   endSession(): void
   /** Ends the run for a failure of the service's own, such as a mirror that cannot be written. */
   failRun(error: unknown): void
+  /** Removes the kept files of chats whose messages the mirror no longer has. */
+  forgetChats(chats: readonly string[]): void
 }
 
 /** Milliseconds as the Telegram second at or after them. */
@@ -58,33 +63,6 @@ function secondsAtOrAfter(ms: number): number {
 /** Milliseconds as the Telegram second at or before them. */
 function secondsAtOrBefore(ms: number): number {
   return Math.min(Math.floor(ms / SECOND_MS), INT32_MAX)
-}
-
-/**
- * Runs a call to Telegram for a request: it gives up the moment the request's
- * client leaves or the run ends, and a failure of it becomes the error the
- * request answers with. `what` names the request in the log.
- */
-async function viaTelegram<T>(
-  ctx: SyncRequestsContext,
-  call: ServiceCall,
-  what: string,
-  work: (signal: AbortSignal) => Promise<T>,
-): Promise<T> {
-  const signal = AbortSignal.any([call.signal, ctx.signal])
-  if (signal.aborted) throw cancelled()
-  try {
-    return await abortable(work(signal), signal)
-  } catch (error) {
-    throw requestFailure(error, what, { endSession: ctx.endSession, log: ctx.settings.log })
-  }
-}
-
-/** The mirror's row for a chat the mirror lists; `not_found` when it does not. */
-function listedChat(mirror: Mirror, id: string): ChatRow {
-  const row = findChat(mirror, id)
-  if (!row) throw new ToolError("not_found", "The chat list has no such chat; refresh it, or check the id.")
-  return row
 }
 
 /** Refuses a live read of a chat the mirror keeps: that one is read from the mirror. */
@@ -308,7 +286,10 @@ async function fetchRequest(
  * `refresh` is the chat list refresh the housekeeping runs, shared with it;
  * `fetch` writes the mirror through the path the gap filling uses, one fetch
  * at a time for the whole service; `sync_add` and `sync_remove` change the
- * sync list and what the mirror keeps, with no call to Telegram.
+ * sync list and what the mirror keeps, with no call to Telegram; `download`
+ * takes one message's file into the label's `incoming/`, from the copy kept as
+ * it arrived or from Telegram, one download at a time (shared with the files
+ * being kept) and apart from the fetches.
  */
 export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, ServiceHandler> {
   const fetches = new RequestQueue()
@@ -320,5 +301,6 @@ export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, Se
     [SERVICE_REQUESTS.fetch]: (params, call) => fetchRequest(ctx, fetches, params, call),
     [SERVICE_REQUESTS.sync_add]: (params) => syncAdd(ctx, params),
     [SERVICE_REQUESTS.sync_remove]: (params) => syncRemove(ctx, params),
+    [SERVICE_REQUESTS.download]: (params, call) => downloadRequest(ctx, ctx.downloads, params, call),
   }
 }

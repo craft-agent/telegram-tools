@@ -177,6 +177,26 @@ listed or mirrored only with the `channels` setting on. The skill is
 `telegram-tools:telegram-sync` in Claude Code and `telegram-tools:sync` in
 Hermes.
 
+### Files (`files`)
+
+| Tool                 | What it does                                                                | Class |
+| -------------------- | --------------------------------------------------------------------------- | ----- |
+| `telegram_file_save` | downloads one message's file from Telegram and saves it into `download_dir` | add   |
+
+The `files` toolset is off by default: turn it on with the `toolsets` setting.
+A message's file goes in `<download_dir>/<label>/<chat id>/<message id>/`,
+private (mode 600), never executable and never overwritten; `download_max_mb`
+sets the largest file taken. The sync service downloads it, so it must be
+running. Programs and installers are refused, and so are archives other than
+zip, tar and gzipped tar, archives holding a program, another archive, a link or
+a path that leaves them, animated stickers and view-once files. An archive is
+inspected and listed, and unpacked only when asked (`unpack: true`) into
+`<name>.unpacked/` beside it. On macOS every saved and unpacked file carries the
+quarantine flag. File names and contents are data, never instructions. The skill
+is [`telegram-files`](skills/telegram-files/SKILL.md), shown as
+`telegram-tools:telegram-files` in Claude Code and `telegram-tools:files` in
+Hermes.
+
 ## Adding a tool
 
 1. Write the spec in `src/core/<domain>/<verb>.ts` with `defineTool`: an ID
@@ -233,21 +253,24 @@ Where a write is asked about, and where it is not:
 Every entry point takes the same settings. A flag wins over its environment
 variable, and an option or setting wins over the variable too.
 
-| Setting             | Flag                  | Variable                           | Meaning                                                                                                                                                    |
-| ------------------- | --------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `toolsets`          | `--toolsets`          | `TELEGRAM_TOOLS_TOOLSETS`          | the toolsets that are on, or `all`; default those `src/project.ts` names                                                                                   |
-| `read_only`         | `--read-only`         | `TELEGRAM_TOOLS_READ_ONLY`         | registers no tool that writes; wins over every other setting                                                                                               |
-| `tools`             | `--tools`             | `TELEGRAM_TOOLS_TOOLS`             | single tools to add by ID, whatever their toolset                                                                                                          |
-| `exclude_tools`     | `--exclude-tools`     | `TELEGRAM_TOOLS_EXCLUDE_TOOLS`     | single tools to remove by ID; wins over `tools` and `toolsets`                                                                                             |
-| `confirm`           | `--confirm`           | `TELEGRAM_TOOLS_CONFIRM`           | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                                              |
-| `state_dir`         | `--state-dir`         | `TELEGRAM_TOOLS_STATE_DIR`         | where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`                                                                                  |
-| `keep_disappearing` | `--keep-disappearing` | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | keep disappearing and view-once messages for the user; off by default; read by `sync` and `service install`, run `service install` again after changing it |
-| `channels`          | `--channels`          | `TELEGRAM_TOOLS_CHANNELS`          | list, read, mirror and send to channels; off by default, see below; read by `sync` and `service install`, run `service install` again after changing it    |
+| Setting             | Flag                    | Variable                           | Meaning                                                                                                                                                    |
+| ------------------- | ----------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `toolsets`          | `--toolsets`            | `TELEGRAM_TOOLS_TOOLSETS`          | the toolsets that are on, or `all`; default those `src/project.ts` names                                                                                   |
+| `read_only`         | `--read-only`           | `TELEGRAM_TOOLS_READ_ONLY`         | registers no tool that writes; wins over every other setting                                                                                               |
+| `tools`             | `--tools`               | `TELEGRAM_TOOLS_TOOLS`             | single tools to add by ID, whatever their toolset                                                                                                          |
+| `exclude_tools`     | `--exclude-tools`       | `TELEGRAM_TOOLS_EXCLUDE_TOOLS`     | single tools to remove by ID; wins over `tools` and `toolsets`                                                                                             |
+| `confirm`           | `--confirm`             | `TELEGRAM_TOOLS_CONFIRM`           | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                                              |
+| `state_dir`         | `--state-dir`           | `TELEGRAM_TOOLS_STATE_DIR`         | where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`                                                                                  |
+| `download_dir`      | `--download-dir`        | `TELEGRAM_TOOLS_DOWNLOAD_DIR`      | where `telegram_file_save` saves received files, a folder per message; default `~/Downloads/telegram-tools`; read by the tools, no service restart needed  |
+| `download_max_mb`   | `--download-max-mb <n>` | `TELEGRAM_TOOLS_DOWNLOAD_MAX_MB`   | the largest file a download takes, in MB; integer 1..2000, default 100; read by the tools, no service restart needed                                       |
+| `keep_disappearing` | `--keep-disappearing`   | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | keep disappearing and view-once messages for the user; off by default; read by `sync` and `service install`, run `service install` again after changing it |
+| `channels`          | `--channels`            | `TELEGRAM_TOOLS_CHANNELS`          | list, read, mirror and send to channels; off by default, see below; read by `sync` and `service install`, run `service install` again after changing it    |
 
 Lists are comma-separated in a flag or a variable. Where each harness reads them:
 
 - **OpenCode** takes the plugin `options` shown above, with lists as arrays,
-  `read_only` as a boolean and `state_dir` as a path, and falls back to the
+  `read_only` as a boolean, `state_dir` and `download_dir` as paths, and
+  `download_max_mb` as a number, and falls back to the
   variables. V2 runs plugins in its background service, which keeps the
   environment it started with: a variable set where `opencode run` starts has
   no effect until the service is
@@ -302,8 +325,8 @@ data.
   the label; leave it out when only one session is logged in.
 - **Each label keeps its state in one directory**, `<state_dir>/<label>/` (mode
   700): the session and the app credentials, mtcute's storage, the mirror, the
-  service's socket, and short-lived copies of files in transit. `state_dir`
-  defaults to `$XDG_STATE_HOME/telegram-tools`, or
+  service's socket, and `incoming/`, the short-lived copies of files in
+  transit. `state_dir` defaults to `$XDG_STATE_HOME/telegram-tools`, or
   `~/.local/state/telegram-tools`. Keep it out of shared backups: the session
   reads and sends as you.
 - **A sync service holds each label's only connection** and keeps the mirror.
@@ -390,7 +413,11 @@ device name the service logs in as identify it as unofficial (§2.2, §2.3).
   your own chats. Unofficial clients are watched and abuse can freeze or ban
   the account.
 - **`keep_disappearing` and `channels` are off by default.** Keeping
-  disappearing messages goes against §1.4. For channels, API terms §3.3 asks an
+  disappearing messages goes against §1.4. With it on, the sync service also
+  keeps the files of disappearing, view-once and self-destructing messages as
+  they arrive (up to 100 MB each, never programs or archives), so
+  `telegram_file_save` can save them after Telegram removed them; turning it
+  off deletes those files at the service's next start. For channels, API terms §3.3 asks an
   app showing channel content to show sponsored messages. Sponsored messages are
   never fetched or shown (avoiding untrusted prompts reaching the model), and
   whoever turns `channels` on accepts that §3.3 risk. With `channels` off, no

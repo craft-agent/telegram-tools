@@ -60,6 +60,8 @@ export function failing(id: string, error: Error): ToolSpec {
 export const settings = (overrides: Partial<EntrySettings> = {}): EntrySettings => ({
   confirm: "harness",
   state_dir: "/default/state",
+  download_dir: "/default/downloads",
+  download_max_mb: 100,
   ...overrides,
 })
 

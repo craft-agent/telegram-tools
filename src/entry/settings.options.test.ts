@@ -1,14 +1,14 @@
 import { describe, expect, test } from "bun:test"
 import { settingsFromOptions } from "./settings"
-import { failure, profile } from "./settings.testing"
+import { DOWNLOAD_SETTINGS, failure, profile } from "./settings.testing"
 
 const fromOptions = (options: Record<string, unknown> | undefined, env: Record<string, string | undefined> = {}) =>
   settingsFromOptions(options, env, profile)
 
 describe("settingsFromOptions", () => {
   test("gives no setting for no options", () => {
-    expect(fromOptions(undefined)).toEqual({ state_dir: expect.any(String) })
-    expect(fromOptions({})).toEqual({ state_dir: expect.any(String) })
+    expect(fromOptions(undefined)).toEqual({ state_dir: expect.any(String), ...DOWNLOAD_SETTINGS })
+    expect(fromOptions({})).toEqual({ state_dir: expect.any(String), ...DOWNLOAD_SETTINGS })
   })
 
   test("reads each option", () => {
@@ -26,6 +26,7 @@ describe("settingsFromOptions", () => {
       tools: ["demo_thing_read"],
       exclude_tools: ["a"],
       state_dir: "/custom/state",
+      ...DOWNLOAD_SETTINGS,
     })
     expect(fromOptions({ toolsets: "all" }).toolsets).toBe("all")
     expect(fromOptions({ toolsets: ["alpha", "all"] }).toolsets).toBe("all")
@@ -44,6 +45,7 @@ describe("settingsFromOptions", () => {
       read_only: true,
       tools: ["a", "b"],
       state_dir: "/env/state",
+      ...DOWNLOAD_SETTINGS,
     })
     expect(
       fromOptions({ toolsets: ["beta"], read_only: false, state_dir: "/opt/state" }, { ...env, DEMO_READ_ONLY: "yes" }),
@@ -52,6 +54,7 @@ describe("settingsFromOptions", () => {
       read_only: false,
       tools: ["a", "b"],
       state_dir: "/opt/state",
+      ...DOWNLOAD_SETTINGS,
     })
   })
 
@@ -76,6 +79,7 @@ describe("settingsFromOptions", () => {
   test("reads keep_disappearing and channels from options and the environment", () => {
     expect(fromOptions({ keep_disappearing: true, channels: false })).toEqual({
       state_dir: expect.any(String),
+      ...DOWNLOAD_SETTINGS,
       keep_disappearing: true,
       channels: false,
     })

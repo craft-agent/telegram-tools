@@ -32,9 +32,12 @@ describe("sync add: the tool", () => {
   })
 
   test("names the account it writes to", async () => {
-    expect(await telegramSyncAdd.targets?.({ chats: [SUPERGROUP] }, { cwd: t.stateDir, stateDir: t.stateDir })).toEqual(
-      ["default"],
-    )
+    expect(
+      await telegramSyncAdd.targets?.(
+        { chats: [SUPERGROUP] },
+        { cwd: t.stateDir, stateDir: t.stateDir, ...DOWNLOAD_CONTEXT },
+      ),
+    ).toEqual(["default"])
   })
 
   test("says what it changes, what it needs and where the ids come from", () => {
@@ -145,3 +148,4 @@ describe("sync add: the service", () => {
     expect((await t.fail(telegramSyncAdd, { chats: [SUPERGROUP] })).code).toBe("uncertain")
   })
 })
+import { DOWNLOAD_CONTEXT } from "../tool.testing"

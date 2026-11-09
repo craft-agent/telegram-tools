@@ -9,12 +9,13 @@ import {
   ToolError,
   type ErrorCode,
   type ErrorDetails,
+  type ToolContext,
   type ToolSpec,
 } from "../core"
 import { errorBody } from "../entry/errors"
 import { permissionResources } from "../entry/permission"
 import { PROJECT_PROFILE, type EntryProfile } from "../entry/profile"
-import { parseStateDir, parseToolSettings } from "../entry/settings"
+import { downloadSettings, parseStateDir, parseToolSettings } from "../entry/settings"
 import { PROJECT } from "../project"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, type CommandIo } from "./command-io"
 import { runLogin } from "./login"
@@ -48,10 +49,31 @@ export type CliIo = {
   signal?: AbortSignal
 }
 
+/** What `run` and `target` name: the tool, the working directory and the resolved directory and download settings. */
+type ToolCall = {
+  toolId: string
+  cwd: string
+  stateDir: string
+  downloadDir: string
+  downloadMaxMb: number
+}
+
 type Command =
   | { name: "list"; selected: ToolSpec[] }
-  | { name: "run"; toolId: string; cwd: string; selected: ToolSpec[]; stateDir: string }
-  | { name: "target"; toolId: string; cwd: string; stateDir: string }
+  | ({ name: "run"; selected: ToolSpec[] } & ToolCall)
+  | ({ name: "target" } & ToolCall)
+
+function toolContext(command: ToolCall, io: CliIo): ToolContext {
+  return {
+    cwd: command.cwd,
+    ownDir: io.ownDir,
+    stateDir: command.stateDir,
+    downloadDir: command.downloadDir,
+    downloadMaxMb: command.downloadMaxMb,
+    programName: PROJECT.name,
+    signal: io.signal,
+  }
+}
 
 function usageError(message: string): ToolError {
   return new ToolError("invalid_argument", message)
@@ -95,7 +117,15 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile
   const { cwd, rest } = takeCwd(options)
   if (cwd === undefined) throw usageError(`Command ${name} needs ${CWD_FLAG} <dir>.`)
   if (name === "target") {
-    return { name, toolId, cwd, stateDir: parseStateDir(rest, io.env, profile) }
+    const settings = downloadSettings(undefined, io.env, profile)
+    return {
+      name,
+      toolId,
+      cwd,
+      stateDir: parseStateDir(rest, io.env, profile),
+      downloadDir: settings.download_dir,
+      downloadMaxMb: settings.download_max_mb,
+    }
   }
 
   const settings = parseToolSettings(rest, io.env, profile)
@@ -105,6 +135,8 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile
     cwd,
     selected: selectTools(io.specs, settings, profile.toolsets),
     stateDir: settings.state_dir,
+    downloadDir: settings.download_dir,
+    downloadMaxMb: settings.download_max_mb,
   }
 }
 
@@ -145,12 +177,7 @@ async function runTool(command: Extract<Command, { name: "run" }>, io: CliIo): P
   const spec = command.selected.find((candidate) => candidate.id === command.toolId)
   if (!spec) return writeError(io, "invalid_argument", `Unknown tool "${command.toolId}".`)
   try {
-    const result = await invoke(spec, await readArguments(io), {
-      cwd: command.cwd,
-      ownDir: io.ownDir,
-      stateDir: command.stateDir,
-      signal: io.signal,
-    })
+    const result = await invoke(spec, await readArguments(io), toolContext(command, io))
     writeJson(io, { result })
     return EXIT_OK
   } catch (error) {
@@ -165,12 +192,7 @@ async function targetOf(command: Extract<Command, { name: "target" }>, io: CliIo
   const spec = io.specs.find((candidate) => candidate.id === command.toolId)
   if (!spec) return writeError(io, "invalid_argument", `Unknown tool "${command.toolId}".`)
   try {
-    const resources = await permissionResources(spec, await readArguments(io), {
-      cwd: command.cwd,
-      ownDir: io.ownDir,
-      stateDir: command.stateDir,
-      signal: io.signal,
-    })
+    const resources = await permissionResources(spec, await readArguments(io), toolContext(command, io))
     writeJson(io, { resources })
     return EXIT_OK
   } catch (error) {

@@ -1,5 +1,12 @@
 import { createRequire } from "node:module"
-import type { ConnectionState, Dialog, ForumTopic, Message, User } from "@mtcute/core"
+import {
+  MtTimeoutError,
+  type ConnectionState,
+  type Dialog,
+  type ForumTopic,
+  type Message,
+  type User,
+} from "@mtcute/core"
 import { fakeAccount } from "./login.testing"
 import type { SyncTelegram } from "./sync-telegram"
 
@@ -25,6 +32,8 @@ export type FakeMethod =
   | "getHistory"
   | "searchMessages"
   | "getForumTopics"
+  | "getMessages"
+  | "downloadAsIterable"
   | "destroy"
   | "freezeStorage"
 
@@ -53,6 +62,9 @@ function windowOf(
   return newestFirst.slice(start, start + limit)
 }
 
+/** How a scripted download ends once its chunks are served: an error is thrown, `stall` waits until the stall limit passes or the download is aborted. */
+export type FakeDownloadEnd = Error | "stall"
+
 /** A fake mtcute client for the sync service, with the scripting and the record of a test. */
 export type FakeSyncClient = SyncTelegram & {
   /** Every call the service made, in order. */
@@ -73,8 +85,10 @@ export type FakeSyncClient = SyncTelegram & {
   holdConnect(): void
   /** Sets the dialogs `iterDialogs` yields, newest first. */
   setDialogs(...dialogs: Dialog[]): void
-  /** Sets the messages `getHistory` has for a chat, by its marked id. */
+  /** Sets the messages `getHistory` and `getMessages` have for a chat, by its marked id. */
   setHistory(chat: number | string, ...messages: Message[]): void
+  /** Sets the chunks every download yields, and how it ends after them; it ends normally by default. */
+  setDownload(chunks: Uint8Array[], end?: FakeDownloadEnd): void
   /** Sets the messages `searchMessages` has for a forum topic of a chat, by the chat's marked id. */
   setThread(chat: number | string, topic: number, ...messages: Message[]): void
   /** Sets the topics `getForumTopics` lists for a chat, most recently active first. */
@@ -95,6 +109,7 @@ export function createFakeSyncClient(): FakeSyncClient {
   const threads = new Map<string, Message[]>()
   const topicLists = new Map<number, ForumTopic[]>()
   const gates = new Map<FakeMethod, Promise<void>>()
+  let download: { chunks: Uint8Array[]; end?: FakeDownloadEnd } = { chunks: [] }
   let dialogs: Dialog[] = []
   let me: User = fakeAccount()
   let holdingConnect = false
@@ -137,6 +152,7 @@ export function createFakeSyncClient(): FakeSyncClient {
     holdConnect: () => void (holdingConnect = true),
     setDialogs: (...list: Dialog[]) => void (dialogs = list),
     setHistory: (chat: number | string, ...messages: Message[]) => void history.set(Number(chat), messages),
+    setDownload: (chunks: Uint8Array[], end?: FakeDownloadEnd) => void (download = { chunks, end }),
     setThread: (chat: number | string, topic: number, ...messages: Message[]) =>
       void threads.set(`${Number(chat)}:${topic}`, messages),
     setTopics: (chat: number | string, ...list: ForumTopic[]) => void topicLists.set(Number(chat), list),
@@ -206,6 +222,35 @@ export function createFakeSyncClient(): FakeSyncClient {
         offsetId: params.offset,
       })
       return Object.assign(found, { total: found.length })
+    },
+    async getMessages(chat: unknown, ids: number | number[]) {
+      record("getMessages", { chat, ids })
+      await passGate("getMessages")
+      const known = history.get(Number(chat)) ?? []
+      return [ids].flat().map((id) => known.find((message) => message.id === id) ?? null)
+    },
+    async *downloadAsIterable(
+      input: { type?: string },
+      params: { abortSignal?: AbortSignal; stallTimeout?: number } = {},
+    ) {
+      const { abortSignal, stallTimeout } = params
+      record("downloadAsIterable", { kind: input.type, stallTimeout })
+      await passGate("downloadAsIterable")
+      yield* download.chunks
+      if (download.end instanceof Error) throw download.end
+      if (download.end === "stall") {
+        // As mtcute stalls: after `stallTimeout` without a chunk it fails with a timeout error; an abort fails it with the reason.
+        await new Promise<never>((_, reject) => {
+          const timer =
+            stallTimeout === undefined
+              ? undefined
+              : setTimeout(() => reject(new MtTimeoutError(stallTimeout)), stallTimeout)
+          abortSignal?.addEventListener("abort", () => {
+            clearTimeout(timer)
+            reject(abortSignal.reason)
+          })
+        })
+      }
     },
     async getForumTopics(chat: unknown, params: { limit?: number; offset?: { topic: number } } = {}) {
       record("getForumTopics", { chat, ...params })

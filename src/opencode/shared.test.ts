@@ -2,8 +2,9 @@ import { describe, expect, test } from "bun:test"
 import { z } from "zod"
 import { ToolError, defineTool, type ToolContext } from "../core"
 import { runTool } from "./shared"
+import { DOWNLOAD_CONTEXT } from "../core/tool.testing"
 
-const CTX: ToolContext = { cwd: "/work", signal: new AbortController().signal }
+const CTX: ToolContext = { cwd: "/work", signal: new AbortController().signal, ...DOWNLOAD_CONTEXT }
 
 /** Runs a read tool that throws `error`, and resolves to what `runTool` threw. */
 async function failure(error: Error): Promise<unknown> {

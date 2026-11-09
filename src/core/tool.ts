@@ -16,6 +16,12 @@ export type ToolContext = {
   ownDir?: string
   /** Where every account's state lives: an absolute path the entry point resolved from its settings. */
   stateDir?: string
+  /** Where received files are saved: an absolute path resolved by the entry point. */
+  downloadDir: string
+  /** The largest received file a call may download, in megabytes. */
+  downloadMaxMb: number
+  /** The name of the program the entry point runs as, used where a file is marked as coming from it, such as the macOS quarantine flag; absent in tests. */
+  programName?: string
   signal?: AbortSignal
   /** Asks the person to approve; absent when the harness's own approval already covers the call. */
   confirm?(request: ConfirmRequest): Promise<boolean>

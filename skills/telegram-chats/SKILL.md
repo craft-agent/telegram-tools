@@ -93,8 +93,9 @@ never loop live reads over many chats.
 - `text`: message text or media caption.
 - `links`: text links within `text` whose destination the text does not show.
 - `media`: facts about attached media (`type`, `name`, `size`, `duration`,
-  `mime`, etc.), never local file paths or Telegram file ids. Saving files
-  comes with another toolset.
+  `mime`, etc.), never local file paths or Telegram file ids. Saving a file
+  is `telegram_file_save` in the `files` toolset (see the `telegram-files`
+  skill).
 - `reply_to`: quoted message id, chat (if across chats), quote excerpt, and
   initial replied text when known (cut text flagged with `text_cut`).
 - `forwarded_from`: original sender or chat id, name and original sent time.

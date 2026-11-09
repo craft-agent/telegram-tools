@@ -3,11 +3,13 @@ import { isChatId, isCount } from "./mirror-input"
 import { isRecord } from "./service-errors"
 import {
   AROUND_LIMIT,
+  DOWNLOAD_MAX_BYTES,
   FETCH_PAGE_LIMIT,
   HISTORY_LIMIT,
   SYNC_LIST_LIMIT,
   TOPICS_LIMIT,
   type AroundParams,
+  type DownloadParams,
   type FetchParams,
   type HistoryParams,
   type SyncChangeParams,
@@ -23,6 +25,7 @@ const TOPICS_KEYS = ["chat", "limit", "offset"]
 const OFFSET_KEYS = ["date", "id", "topic"]
 const AROUND_KEYS = ["chat", "id", "before_count", "after_count", "topic"]
 const FETCH_KEYS = ["chat", "pages"]
+const DOWNLOAD_KEYS = ["chat", "id", "max_bytes"]
 const SYNC_CHANGE_KEYS = ["chats"]
 
 function invalid(message: string): ToolError {
@@ -133,6 +136,21 @@ export function parseFetchParams(params: unknown): FetchParams {
   return {
     chat: chatAt(fields),
     pages: numberAt(fields, "pages", isLimitUpTo(FETCH_PAGE_LIMIT), `an integer from 1 to ${FETCH_PAGE_LIMIT}`),
+  }
+}
+
+/** The parameters of a `download` request, checked; anything off is `invalid_argument`. */
+export function parseDownloadParams(params: unknown): DownloadParams {
+  const fields = recordOf(params, DOWNLOAD_KEYS, "The download parameters")
+  return {
+    chat: chatAt(fields),
+    id: numberAt(fields, "id", isIdNumber, ID_TEXT),
+    max_bytes: numberAt(
+      fields,
+      "max_bytes",
+      isLimitUpTo(DOWNLOAD_MAX_BYTES),
+      `an integer from 1 to ${DOWNLOAD_MAX_BYTES}`,
+    ),
   }
 }
 

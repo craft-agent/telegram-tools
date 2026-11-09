@@ -233,7 +233,8 @@ Every entry point takes the same settings:
 - **Each label keeps all of its state in one directory**,
   `<state root>/<label>/`, created with mode 700: the session and the app's
   `api_id` and `api_hash`, mtcute's storage, the mirror, the service's socket,
-  and short-lived copies of files in transit. The state root is the `state_dir`
+  short-lived copies of files in transit (`incoming/`, `outbox/`), and the
+  files `keep_disappearing` kept (`kept/`). The state root is the `state_dir`
   setting, by default `$XDG_STATE_HOME/telegram-tools`, or
   `~/.local/state/telegram-tools` without it. One directory per label means a
   label is moved, backed up or removed as a whole, and nothing of one account
@@ -249,7 +250,8 @@ Every entry point takes the same settings:
 - **The session and credentials never leave the state directory.** Nothing
   from the session or the app's credentials reaches a result, an error or a
   log, and no tool reads or writes the state directory except through the
-  mirror, the service client and the outbox. The session stands for the
+  mirror, the service client, the outbox, and the folder the service
+  downloaded into under `incoming/`. The session stands for the
   account itself: whoever holds it reads and sends as the user, on every
   device.
 
@@ -358,8 +360,67 @@ Every entry point takes the same settings:
 - **Files go in and out only through the directories a setting names**,
   judged by real path, so a link that leads elsewhere counts as elsewhere.
   The state directory and the tools' own install directory are never among
-  them. Which settings, and their defaults, are settled with the tools that
-  save and send files.
+  them, nor inside them.
+- **Received files are saved under `download_dir`**, by default
+  `~/Downloads/telegram-tools`, where a person looks for what they downloaded.
+  A message's file goes in `<download_dir>/<label>/<chat id>/<message id>/`,
+  directories mode 700 and files mode 600, never executable: a received file
+  is private, and someone else wrote it. A file already there is never
+  overwritten: the same file is reused, another one gets a numbered name.
+- **One call saves one message's file.** A Telegram message carries at most
+  one file, and each file of an album is a message of its own.
+- **The service downloads, and only into the label's `incoming/`.** The
+  mirror keeps facts about a file, never Telegram's file id or reference, so
+  the service takes the message again and downloads it into a fresh folder
+  there; the tool takes only a file inside that folder and removes the folder
+  after the call. No name a message carries reaches the file system before it
+  is cleaned: the sender chose it.
+- **A download stops at `download_max_mb`**, 100 by default and at most 2000.
+  A file declaring more is refused before anything is downloaded, and a
+  download that passes the limit stops and leaves nothing. Telegram takes
+  files of several gigabytes, and the one connection serves every request.
+  A download that receives nothing for 60 seconds stops too: mtcute waits out
+  flood waits and retries failed parts inside a download without end, so the
+  stall limit is what bounds a flood wait there.
+- **Programs and installers are never saved**, judged by the name, the
+  declared type and the first bytes, since any one of them can lie. Source
+  code is saved as text: it runs only if someone runs it. Animated stickers
+  (`.tgs`, gzipped Lottie) are refused like an archive nothing can inspect.
+- **An archive is saved only once its contents pass inspection**, on the
+  downloaded copy itself: a zip, tar or gzipped tar holding no program,
+  installer, nested archive, link or special file, encrypted entry, or path
+  that leaves it, within 500 entries and 500 MB unpacked, counted from the
+  bytes read rather than from what the archive claims. Every other archive
+  format is refused: what cannot be read cannot be checked. An app or system
+  bundle inside it, or a name holding control or direction-changing
+  characters, refuses it too. Its listing comes back with names cleaned of the
+  remaining invisible characters, which could make one name read as another.
+  The inspection lives in a module of its own that knows nothing of Telegram.
+- **A document built on zip is a file, not an archive.** Word, Excel,
+  PowerPoint, OpenDocument and EPUB files are saved whole and never unpacked,
+  since they routinely hold other zips (a chart holds a spreadsheet). One
+  with macros is refused like a program.
+- **Unpacking is asked for, never automatic.** It goes into
+  `<name>.unpacked/` beside the archive, from a private copy inspected again,
+  following no link; a failure removes everything it wrote.
+- **Disappearing and view-once files follow their messages.** A disappearing
+  message's file is saved, while the message lasts, with the same note as its
+  text. A view-once or self-destructing file is refused, since its sender
+  meant it to be seen once, unless `keep_disappearing` kept it.
+- **With `keep_disappearing` on, the service keeps their files as they
+  arrive**, in the label's `kept/`, at most 100 MB each and never a program or
+  an archive, judged again on its bytes once it is in. A file is kept when the
+  service receives its message, live or in the catch-up after a restart; one
+  Telegram has already removed by then is not kept. A kept file lasts as long as its
+  message's row: delete for everyone removes it at once, and the service
+  removes, at every start, any kept file whose message the mirror no longer
+  has. Saving such a message saves from that copy, even once the message has
+  expired at Telegram: the service copies it into a fresh folder under
+  `incoming/`, so the save tool reads `incoming/` only and the same checks
+  apply.
+- **On macOS every saved and unpacked file carries the quarantine flag**, set
+  through the runner, so the system checks it before anything opens it as an
+  app; elsewhere nothing stands for it.
 
 ## Writes
 
@@ -393,6 +454,9 @@ Every entry point takes the same settings:
   sponsored messages, which are text from advertisers nobody in the chat
   chose, a new way for instructions to reach the model; whoever turns
   channels on accepts that §3.3 risk.
+- **`download_dir` and `download_max_mb` are taken the same way** and read by
+  the save tool, which sends the limit with each download, so changing either
+  needs no service restart; the service refuses a limit over 2000.
 
 ## Unofficial
 

@@ -3,8 +3,9 @@ import { z } from "zod"
 import { abortError } from "./exec"
 import { ANY_TARGET, writeTargets } from "./targets"
 import type { ToolContext, ToolSpec } from "./tool"
+import { DOWNLOAD_CONTEXT } from "./tool.testing"
 
-const CTX: ToolContext = { cwd: "/work" }
+const CTX: ToolContext = { cwd: "/work", ...DOWNLOAD_CONTEXT }
 const input = z.object({ names: z.array(z.string()).default([]), count: z.number().optional() })
 
 type Resolver = NonNullable<ToolSpec<typeof input>["targets"]>

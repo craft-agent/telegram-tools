@@ -20,6 +20,8 @@ export const SERVICE_REQUESTS = {
   sync_add: "sync_add",
   /** Supergroups and channels taken off the sync list: `SyncChangeParams` → `SyncRemoveResult`. */
   sync_remove: "sync_remove",
+  /** One message's file, kept or taken from Telegram, in a fresh folder of the label's `incoming/`: `DownloadParams` → `DownloadResult`. */
+  download: "download",
 } as const
 
 /** The most messages one live read returns. */
@@ -141,3 +143,52 @@ export type SyncAddResult = { added: string[]; listed: string[]; size: number }
  * the list holds now.
  */
 export type SyncRemoveResult = { removed: string[]; absent: string[]; size: number }
+
+/** Bytes in the megabyte the download limit is told in. */
+export const BYTES_PER_MB = 1024 * 1024
+
+/** The largest download limit a request may send (2000 MB): Telegram takes files of several gigabytes. */
+export const DOWNLOAD_MAX_BYTES = 2000 * BYTES_PER_MB
+
+/** The file of one message, taken from Telegram again, since the mirror keeps no file id or reference. */
+export type DownloadParams = {
+  /** A chat the mirror lists, mirrored or not. */
+  chat: string
+  /** The message in that chat. */
+  id: number
+  /** 1 to `DOWNLOAD_MAX_BYTES`: a file declaring more is refused, and a download that passes it stops. */
+  max_bytes: number
+}
+
+/** What Telegram declares of a message's file; the sender chose the name and the type. */
+export type DeclaredFile = {
+  /** The file name as Telegram gives it, unchanged; `null` when it has none (a photo). */
+  name: string | null
+  /** The declared MIME type. */
+  type: string | null
+  /** The declared size in bytes; `null` when Telegram gives none. */
+  size: number | null
+  /** The media type as the mirror names it: `photo`, `video`, `document`, `audio`, `voice`, `sticker`. */
+  kind: string
+}
+
+/**
+ * A file downloaded as `file` into a folder of its own, mode 700, under the
+ * label's `incoming/`: `path` is absolute, and `size` is the bytes written.
+ * The caller reads that folder and removes it. `disappears_at` (Unix
+ * milliseconds) is set when the message disappears by its chat's timer.
+ * `kept` is set when the file is a copy that `keep_disappearing` kept as the
+ * message arrived, served without asking Telegram.
+ */
+export type SavedFile = Omit<DeclaredFile, "size"> & {
+  path: string
+  size: number
+  disappears_at?: number
+  kept?: true
+}
+
+/** A file the service did not download, and why; a refusal is an answer, not an error. */
+export type RefusedFile = DeclaredFile & { reason: string }
+
+/** Either the file was downloaded, or it was refused with nothing left on disk. */
+export type DownloadResult = { saved: SavedFile } | { refused: RefusedFile }

@@ -9,6 +9,7 @@ import { MIRROR_VERSION } from "../telegram/mirror-schema"
 import { NOW, makeTempDir } from "../telegram/mirror.testing"
 import { formatLocalTime } from "../time"
 import { annotations, invoke } from "../tool"
+import { DOWNLOAD_CONTEXT } from "../tool.testing"
 import { telegramAccountRead } from "./read"
 
 let stateDir: string
@@ -47,7 +48,7 @@ function mirrorMeta(meta: Parameters<typeof setMeta>[1], name = "default", versi
 }
 
 function read(args: unknown = {}) {
-  return invoke(telegramAccountRead, args, { cwd: stateDir, stateDir })
+  return invoke(telegramAccountRead, args, { cwd: stateDir, stateDir, ...DOWNLOAD_CONTEXT })
 }
 
 async function failure(args: unknown) {
@@ -143,7 +144,7 @@ describe("account read: login and selection", () => {
   )
 
   test("missing state directory is an entry-point bug", async () => {
-    await expect(invoke(telegramAccountRead, {}, { cwd: stateDir })).rejects.toMatchObject({
+    await expect(invoke(telegramAccountRead, {}, { cwd: stateDir, ...DOWNLOAD_CONTEXT })).rejects.toMatchObject({
       code: "internal_error",
     })
   })

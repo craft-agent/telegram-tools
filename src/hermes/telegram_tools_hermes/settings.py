@@ -8,6 +8,7 @@ from .context import PluginContext
 
 #: The value of ``toolsets`` that turns on every toolset.
 ALL_TOOLSETS = "all"
+MAX_DOWNLOAD_MB = 2000
 
 
 class SettingsError(ValueError):
@@ -70,5 +71,17 @@ def settings_flags(ctx: PluginContext) -> list[str]:
             flags += [flag, names]
 
     flags += state_dir_flags(ctx)
+
+    download_dir = ctx.get_config("download_dir")
+    if download_dir is not None:
+        if not isinstance(download_dir, str) or not download_dir.strip():
+            raise SettingsError('setting "download_dir" must be a path')
+        flags += ["--download-dir", download_dir]
+
+    download_max_mb = ctx.get_config("download_max_mb")
+    if download_max_mb is not None:
+        if type(download_max_mb) is not int or not 1 <= download_max_mb <= MAX_DOWNLOAD_MB:
+            raise SettingsError(f'setting "download_max_mb" must be an integer from 1 to {MAX_DOWNLOAD_MB}')
+        flags += ["--download-max-mb", str(download_max_mb)]
 
     return flags

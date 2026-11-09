@@ -2,11 +2,12 @@ import { describe, expect, test } from "bun:test"
 import { z } from "zod"
 import { ToolError, isToolError } from "./errors"
 import { StepErrors, confirmWrite, defineTool, invoke, type ToolContext, type ToolSpec } from "./tool"
+import { DOWNLOAD_CONTEXT } from "./tool.testing"
 
 const input = z.object({ count: z.number().int(), label: z.string().optional() })
 const output = z.object({ total: z.number() })
 
-const CTX: ToolContext = { cwd: process.cwd() }
+const CTX: ToolContext = { cwd: process.cwd(), ...DOWNLOAD_CONTEXT }
 
 async function thrown(promise: Promise<unknown>): Promise<unknown> {
   return promise.then(
