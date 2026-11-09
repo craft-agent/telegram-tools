@@ -62,6 +62,13 @@ export function existingChat(mirror: Mirror, id: string): ChatRow {
   return chat
 }
 
+/** The title the mirror holds for a topic of a chat, or `undefined` when it has no such topic or no title for it. */
+export function topicTitle(mirror: Mirror, chat: string, topic: number): string | undefined {
+  const row = mirror.prepare("SELECT title FROM topics WHERE chat = ? AND id = ?").get(chat, topic) as
+    { title: string | null } | undefined
+  return row?.title ?? undefined
+}
+
 /** The chats with these ids that this mirror has, by id. */
 export function findChats(mirror: Mirror, ids: readonly string[]): Map<string, ChatRow> {
   if (ids.length === 0) return new Map()
