@@ -39,7 +39,7 @@ describe("a disappearing file that arrives with keeping on", () => {
     [
       "a view-once photo",
       () => arriving(1, fakeViewOncePhotoMedia()),
-      { name: null, type: null, kind: "photo", size: 3 },
+      { name: null, type: "image/jpeg", kind: "photo", size: 3 },
     ],
     [
       "a self-destructing video",

@@ -5,6 +5,9 @@ import type { MediaInfo, MessageInput } from "./mirror-input"
 /** The `ttlSeconds` Telegram gives media that can be opened once. */
 export const VIEW_ONCE_TTL_SECONDS = 0x7fffffff
 
+/** The type of every photo: Telegram stores a photo as JPEG, and mtcute gives a photo no type of its own. */
+export const PHOTO_MIME = "image/jpeg"
+
 /** How a message's media disappears: opened once, or some seconds after it is opened. */
 export type MediaTimer = Pick<MessageInput, "viewOnce" | "selfDestruct">
 
@@ -37,7 +40,7 @@ function wholeSeconds(seconds: number): number | null {
 function draftOf(media: NonNullable<MessageMedia>): Draft {
   switch (media.type) {
     case "photo":
-      return { type: "photo", size: media.fileSize, width: media.width, height: media.height }
+      return { type: "photo", mime: PHOTO_MIME, size: media.fileSize, width: media.width, height: media.height }
     case "document":
       return fileFacts(media)
     case "audio":

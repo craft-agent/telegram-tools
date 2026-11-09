@@ -66,7 +66,7 @@ describe("a message made from mtcute objects, stored", () => {
       sender_name: "Alice Example",
       kind: "message",
       body: "see this",
-      media: '{"type":"photo","size":123456,"width":800,"height":600,"spoiler":true}',
+      media: '{"type":"photo","mime":"image/jpeg","size":123456,"width":800,"height":600,"spoiler":true}',
       reply: '{"id":3}',
       reactions: '[{"emoji":"👍","count":2,"mine":true}]',
       view_once: 0,
