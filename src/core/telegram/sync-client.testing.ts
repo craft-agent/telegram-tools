@@ -8,6 +8,7 @@ import {
   type User,
 } from "@mtcute/core"
 import { fakeAccount } from "./login.testing"
+import { fakeSendMethods, type FakeSendMethods } from "./sync-client-send.testing"
 import type { SyncTelegram } from "./sync-telegram"
 
 /**
@@ -34,6 +35,9 @@ export type FakeMethod =
   | "getForumTopics"
   | "getMessages"
   | "downloadAsIterable"
+  | "resolvePeer"
+  | "call"
+  | "handleClientUpdate"
   | "destroy"
   | "freezeStorage"
 
@@ -65,8 +69,8 @@ function windowOf(
 /** How a scripted download ends once its chunks are served: an error is thrown, `stall` waits until the stall limit passes or the download is aborted. */
 export type FakeDownloadEnd = Error | "stall"
 
-/** A fake mtcute client for the sync service, with the scripting and the record of a test. */
-export type FakeSyncClient = SyncTelegram & {
+/** The scripting and the record of a test. */
+type FakeScripting = {
   /** Every call the service made, in order. */
   calls: FakeCall[]
   /** The arguments of the calls to one method, in order. */
@@ -100,6 +104,9 @@ export type FakeSyncClient = SyncTelegram & {
   /** The connection comes back, as the client reports it. */
   regain(): void
 }
+
+/** A fake mtcute client for the sync service, with the scripting and the record of a test. */
+export type FakeSyncClient = SyncTelegram & FakeSendMethods & FakeScripting
 
 /** A client that answers from what a test scripted, records its calls, and has mtcute's real emitters. */
 export function createFakeSyncClient(): FakeSyncClient {
@@ -140,6 +147,7 @@ export function createFakeSyncClient(): FakeSyncClient {
 
   const client = {
     ...emitters,
+    ...fakeSendMethods(record),
     calls,
     listenersAtConnect: undefined as ListenerCounts | undefined,
     listenersAtStart: undefined as ListenerCounts | undefined,

@@ -7,11 +7,13 @@ import {
   FETCH_PAGE_LIMIT,
   HISTORY_LIMIT,
   SYNC_LIST_LIMIT,
+  TEXT_MAX_UNITS,
   TOPICS_LIMIT,
   type AroundParams,
   type DownloadParams,
   type FetchParams,
   type HistoryParams,
+  type SendParams,
   type SyncChangeParams,
   type TopicsOffset,
   type TopicsParams,
@@ -26,6 +28,7 @@ const OFFSET_KEYS = ["date", "id", "topic"]
 const AROUND_KEYS = ["chat", "id", "before_count", "after_count", "topic"]
 const FETCH_KEYS = ["chat", "pages"]
 const DOWNLOAD_KEYS = ["chat", "id", "max_bytes"]
+const SEND_KEYS = ["chat", "text", "topic", "reply_to"]
 const SYNC_CHANGE_KEYS = ["chats"]
 
 function invalid(message: string): ToolError {
@@ -152,6 +155,27 @@ export function parseDownloadParams(params: unknown): DownloadParams {
       `an integer from 1 to ${DOWNLOAD_MAX_BYTES}`,
     ),
   }
+}
+
+/** The text of a `send` request: not blank, already trimmed, and within Telegram's length. Never echoed in an error. */
+function sendTextAt(fields: Record<string, unknown>): string {
+  const { text } = fields
+  if (typeof text !== "string") throw invalid("text must be a string.")
+  if (text.trim() === "") throw invalid("text must not be blank.")
+  if (text !== text.trim()) throw invalid("text must not start or end with blank space.")
+  if (text.length > TEXT_MAX_UNITS) throw invalid(`text must be at most ${TEXT_MAX_UNITS} characters.`)
+  return text
+}
+
+/** The parameters of a `send` request, checked; anything off is `invalid_argument`. */
+export function parseSendParams(params: unknown): SendParams {
+  const fields = recordOf(params, SEND_KEYS, "The send parameters")
+  const parsed: SendParams = { chat: chatAt(fields), text: sendTextAt(fields) }
+  const topic = optionalNumberAt(fields, "topic", isIdNumber, ID_TEXT)
+  const replyTo = optionalNumberAt(fields, "reply_to", isIdNumber, ID_TEXT)
+  if (topic !== undefined) parsed.topic = topic
+  if (replyTo !== undefined) parsed.reply_to = replyTo
+  return parsed
 }
 
 /** The parameters of a `sync_add` or `sync_remove` request, checked; anything off is `invalid_argument`. */

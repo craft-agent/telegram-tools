@@ -177,6 +177,23 @@ listed or mirrored only with the `channels` setting on. The skill is
 `telegram-tools:telegram-sync` in Claude Code and `telegram-tools:sync` in
 Hermes.
 
+### Sends (`sends`)
+
+| Tool                    | What it does                                                              | Class |
+| ----------------------- | ------------------------------------------------------------------------- | ----- |
+| `telegram_message_send` | sends one text to a chat by id, optionally to a forum topic or as a reply | add   |
+
+The `sends` toolset is on by default. The text goes out as written (never read
+as Markdown or HTML), trimmed, at most 4096 characters. One call sends once,
+with one `random_id`, and is never repeated: a failure `uncertain` means the
+message may have gone out, and its hint lists the matching messages the mirror
+saw, so the person checks the chat before anything is sent again. `duplicate`
+means an earlier delivery of the same call had already gone out. The sync
+service sends it, so it must be running. The skill is
+[`telegram-sends`](skills/telegram-sends/SKILL.md), shown as
+`telegram-tools:telegram-sends` in Claude Code and `telegram-tools:sends` in
+Hermes.
+
 ### Files (`files`)
 
 | Tool                 | What it does                                                                | Class |
