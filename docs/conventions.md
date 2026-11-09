@@ -587,6 +587,22 @@ Every entry point takes the same settings:
   units as Telegram counts them, and goes out exactly as written, never parsed
   as Markdown or HTML: what the harness showed is what arrives.
 
+## Approval facts
+
+The facts this package's tools add beside the shared `Size`
+(`src/core/facts.ts`), in the form "Write classes" describes:
+
+- **`Chat`** is the kind of chat a call writes to, as a word of the tool's:
+  `Person`, `Bot`, `Saved Messages`, `Group`, `Supergroup` or `Channel`. It
+  comes first, since sending to a group or a channel is a different answer
+  from sending to one person. Defined in `src/core/chat/facts.ts`.
+- **`Topic`** is the forum topic, by its title in the mirror (else its id).
+- **`Reply to`** is the message replied to, as `message {id}`.
+
+Values come from the label's mirror (the chat's own title, never the model's
+account of it). A chat the mirror does not have gives no description, so the
+prompt shows the intent and the target.
+
 ## Toolsets
 
 - **One per domain**: `account`, `chats`, `sync` (which supergroups and
