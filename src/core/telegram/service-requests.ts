@@ -22,6 +22,8 @@ export const SERVICE_REQUESTS = {
   sync_remove: "sync_remove",
   /** One message's file, kept or taken from Telegram, in a fresh folder of the label's `incoming/`: `DownloadParams` → `DownloadResult`. */
   download: "download",
+  /** One text sent to a chat, with one `random_id`, and recorded in the mirror: `SendParams` → `SendResult`. */
+  send: "send",
 } as const
 
 /** The most messages one live read returns. */
@@ -192,3 +194,30 @@ export type RefusedFile = DeclaredFile & { reason: string }
 
 /** Either the file was downloaded, or it was refused with nothing left on disk. */
 export type DownloadResult = { saved: SavedFile } | { refused: RefusedFile }
+
+/** The most UTF-16 units a text may have, as Telegram counts the length of a message. */
+export const TEXT_MAX_UNITS = 4096
+
+/** The id of the General topic of a forum: its messages carry no topic header. */
+export const GENERAL_TOPIC = 1
+
+/** One text sent to a chat, exactly as written. */
+export type SendParams = {
+  /** A chat the mirror lists. */
+  chat: string
+  /** Not blank, equal to itself trimmed, and at most `TEXT_MAX_UNITS` UTF-16 units long. */
+  text: string
+  /** The forum topic to send to; the chat must be a forum, and the General topic is `GENERAL_TOPIC`. */
+  topic?: number
+  /** The message in that chat to reply to. */
+  reply_to?: number
+}
+
+/**
+ * What Telegram accepted: the sent message's `id` and its time (Unix
+ * milliseconds) when Telegram gave them. `duplicate` is set when Telegram
+ * answered `RANDOM_ID_DUPLICATE`: an earlier delivery of this call landed and
+ * no second message exists; `id` is then given only when the mirror has the
+ * message, and `date` is left out.
+ */
+export type SendResult = { id?: number; date?: number; duplicate?: true }
