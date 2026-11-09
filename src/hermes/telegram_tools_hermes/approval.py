@@ -130,6 +130,7 @@ def resolve_target(
 ) -> Target:
     """What ``target`` prints: ``["*"]`` for resources that cannot be told, no description for one absent or bad.
 
+    ``flags`` are the same settings flags ``run`` gets, so ``target`` resolves the call as ``run`` will.
     ``language`` is the plugin's ``language`` setting and ``harness_language`` reads Hermes' display language
     per call; neither may fail the run, and ``target`` picks among them.
     """
@@ -199,10 +200,12 @@ def make_hook(
     """The ``pre_tool_call`` hook: it sends every call of these tools but a read to the person's approval.
 
     Whether a person is there to ask, and what happens when none is, is
-    Hermes' own gate to decide. ``language`` is the plugin's ``language``
-    setting; ``harness_language`` is read on every call. When ``pins`` is
-    given, the pin ``target`` answered is kept in it under the call's
-    ``tool_call_id`` for the pin hook; the decision is the same either way.
+    Hermes' own gate to decide. ``flags`` are the same settings flags ``run``
+    gets, so ``target`` resolves the call as ``run`` will. ``language`` is the
+    plugin's ``language`` setting; ``harness_language`` is read on every call.
+    When ``pins`` is given, the pin ``target`` answered is kept in it under the
+    call's ``tool_call_id`` for the pin hook; the decision is the same either
+    way.
     """
     by_id = {tool.id: tool for tool in tools}
 
@@ -275,6 +278,8 @@ def register_approval(
     language: str | None = None,
 ) -> None:
     """Hold every non-read call of ``tools`` for approval, with the card in ``language`` (the plugin's setting).
+
+    ``flags`` are the same settings flags ``run`` gets, so ``target`` resolves the call as ``run`` will.
 
     Two hooks, in this order, since Hermes runs them in registration order: the approval hook
     stashes the pin of what the card shows, then the pin hook gives it to the call.

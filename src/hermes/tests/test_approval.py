@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
-from support import CWD, FAKE_CLI, LISTING, FakeCliCase, StubContext, approval, listing, project, runtime
+from support import CWD, FAKE_CLI, LISTING, FakeCliCase, StubContext, approval, listing, project, runtime, settings
 
 
 CREATE = "Create a thing"
@@ -52,13 +52,21 @@ class ApprovalHookTest(FakeCliCase):
         self.assertEqual(call["argv"], ["target", "demo_thing_create", "--cwd", CWD])
         self.assertEqual(json.loads(call["stdin"]), {"target": "target/one", "body": "hi"})
 
-    def test_state_dir_flags_are_appended_to_target_call(self) -> None:
+    def test_target_call_gets_the_same_settings_flags_as_run(self) -> None:
         self.reply("target demo_thing_create", stdout='{"resources":["target/one"]}\n')
-        ctx = self.register({"state_dir": "/custom/state"})
+        config = {
+            "state_dir": "/custom/state",
+            "download_dir": "/custom/downloads",
+            "download_max_mb": 5,
+            "read_only": True,
+        }
+        ctx = self.register(config)
         hook = ctx.hooks[0][1]
         hook(tool_name="demo_thing_create", args={"target": "target/one"})
         [call] = self.target_calls()
-        self.assertEqual(call["argv"], ["target", "demo_thing_create", "--cwd", CWD, "--state-dir", "/custom/state"])
+        flags = settings.settings_flags(StubContext(config))
+        self.assertIn("--download-dir", flags)
+        self.assertEqual(call["argv"], ["target", "demo_thing_create", "--cwd", CWD, *flags])
 
     def test_every_non_read_class_is_sent_to_approval(self) -> None:
         for tool_id in ("demo_widget_update", "demo_item_add", "demo_gadget_edit", "demo_task_run"):
