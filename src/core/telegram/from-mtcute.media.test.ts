@@ -41,7 +41,7 @@ describe("messageInputOf media files", () => {
   test("a photo keeps its best size and the caption stays the body", () => {
     expect(inputOf(fakePhotoMedia())).toMatchObject({
       body: "caption",
-      media: { type: "photo", size: 123_456, width: 800, height: 600 },
+      media: { type: "photo", mime: "image/jpeg", size: 123_456, width: 800, height: 600 },
     })
   })
 

@@ -94,13 +94,13 @@ describe("a file that is downloaded", () => {
 })
 
 describe("a photo that is downloaded", () => {
-  test("has no name and no type", async () => {
+  test("has no name and is declared JPEG", async () => {
     fixture.client.setHistory(CHAT, mediaMessage(1, fakePhotoMedia()))
     fixture.client.setDownload([Uint8Array.of(9, 9)])
 
     const saved = savedOf(await download(fixture, 1, 200_000))
 
-    expect(saved).toEqual({ path: saved.path, name: null, type: null, size: 2, kind: "photo" })
+    expect(saved).toEqual({ path: saved.path, name: null, type: "image/jpeg", size: 2, kind: "photo" })
     expect(fixture.client.argsOf("downloadAsIterable")).toEqual([{ kind: "photo", stallTimeout: DOWNLOAD_STALL_MS }])
   })
 })
