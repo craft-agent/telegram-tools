@@ -81,6 +81,7 @@ describe("labelPaths", () => {
     expect(paths.outbox).toBe(join(stateDir, "work", "outbox"))
     expect(paths.incoming).toBe(join(stateDir, "work", "incoming"))
     expect(paths.syncLock).toBe(join(stateDir, "work", "sync.lock"))
+    expect(paths.serviceRecord).toBe(join(stateDir, "work", "service.json"))
   })
 
   test("throws internal_error on relative stateDir", () => {
