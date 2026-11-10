@@ -1,5 +1,9 @@
 import { ToolError } from "../errors"
-import { CAPTION_MAX_UNITS, TEXT_MAX_UNITS } from "../telegram/service-requests"
+import { checkEmojiOrRemove, checkPinFlagsWithUnpin, checkReactionEmoji } from "../telegram/action-checks"
+import { CAPTION_MAX_UNITS, type PinParams, TEXT_MAX_UNITS } from "../telegram/service-requests"
+
+/** The flags of a pin call. */
+export type PinFlags = Pick<PinParams, "unpin" | "notify" | "both_sides">
 
 /**
  * The text as it will be sent: trimmed, and then not blank and at most
@@ -33,4 +37,21 @@ export function checkedCaption(caption: string | undefined): string | undefined 
     )
   }
   return trimmed
+}
+
+/**
+ * The reaction a call asks for, as the sync service checks it: exactly one of
+ * `emoji` and `remove: true` (`remove: false` counts as not given), and the
+ * emoji one standard emoji. Returns the emoji, or `undefined` for a removal;
+ * anything off is `invalid_argument`.
+ */
+export function checkedReaction(emoji: string | undefined, remove: boolean | undefined): string | undefined {
+  checkEmojiOrRemove(emoji !== undefined, remove === true)
+  if (emoji !== undefined) checkReactionEmoji(emoji)
+  return emoji
+}
+
+/** Refuses `notify` and `both_sides` on an unpin, as the sync service does: they go with a pin only (`invalid_argument`). */
+export function checkedPinFlags({ unpin, notify, both_sides }: PinFlags): void {
+  checkPinFlagsWithUnpin(unpin, notify, both_sides)
 }
