@@ -17,6 +17,7 @@ const UNIT = "com-example-tool-default.service"
 
 const BASE_SPEC: ServiceSpec = {
   id: ID,
+  launcher: "example-sync",
   label: "work",
   description: "Example sync service",
   program: "/bin/node",

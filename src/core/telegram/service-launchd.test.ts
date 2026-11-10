@@ -1,22 +1,26 @@
 import { describe, expect, test } from "bun:test"
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises"
+import { lstat, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import {
   buildLaunchdPlist,
   installLaunchdService,
+  LAUNCHER_SCRIPT,
   launchdServiceStatus,
   removeLaunchdServiceLog,
   uninstallLaunchdService,
   xmlEscape,
 } from "./service-launchd"
-import type { ServiceHost, ServiceSpec } from "./service-types"
+import type { ServiceHost, ServiceName, ServiceSpec } from "./service-types"
 import type { ExecResult } from "../exec"
 
 const ID = "com.example.tool"
+const LAUNCHER = "example-sync"
+const NAME: ServiceName = { id: ID, launcher: LAUNCHER }
+const LAUNCHER_PATH = "/Users/test/Library/Application Support/com.example.tool/example-sync-work"
 
 const BASE_SPEC: ServiceSpec = {
-  id: ID,
+  ...NAME,
   label: "work",
   description: "Example sync service",
   program: "/bin/node",
@@ -68,9 +72,12 @@ describe("service-launchd", () => {
       path: "/usr/local/bin:/usr/bin",
     }
     const logPath = `/Users/test/Library/Logs/${ID}/work.log`
-    const xml = buildLaunchdPlist(spec, logPath)
+    const xml = buildLaunchdPlist(spec, logPath, LAUNCHER_PATH)
 
     expect(xml).toContain(`<key>Label</key>\n\t<string>${ID}.work</string>`)
+    expect(xml).toContain(
+      `<array>\n\t\t<string>${LAUNCHER_PATH}</string>\n\t\t<string>/path/to/node</string>\n\t\t<string>/path/to/cli.js</string>`,
+    )
     expect(xml).toContain("<string>/path/to/node</string>")
     expect(xml).toContain("<string>work &lt;test&gt;</string>")
     expect(xml).toContain("<string>/state &amp; dir</string>")
@@ -86,16 +93,16 @@ describe("service-launchd", () => {
   test("refuses control characters in program, args, PATH, or description", async () => {
     const logPath = "/tmp/test.log"
 
-    expect(() => buildLaunchdPlist({ ...BASE_SPEC, program: "/bin/no\nde" }, logPath)).toThrow(
+    expect(() => buildLaunchdPlist({ ...BASE_SPEC, program: "/bin/no\nde" }, logPath, LAUNCHER_PATH)).toThrow(
       "Control characters are not allowed in the program.",
     )
-    expect(() => buildLaunchdPlist({ ...BASE_SPEC, args: ["sync", "arg\x00bad"] }, logPath)).toThrow(
+    expect(() => buildLaunchdPlist({ ...BASE_SPEC, args: ["sync", "arg\x00bad"] }, logPath, LAUNCHER_PATH)).toThrow(
       "Control characters are not allowed in an argument.",
     )
-    expect(() => buildLaunchdPlist({ ...BASE_SPEC, path: "/bin:\r/usr/bin" }, logPath)).toThrow(
+    expect(() => buildLaunchdPlist({ ...BASE_SPEC, path: "/bin:\r/usr/bin" }, logPath, LAUNCHER_PATH)).toThrow(
       "Control characters are not allowed in PATH.",
     )
-    expect(() => buildLaunchdPlist({ ...BASE_SPEC, description: "bad\ntext" }, logPath)).toThrow(
+    expect(() => buildLaunchdPlist({ ...BASE_SPEC, description: "bad\ntext" }, logPath, LAUNCHER_PATH)).toThrow(
       "Control characters are not allowed in the description.",
     )
 
@@ -177,7 +184,7 @@ describe("service-launchd", () => {
         },
       })
 
-      await uninstallLaunchdService(ID, "default", host)
+      await uninstallLaunchdService(NAME, "default", host)
       expect(calls[0]).toEqual(["launchctl", "bootout", `gui/501/${ID}.default`])
     } finally {
       await rm(dir, { recursive: true, force: true })
@@ -190,7 +197,7 @@ describe("service-launchd", () => {
       const { host } = createFakeHost(dir)
       const { file } = await installLaunchdService({ ...BASE_SPEC, label: "default" }, host)
 
-      await uninstallLaunchdService(ID, "default", host)
+      await uninstallLaunchdService(NAME, "default", host)
 
       const gone = await stat(file).then(
         () => false,
@@ -253,9 +260,156 @@ describe("service-launchd", () => {
       const { log } = await installLaunchdService({ ...BASE_SPEC, label: "default" }, host)
       await writeFile(log, "line\n")
 
-      await uninstallLaunchdService(ID, "default", host)
+      await uninstallLaunchdService(NAME, "default", host)
 
       expect(await readFile(log, "utf8")).toBe("line\n")
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("installLaunchdService writes the launcher first in the plist, 0755 in a 0700 directory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host } = createFakeHost(dir)
+      const { file } = await installLaunchdService({ ...BASE_SPEC, label: "default", args: ["cli.js", "sync"] }, host)
+
+      const launcherDir = join(dir, "Library", "Application Support", ID)
+      const launcher = join(launcherDir, `${LAUNCHER}-default`)
+      expect(await readFile(launcher, "utf8")).toBe(LAUNCHER_SCRIPT)
+      expect((await stat(launcher)).mode & 0o777).toBe(0o755)
+      expect((await stat(launcherDir)).mode & 0o777).toBe(0o700)
+
+      const plist = await readFile(file, "utf8")
+      expect(plist).toContain(
+        `<array>\n\t\t<string>${launcher}</string>\n\t\t<string>/bin/node</string>\n\t\t<string>cli.js</string>`,
+      )
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("installLaunchdService replaces the launcher on reinstall and leaves no staging file", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host } = createFakeHost(dir)
+      const launcherDir = join(dir, "Library", "Application Support", ID)
+      const launcher = join(launcherDir, `${LAUNCHER}-work`)
+      await installLaunchdService(BASE_SPEC, host)
+      await writeFile(launcher, "old\n")
+      await writeFile(join(launcherDir, `.${LAUNCHER}-work.tmp`), "stale\n")
+
+      await installLaunchdService(BASE_SPEC, host)
+
+      expect(await readFile(launcher, "utf8")).toBe(LAUNCHER_SCRIPT)
+      expect(await readdir(launcherDir)).toEqual([`${LAUNCHER}-work`])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("installLaunchdService replaces a link at the launcher path without following it", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host } = createFakeHost(dir)
+      const launcherDir = join(dir, "Library", "Application Support", ID)
+      const launcher = join(launcherDir, `${LAUNCHER}-work`)
+      const target = join(dir, "target")
+      await writeFile(target, "keep\n")
+      await mkdir(launcherDir, { recursive: true })
+      await symlink(target, launcher)
+
+      await installLaunchdService(BASE_SPEC, host)
+
+      expect(await readFile(target, "utf8")).toBe("keep\n")
+      expect((await lstat(launcher)).isFile()).toBe(true)
+      expect(await readFile(launcher, "utf8")).toBe(LAUNCHER_SCRIPT)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("refuses an invalid launcher name, writing nothing on install", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host, calls } = createFakeHost(dir)
+      for (const launcher of ["", "../x", "a/b", ".hidden", "a b"]) {
+        const error = await installLaunchdService({ ...BASE_SPEC, launcher }, host).catch((e: unknown) => e)
+        expect((error as { code: string }).code).toBe("invalid_argument")
+        expect((error as Error).message).toContain("launcher name")
+      }
+      expect(calls).toEqual([])
+      expect(await readdir(dir)).toEqual([])
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("uninstallLaunchdService refuses an invalid launcher name only after bootout and plist deletion", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host, calls } = createFakeHost(dir)
+      const { file } = await installLaunchdService(BASE_SPEC, host)
+      calls.length = 0
+
+      const error = await uninstallLaunchdService({ id: ID, launcher: "../x" }, "work", host).catch((e: unknown) => e)
+
+      expect((error as { code: string }).code).toBe("invalid_argument")
+      expect(calls).toEqual([["launchctl", "bootout", `gui/501/${ID}.work`]])
+      expect(await exists(file)).toBe(false)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("uninstallLaunchdService deletes the launcher and its empty directory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host } = createFakeHost(dir)
+      await installLaunchdService(BASE_SPEC, host)
+      const launcherDir = join(dir, "Library", "Application Support", ID)
+
+      await uninstallLaunchdService(NAME, "work", host)
+
+      expect(await exists(join(launcherDir, `${LAUNCHER}-work`))).toBe(false)
+      expect(await exists(launcherDir)).toBe(false)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("uninstallLaunchdService leaves another label's launcher and the directory", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host } = createFakeHost(dir)
+      await installLaunchdService({ ...BASE_SPEC, label: "default" }, host)
+      await installLaunchdService({ ...BASE_SPEC, label: "work" }, host)
+      const launcherDir = join(dir, "Library", "Application Support", ID)
+
+      await uninstallLaunchdService(NAME, "default", host)
+
+      expect(await exists(join(launcherDir, `${LAUNCHER}-default`))).toBe(false)
+      expect(await readFile(join(launcherDir, `${LAUNCHER}-work`), "utf8")).toBe(LAUNCHER_SCRIPT)
+    } finally {
+      await rm(dir, { recursive: true, force: true })
+    }
+  })
+
+  test("uninstallLaunchdService leaves a link at the launcher path in place", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "tg-"))
+    try {
+      const { host } = createFakeHost(dir)
+      const launcherDir = join(dir, "Library", "Application Support", ID)
+      const launcher = join(launcherDir, `${LAUNCHER}-work`)
+      const target = join(dir, "target")
+      await writeFile(target, "keep\n")
+      await mkdir(launcherDir, { recursive: true })
+      await symlink(target, launcher)
+
+      await uninstallLaunchdService(NAME, "work", host)
+
+      expect((await lstat(launcher)).isSymbolicLink()).toBe(true)
+      expect(await readFile(target, "utf8")).toBe("keep\n")
     } finally {
       await rm(dir, { recursive: true, force: true })
     }

@@ -7,7 +7,7 @@ import { PROJECT } from "../project"
 import { fakeHost, harness, type Harness } from "./commands.testing"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, type CommandIo } from "./command-io"
 import { runRemoveCommand } from "./remove"
-import { SERVICE_ID } from "./service"
+import { SERVICE_ID, SERVICE_LAUNCHER } from "./service"
 
 let open: Harness[] = []
 let homes: string[] = []
@@ -98,6 +98,19 @@ describe("runRemoveCommand", () => {
     expect(existsSync(log)).toBe(false)
     expect(existsSync(dirname(log))).toBe(false)
     expect(await listLabels(t.stateDir)).toEqual([])
+  })
+
+  test("deletes the service's launcher and its directory", async () => {
+    const t = setUp({ isTTY: false })
+    const { home } = makeLog("work")
+    const launcher = join(home, "Library", "Application Support", SERVICE_ID, `${SERVICE_LAUNCHER}-work`)
+    mkdirSync(dirname(launcher), { recursive: true })
+    writeFileSync(launcher, "#!/bin/sh\n")
+    t.io.serviceHost = fakeHost(home)
+
+    expect(await runRemoveCommand(["--account", "work", "--yes", "--state-dir", t.stateDir], t.io)).toBe(EXIT_OK)
+    expect(existsSync(launcher)).toBe(false)
+    expect(existsSync(dirname(launcher))).toBe(false)
   })
 
   test("deletes nothing when the service cannot be uninstalled", async () => {

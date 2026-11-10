@@ -14,6 +14,7 @@ import { mapProgramError } from "./service-types"
 describe("service dispatcher", () => {
   const spec: ServiceSpec = {
     id: "com.example.tool",
+    launcher: "example-sync",
     label: "default",
     description: "Example sync service",
     program: "/bin/node",
@@ -35,7 +36,7 @@ describe("service dispatcher", () => {
     expect((installError as ToolError).code).toBe("invalid_argument")
     expect((installError as ToolError).message).toBe("Running the sync service is supported on macOS and Linux only.")
 
-    const uninstallError = await uninstallService(spec.id, spec.label, host).catch((e: unknown) => e)
+    const uninstallError = await uninstallService(spec, spec.label, host).catch((e: unknown) => e)
     expect((uninstallError as ToolError).code).toBe("invalid_argument")
 
     const statusError = await serviceStatus(spec.id, spec.label, host).catch((e: unknown) => e)

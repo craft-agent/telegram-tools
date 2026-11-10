@@ -7,6 +7,7 @@ import {
   serviceStatus,
   uninstallService,
   type ServiceHost,
+  type ServiceName,
   type ServiceSpec,
 } from "../core/telegram/service-host"
 import { lockHolder } from "../core/telegram/sync-lock"
@@ -17,6 +18,12 @@ import { EXIT_OK, type CommandIo } from "./command-io"
 
 /** The service's identity for the service manager; the label is appended to it. */
 export const SERVICE_ID = "io.github.craft-agent.telegram-tools"
+
+/** The name the macOS Login Items list shows for the agent, before `-<label>`. */
+export const SERVICE_LAUNCHER = `${PROJECT.name}-sync`
+
+/** What names the service on disk, passed to uninstall. */
+export const SERVICE_NAME: ServiceName = { id: SERVICE_ID, launcher: SERVICE_LAUNCHER }
 
 const SERVICE_DESCRIPTION = "Telegram sync service"
 
@@ -91,7 +98,7 @@ async function install(label: string, settings: ServiceSettings, host: ServiceHo
 
   const self = resolveSelf(io.self)
   const spec: ServiceSpec = {
-    id: SERVICE_ID,
+    ...SERVICE_NAME,
     label,
     description: SERVICE_DESCRIPTION,
     program: self.program,
@@ -150,7 +157,7 @@ export async function runServiceCommand(argv: string[], io: CommandIo): Promise<
     if (action === "install") {
       await install(label, settings, host, io)
     } else if (action === "uninstall") {
-      await uninstallService(SERVICE_ID, label, host)
+      await uninstallService(SERVICE_NAME, label, host)
       io.stdout(`Uninstalled sync service for "${label}".\n`)
     } else {
       await status(label, host, io)

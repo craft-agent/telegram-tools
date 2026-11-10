@@ -6,10 +6,19 @@ import { detail } from "./service-errors"
 /** How long a service management command may run before timing out. */
 const DEFAULT_RUN_TIMEOUT_MS = 30_000
 
-/** The specification for installing the sync service for one label. */
-export type ServiceSpec = {
+/** What names one service across its labels. */
+export type ServiceName = {
   /** The reverse-DNS prefix for the service, e.g. "com.example.tool". */
   id: string
+  /**
+   * The file name the launcher script is given, before `-<label>`; the agent is
+   * listed under it where the platform names background items after their program.
+   */
+  launcher: string
+}
+
+/** The specification for installing the sync service for one label. */
+export type ServiceSpec = ServiceName & {
   /** The label this service syncs for. */
   label: string
   /** What the service is, as the service manager shows it; the label is appended. */
@@ -81,6 +90,19 @@ export function checkServiceSpecControlChars(spec: ServiceSpec): void {
   }
   if (CONTROL_CHARACTERS.test(spec.description)) {
     throw new ToolError("invalid_argument", "Control characters are not allowed in the description.")
+  }
+}
+
+/** A launcher name safe as a file name: it starts with a letter or digit and holds no separator. */
+const LAUNCHER_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
+
+/** Refuses a launcher name that is not a plain file name. */
+export function checkLauncherName(name: string): void {
+  if (!LAUNCHER_NAME.test(name)) {
+    throw new ToolError(
+      "invalid_argument",
+      "The launcher name may hold only letters, digits, dots, hyphens and underscores, and must start with a letter or digit.",
+    )
   }
 }
 

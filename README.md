@@ -438,6 +438,10 @@ one `default`), and every command takes `--state-dir` like the tools.
   `service install` prints. On Linux, it logs to the systemd user journal
   (`journalctl --user -u <unit>` as `service status` shows); run
   `loginctl enable-linger` to keep the service running after you log out.
+- **On macOS, Login Items lists the service as `telegram-tools-sync-<label>`**:
+  the agent starts through that launcher script, which `service install` writes
+  to `~/Library/Application Support/io.github.craft-agent.telegram-tools/` and
+  `service uninstall` deletes. Switching the item off there stops syncing.
 - **Service updates and restarts**: `service install` records this package's
   executable path, so run `service install` again after updating the package or
   changing `keep_disappearing` or `channels`. The service restarts after a
