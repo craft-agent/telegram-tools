@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test"
+import { existsSync } from "node:fs"
 import { lstat, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
@@ -17,6 +18,8 @@ import type { ExecResult } from "../exec"
 const ID = "com.example.tool"
 const LAUNCHER = "example-sync"
 const NAME: ServiceName = { id: ID, launcher: LAUNCHER }
+const NOT_FOUND: ExecResult = { code: 113, stdout: "", stderr: "Could not find service" }
+const FOUND: ExecResult = { code: 0, stdout: "state = running\n", stderr: "" }
 const LAUNCHER_PATH = "/Users/test/Library/Application Support/com.example.tool/example-sync-work"
 
 const BASE_SPEC: ServiceSpec = {
@@ -49,10 +52,12 @@ function createFakeHost(
     home,
     uid: 501,
     env: { PATH: "/usr/bin:/bin" },
+    sleep: async () => {},
     ...overrides,
     run: async (argv: string[]): Promise<ExecResult> => {
       calls.push(argv)
       if (customRun) return customRun(argv)
+      if (argv[1] === "print") return NOT_FOUND
       return { code: 0, stdout: "", stderr: "" }
     },
   }
@@ -140,6 +145,7 @@ describe("service-launchd", () => {
 
       expect(calls).toEqual([
         ["launchctl", "bootout", `gui/501/${ID}.default`],
+        ["launchctl", "print", `gui/501/${ID}.default`],
         ["launchctl", "bootstrap", "gui/501", expectedPlist],
       ])
     } finally {
@@ -158,6 +164,7 @@ describe("service-launchd", () => {
           if (argv[1] === "bootstrap") {
             return { code: 1, stdout: "", stderr: "Bootstrap failed for +1234567890 permission denied" }
           }
+          if (argv[1] === "print") return NOT_FOUND
           return { code: 0, stdout: "", stderr: "" }
         },
       })
@@ -180,6 +187,7 @@ describe("service-launchd", () => {
           if (argv[1] === "bootout") {
             return { code: 1, stdout: "", stderr: "service is not loaded" }
           }
+          if (argv[1] === "print") return NOT_FOUND
           return { code: 0, stdout: "", stderr: "" }
         },
       })
@@ -355,7 +363,10 @@ describe("service-launchd", () => {
       const error = await uninstallLaunchdService({ id: ID, launcher: "../x" }, "work", host).catch((e: unknown) => e)
 
       expect((error as { code: string }).code).toBe("invalid_argument")
-      expect(calls).toEqual([["launchctl", "bootout", `gui/501/${ID}.work`]])
+      expect(calls).toEqual([
+        ["launchctl", "bootout", `gui/501/${ID}.work`],
+        ["launchctl", "print", `gui/501/${ID}.work`],
+      ])
       expect(await exists(file)).toBe(false)
     } finally {
       await rm(dir, { recursive: true, force: true })
@@ -413,6 +424,95 @@ describe("service-launchd", () => {
     } finally {
       await rm(dir, { recursive: true, force: true })
     }
+  })
+
+  describe("waiting for launchd to let go of the job", () => {
+    const plistRelative = `Library/LaunchAgents/${ID}.${BASE_SPEC.label}.plist`
+    const launcherRelative = `Library/Application Support/${ID}/${LAUNCHER}-${BASE_SPEC.label}`
+    const maxPolls = 150
+
+    /** A host whose `print` finds the job for the first `found` polls, or always when `found` is Infinity. */
+    function lingeringHost(dir: string, found: number, onPrint: () => void = () => {}) {
+      const sleeps: number[] = []
+      let prints = 0
+      const fake = createFakeHost(dir, {
+        sleep: async (ms) => {
+          sleeps.push(ms)
+        },
+        run: async (argv) => {
+          if (argv[1] !== "print") return { code: 0, stdout: "", stderr: "" }
+          prints++
+          onPrint()
+          return prints <= found ? FOUND : NOT_FOUND
+        },
+      })
+      return { ...fake, sleeps, prints: () => prints }
+    }
+
+    test("install bootstraps only once the job is gone", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "tg-"))
+      try {
+        const { host, calls, sleeps } = lingeringHost(dir, 2)
+
+        await installLaunchdService(BASE_SPEC, host)
+
+        expect(calls.map((argv) => argv[1])).toEqual(["bootout", "print", "print", "print", "bootstrap"])
+        expect(sleeps).toEqual([200, 200])
+      } finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    })
+
+    test("install gives up when the job never goes", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "tg-"))
+      try {
+        const { host, calls, prints } = lingeringHost(dir, Infinity)
+
+        const error = await installLaunchdService(BASE_SPEC, host).catch((e: unknown) => e)
+
+        expect((error as { code: string }).code).toBe("upstream_error")
+        expect((error as Error).message).toContain("30 seconds")
+        expect(calls.some((argv) => argv[1] === "bootstrap")).toBe(false)
+        expect(prints()).toBe(maxPolls)
+      } finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    })
+
+    test("uninstall deletes the plist only once the job is gone", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "tg-"))
+      try {
+        await installLaunchdService(BASE_SPEC, createFakeHost(dir).host)
+        const plist = join(dir, plistRelative)
+        const plistPresentAtPrint: boolean[] = []
+        const { host } = lingeringHost(dir, 2, () => {
+          plistPresentAtPrint.push(existsSync(plist))
+        })
+
+        await uninstallLaunchdService(NAME, BASE_SPEC.label, host)
+
+        expect(plistPresentAtPrint).toEqual([true, true, true])
+        expect(existsSync(plist)).toBe(false)
+      } finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    })
+
+    test("uninstall that times out leaves the plist and launcher in place", async () => {
+      const dir = await mkdtemp(join(tmpdir(), "tg-"))
+      try {
+        await installLaunchdService(BASE_SPEC, createFakeHost(dir).host)
+        const { host } = lingeringHost(dir, Infinity)
+
+        const error = await uninstallLaunchdService(NAME, BASE_SPEC.label, host).catch((e: unknown) => e)
+
+        expect((error as { code: string }).code).toBe("upstream_error")
+        expect(existsSync(join(dir, plistRelative))).toBe(true)
+        expect(existsSync(join(dir, launcherRelative))).toBe(true)
+      } finally {
+        await rm(dir, { recursive: true, force: true })
+      }
+    })
   })
 
   test("launchdServiceStatus parses state, pid, and last exit code", async () => {
