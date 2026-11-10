@@ -45,6 +45,8 @@ export type ToolContext = {
   downloadDir: string
   /** The largest received file a call may download, in megabytes. */
   downloadMaxMb: number
+  /** The directories files may be sent from besides the working directory: absolute paths, which may not exist. */
+  sendDirs?: string[]
   /** The name of the program the entry point runs as, used where a file is marked as coming from it, such as the macOS quarantine flag; absent in tests. */
   programName?: string
   signal?: AbortSignal

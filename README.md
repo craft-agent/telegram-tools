@@ -281,6 +281,7 @@ variable, and an option or setting wins over the variable too.
 | `state_dir`         | `--state-dir`           | `TELEGRAM_TOOLS_STATE_DIR`         | where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`                                                                                  |
 | `download_dir`      | `--download-dir`        | `TELEGRAM_TOOLS_DOWNLOAD_DIR`      | where `telegram_file_save` saves received files, a folder per message; default `~/Downloads/telegram-tools`; read by the tools, no service restart needed  |
 | `download_max_mb`   | `--download-max-mb <n>` | `TELEGRAM_TOOLS_DOWNLOAD_MAX_MB`   | the largest file a download takes, in MB; integer 1..2000, default 100; read by the tools, no service restart needed                                       |
+| `send_dirs`         | `--send-dirs`           | `TELEGRAM_TOOLS_SEND_DIRS`         | the directories files may be sent from, besides the working directory; absolute paths, default none; read by the tools, no service restart needed          |
 | `keep_disappearing` | `--keep-disappearing`   | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | keep disappearing and view-once messages for the user; off by default; read by `sync` and `service install`, run `service install` again after changing it |
 | `channels`          | `--channels`            | `TELEGRAM_TOOLS_CHANNELS`          | list, read, mirror and send to channels; off by default, see below; read by `sync` and `service install`, run `service install` again after changing it    |
 
@@ -288,7 +289,7 @@ Lists are comma-separated in a flag or a variable. Where each harness reads them
 
 - **OpenCode** takes the plugin `options` shown above, with lists as arrays,
   `read_only` as a boolean, `state_dir` and `download_dir` as paths, and
-  `download_max_mb` as a number, and falls back to the
+  `download_max_mb` as a number, `send_dirs` as an array of paths, and falls back to the
   variables. V2 runs plugins in its background service, which keeps the
   environment it started with: a variable set where `opencode run` starts has
   no effect until the service is

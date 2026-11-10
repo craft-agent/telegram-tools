@@ -191,4 +191,14 @@ describe("calls", () => {
     expect(calls[0]?.ctx.downloadDir).toBe("/custom/downloads")
     expect(calls[0]?.ctx.downloadMaxMb).toBe(42)
   })
+
+  test("passes send_dirs from settings into ctx.sendDirs", async () => {
+    const calls: Call[] = []
+    const { client } = await connect(
+      [tool("demo_thing_create", "alpha", "add", calls)],
+      settings({ send_dirs: ["/custom/send", "/custom/more"] }),
+    )
+    await call(client, "demo_thing_create", { count: 1 })
+    expect(calls[0]?.ctx.sendDirs).toEqual(["/custom/send", "/custom/more"])
+  })
 })

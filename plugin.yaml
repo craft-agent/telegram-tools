@@ -32,6 +32,9 @@ config_schema:
   download_max_mb:
     type: int
     description: "The largest file a download takes, in MB; an integer from 1 to 2000, default 100. Read by tools; no service restart needed."
+  send_dirs:
+    type: list
+    description: "The directories files may be sent from, besides the working directory; absolute paths, or ones starting with ~, without commas. Defaults to none. Read by tools; no service restart needed."
   keep_disappearing:
     type: bool
     description: Keeps disappearing and view-once messages for the user; off by default. Read by the sync service.

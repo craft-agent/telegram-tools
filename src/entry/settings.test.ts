@@ -25,6 +25,7 @@ describe("settingVariables", () => {
       "DEMO_STATE_DIR",
       "DEMO_DOWNLOAD_DIR",
       "DEMO_DOWNLOAD_MAX_MB",
+      "DEMO_SEND_DIRS",
       "DEMO_KEEP_DISAPPEARING",
       "DEMO_CHANNELS",
     ])

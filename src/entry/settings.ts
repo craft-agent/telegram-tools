@@ -3,6 +3,7 @@ import { PROJECT } from "../project"
 import type { GivenDirectory } from "./directory"
 import { resolveDownloadDir } from "./download-dir"
 import { PROJECT_PROFILE, type EntryProfile } from "./profile"
+import { resolveSendDirs } from "./send-dirs"
 import { resolveStateDir } from "./state-dir"
 
 /** Who asks the person before an administrative tool acts: the harness, or the tool through the client's form. */
@@ -16,6 +17,8 @@ export type RunSettings = ToolSettings & {
   state_dir: string
   download_dir: string
   download_max_mb: number
+  /** The directories files may be sent from, besides the working directory: absolute paths. */
+  send_dirs: string[]
   /** Whether messages that disappear are kept. */
   keep_disappearing?: boolean
   /** Whether channels are listed and their messages received. */
@@ -40,6 +43,7 @@ type OptionName =
   | "state_dir"
   | "download_dir"
   | "download_max_mb"
+  | "send_dirs"
   | "keep_disappearing"
   | "channels"
 
@@ -55,6 +59,7 @@ const OPTIONS: Record<OptionName, Option> = {
   state_dir: { flag: "--state-dir", envSuffix: "STATE_DIR" },
   download_dir: { flag: "--download-dir", envSuffix: "DOWNLOAD_DIR" },
   download_max_mb: { flag: "--download-max-mb", envSuffix: "DOWNLOAD_MAX_MB" },
+  send_dirs: { flag: "--send-dirs", envSuffix: "SEND_DIRS" },
   keep_disappearing: { flag: "--keep-disappearing", envSuffix: "KEEP_DISAPPEARING", boolean: true },
   channels: { flag: "--channels", envSuffix: "CHANNELS", boolean: true },
 }
@@ -148,6 +153,11 @@ function parseConfirm(value: string, source: string): ConfirmMode {
 /** A setting given as text, and where it came from, for error messages. */
 type SettingText = GivenDirectory
 
+/** A comma-separated directory setting as one entry per directory, each keeping where it came from. */
+function listedDirectories(given: SettingText | undefined): GivenDirectory[] {
+  return given === undefined ? [] : splitList(given.text).map((text) => ({ text, source: given.source }))
+}
+
 function downloadMaxMb(value: unknown, source: string): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > MAX_DOWNLOAD_MB) {
     throw new ToolError("invalid_argument", `${source} must be an integer from 1 to ${MAX_DOWNLOAD_MB}.`)
@@ -214,6 +224,7 @@ export function parseSettings(
     confirm: "harness",
     state_dir: resolveStateDir(value("state_dir"), env, profile),
     ...downloadSettings(value, env, profile),
+    send_dirs: resolveSendDirs(listedDirectories(value("send_dirs")), env),
   }
   const toolsets = value("toolsets")
   if (toolsets) settings.toolsets = checkToolsets(splitList(toolsets.text), toolsets.source, profile.toolsets)
@@ -311,6 +322,7 @@ const TOOL_OPTION_NAMES = [
   "state_dir",
   "download_dir",
   "download_max_mb",
+  "send_dirs",
   ...SERVICE_OPTION_NAMES,
 ] as const satisfies readonly OptionName[]
 type ToolOptionName = (typeof TOOL_OPTION_NAMES)[number]
@@ -319,13 +331,21 @@ function stringList(value: unknown): string[] | undefined {
   return Array.isArray(value) && value.every((item): item is string => typeof item === "string") ? value : undefined
 }
 
+const optionSource = (name: string): string => `Option "${name}"`
+
 function optionError(name: string, expected: string): ToolError {
-  return new ToolError("invalid_argument", `Option "${name}" must be ${expected}.`)
+  return new ToolError("invalid_argument", `${optionSource(name)} must be ${expected}.`)
 }
 
 function directoryOption(name: "state_dir" | "download_dir", value: unknown): string {
   if (typeof value !== "string") throw optionError(name, "an absolute path")
   return value
+}
+
+function sendDirsOption(value: unknown): GivenDirectory[] {
+  const list = stringList(value)
+  if (!list) throw optionError("send_dirs", "a list of absolute paths")
+  return list.map((text) => ({ text, source: optionSource("send_dirs") }))
 }
 
 function toolsetsOption(value: unknown, toolsets: Toolsets): string[] | "all" | undefined {
@@ -416,13 +436,14 @@ export function settingsFromOptions(
 
   const directoryText = (name: "state_dir" | "download_dir"): SettingText | undefined =>
     given[name] !== undefined
-      ? { text: directoryOption(name, given[name]), source: `Option "${name}"` }
+      ? { text: directoryOption(name, given[name]), source: optionSource(name) }
       : envText(name, env, profile)
   const settings: PluginSettings = {
     state_dir: resolveStateDir(directoryText("state_dir"), env, profile),
+    send_dirs: resolveSendDirs(resolve("send_dirs", sendDirsOption, listedDirectories) ?? [], env),
     download_dir: resolveDownloadDir(directoryText("download_dir"), env, profile),
     download_max_mb:
-      resolve("download_max_mb", (value) => downloadMaxMb(value, 'Option "download_max_mb"'), downloadMaxMbText) ??
+      resolve("download_max_mb", (value) => downloadMaxMb(value, optionSource("download_max_mb")), downloadMaxMbText) ??
       DEFAULT_DOWNLOAD_MAX_MB,
   }
   const toolsets = resolve(
