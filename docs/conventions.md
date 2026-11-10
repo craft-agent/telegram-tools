@@ -369,9 +369,9 @@ Every entry point takes the same settings:
 - **Each label keeps all of its state in one directory**,
   `<state root>/<label>/`, created with mode 700: the session and the app's
   `api_id` and `api_hash`, mtcute's storage, the mirror, the service's socket,
-  short-lived copies of files in transit (`incoming/`, `outbox/`), and the
-  files `keep_disappearing` kept (`kept/`). The state root is the `state_dir`
-  setting, by default `$XDG_STATE_HOME/telegram-tools`, or
+  the service record, short-lived copies of files in transit (`incoming/`,
+  `outbox/`), and the files `keep_disappearing` kept (`kept/`). The state root
+  is the `state_dir` setting, by default `$XDG_STATE_HOME/telegram-tools`, or
   `~/.local/state/telegram-tools` without it. One directory per label means a
   label is moved, backed up or removed as a whole, and nothing of one account
   sits in another's.
@@ -386,8 +386,8 @@ Every entry point takes the same settings:
 - **The session and credentials never leave the state directory.** Nothing
   from the session or the app's credentials reaches a result, an error or a
   log, and no tool reads or writes the state directory except through the
-  mirror, the service client, the outbox, and the folder the service
-  downloaded into under `incoming/`. The session stands for the
+  mirror, the service client, the outbox, the service record, and the folder
+  the service downloaded into under `incoming/`. The session stands for the
   account itself: whoever holds it reads and sends as the user, on every
   device.
 
@@ -413,6 +413,22 @@ Every entry point takes the same settings:
   once Telegram has ended it, the service exits and stays down until the label
   logs in again, rather than restarting against an account it can no longer
   reach.
+- **The service record names what the service starts.** Installing the
+  service writes `<label>/service.json`, mode 600: the program and the script
+  it runs, as paths, and nothing else; uninstalling deletes it. The account
+  read checks that both still exist, since a program removed by an update
+  stops the service only at its next start, and the system's own log names
+  just the missing file. A stopped service is then told to be installed again,
+  and a running one is told before it stops, rather than after receiving has
+  ended.
+- **Installing prefers a program at a path that outlives updates.** A
+  program whose path holds its own version goes when that version is
+  removed, so installing looks on the recorded `PATH` for one at a path
+  without it that starts the same program, and says so when there is none.
+  One under the temporary or runtime directory is passed over, since it is
+  gone after a restart. The program is the same at install only: a link or
+  a shim follows whatever its owner makes current later, which is the point
+  of choosing it.
 - **The service is a quiet client.** It sends no read marks, online status or
   typing indicators of its own, so the phone keeps its notifications and
   nobody learns that a message was read by a tool. The API terms §1.4 forbid
