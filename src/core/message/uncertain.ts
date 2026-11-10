@@ -1,5 +1,5 @@
 import { readMirror } from "../chat/open"
-import { ToolError } from "../errors"
+import { ToolError, type JsonValue } from "../errors"
 import type { LabelPaths } from "../telegram/labels"
 import { formatLocalTime } from "../time"
 import { MAX_SENT_LIKE, SENT_LOOKBACK_MS } from "./constants"
@@ -34,6 +34,29 @@ function sentence(count: number): string {
 }
 
 /**
+ * An `uncertain` send's error with what the mirror shows added: what `find`
+ * reads from it, as `details.sent_like_this`, and `describe`'s sentence for
+ * how many it found. It decides nothing, so the code stays `uncertain`. When
+ * `find` fails (the mirror cannot be read) the error is returned as it is.
+ */
+export function withFound<T extends Record<string, JsonValue>>(
+  error: ToolError,
+  find: () => T[],
+  describe: (count: number) => string,
+): ToolError {
+  let found: T[]
+  try {
+    found = find()
+  } catch {
+    return error
+  }
+  return new ToolError("uncertain", `${error.message} ${describe(found.length)}`, {
+    ...("cause" in error && { cause: error.cause }),
+    details: { ...error.details, sent_like_this: found },
+  })
+}
+
+/**
  * An `uncertain` send's error with what the mirror shows added: the user's own
  * messages in the chat with the same text since the send began, by id and time,
  * as `details.sent_like_this`. It decides nothing, so the code stays
@@ -46,14 +69,5 @@ export function withSentLike(
   text: string,
   startedAt: number,
 ): ToolError {
-  let found: SentLike[]
-  try {
-    found = sentLike(paths, chat, text, startedAt)
-  } catch {
-    return error
-  }
-  return new ToolError("uncertain", `${error.message} ${sentence(found.length)}`, {
-    ...("cause" in error && { cause: error.cause }),
-    details: { ...error.details, sent_like_this: found },
-  })
+  return withFound(error, () => sentLike(paths, chat, text, startedAt), sentence)
 }
