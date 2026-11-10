@@ -10,6 +10,8 @@ provides_tools:
   - telegram_file_send
   - telegram_message_delete
   - telegram_message_edit
+  - telegram_message_pin
+  - telegram_message_react
   - telegram_message_send
   - telegram_sync_add
   - telegram_sync_read

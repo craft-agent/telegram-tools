@@ -4,6 +4,8 @@ import { telegramFileSave } from "./core/file/save"
 import { telegramFileSend } from "./core/file/send/tool"
 import { telegramMessageDelete } from "./core/message/delete"
 import { telegramMessageEdit } from "./core/message/edit"
+import { telegramMessagePin } from "./core/message/pin"
+import { telegramMessageReact } from "./core/message/react"
 import { telegramMessageSend } from "./core/message/send"
 import { telegramSyncAdd } from "./core/sync/add"
 import { telegramSyncRead } from "./core/sync/read"
@@ -22,4 +24,6 @@ export const ALL_TOOLS: ToolSpec[] = [
   telegramMessageSend,
   telegramMessageEdit,
   telegramMessageDelete,
+  telegramMessageReact,
+  telegramMessagePin,
 ]
