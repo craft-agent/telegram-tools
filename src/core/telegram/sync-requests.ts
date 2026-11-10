@@ -35,6 +35,7 @@ import {
 import { RequestQueue } from "./sync-request-queue"
 import { deleteRequest } from "./sync-delete"
 import { editRequest } from "./sync-edit"
+import { pinRequest } from "./sync-pin"
 import { reactRequest } from "./sync-react"
 import { sendRequest } from "./sync-send"
 import { sendFilesRequest } from "./sync-send-files"
@@ -338,5 +339,6 @@ export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, Se
     [SERVICE_REQUESTS.edit]: (params, call) => editRequest(callContext(ctx, call), sends, params, call),
     [SERVICE_REQUESTS.delete]: (params, call) => deleteRequest(callContext(ctx, call), sends, params, call),
     [SERVICE_REQUESTS.react]: (params, call) => reactRequest(callContext(ctx, call), sends, params, call),
+    [SERVICE_REQUESTS.pin]: (params, call) => pinRequest(callContext(ctx, call), sends, params, call),
   }
 }
