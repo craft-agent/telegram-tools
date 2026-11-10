@@ -25,9 +25,10 @@ export type DownloadContext = DownloadStreamContext & {
 }
 
 /**
- * How long a download may receive nothing before it stops, in milliseconds.
- * mtcute waits out flood waits and retries failed parts inside a download
- * without end; this is what bounds those sleeps and retries.
+ * How long a download may receive nothing, or an upload move no byte, before
+ * it stops, in milliseconds. mtcute waits out flood waits and retries failed
+ * parts inside either without end; this is what bounds those sleeps and
+ * retries.
  */
 export const DOWNLOAD_STALL_MS = 60_000
 

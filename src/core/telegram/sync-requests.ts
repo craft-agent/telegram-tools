@@ -34,6 +34,7 @@ import {
 } from "./sync-request-params"
 import { RequestQueue } from "./sync-request-queue"
 import { sendRequest } from "./sync-send"
+import { sendFilesRequest } from "./sync-send-files"
 import type { SyncTelegram } from "./sync-telegram"
 
 const SECOND_MS = 1000
@@ -291,8 +292,9 @@ async function fetchRequest(
  * takes one message's file into the label's `incoming/`, from the copy kept as
  * it arrived or from Telegram, one download at a time (shared with the files
  * being kept) and apart from the fetches; `send` sends one text and records it,
- * one send at a time on a queue of its own, so that it waits behind neither a
- * fetch nor a download.
+ * and `send_files` uploads and sends files and records them, one send at a time
+ * on a queue of their own, so that they wait behind neither a fetch nor a
+ * download.
  */
 export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, ServiceHandler> {
   const fetches = new RequestQueue()
@@ -307,5 +309,6 @@ export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, Se
     [SERVICE_REQUESTS.sync_remove]: (params) => syncRemove(ctx, params),
     [SERVICE_REQUESTS.download]: (params, call) => downloadRequest(ctx, ctx.downloads, params, call),
     [SERVICE_REQUESTS.send]: (params, call) => sendRequest(ctx, sends, params, call),
+    [SERVICE_REQUESTS.sendFiles]: (params, call) => sendFilesRequest(ctx, sends, params, call),
   }
 }
