@@ -5,7 +5,8 @@ import { dirname, join } from "node:path"
 import { PROJECT } from "../project"
 import { fakeHost, harness, type Harness } from "./commands.testing"
 import { EXIT_FAILED, EXIT_OK, EXIT_USAGE, type CommandIo } from "./command-io"
-import { SERVICE_ID, runServiceCommand } from "./service"
+import { LAUNCHER_SCRIPT } from "../core/telegram/service-launchd"
+import { SERVICE_ID, SERVICE_LAUNCHER, runServiceCommand } from "./service"
 
 const SELF = { program: "/bin/node", script: "/bin/cli.js" }
 
@@ -50,6 +51,19 @@ describe("service install", () => {
     }
     expect(unit).not.toContain("--keep-disappearing")
     expect(unit).not.toContain("--channels")
+  })
+
+  test("starts the agent through the launcher, written first in the plist", async () => {
+    const t = setUp()
+    t.addLabel("default", true)
+
+    expect(await runServiceCommand(["install", "--state-dir", t.stateDir], t.io)).toBe(EXIT_OK)
+
+    const launcher = join(t.stateDir, "Library", "Application Support", SERVICE_ID, `${SERVICE_LAUNCHER}-default`)
+    expect(readFileSync(launcher, "utf8")).toBe(LAUNCHER_SCRIPT)
+    expect(unitText(t.stateDir)).toContain(
+      `<array>\n\t\t<string>${launcher}</string>\n\t\t<string>${SELF.program}</string>`,
+    )
   })
 
   test("bakes --keep-disappearing and --channels into the unit when on", async () => {

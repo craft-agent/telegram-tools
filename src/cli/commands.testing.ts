@@ -47,8 +47,10 @@ export function fakeHost(home: string, overrides: Partial<ServiceHost> = {}): Se
     home,
     uid: 501,
     env: { PATH: "/bin" },
+    sleep: async () => {},
     run: async (argv) => {
       ran.push(argv)
+      if (argv[1] === "print") return { code: 113, stdout: "", stderr: "Could not find service" }
       return { code: 0, stdout: "", stderr: "" }
     },
     ...overrides,
