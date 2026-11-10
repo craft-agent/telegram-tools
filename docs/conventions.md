@@ -417,7 +417,9 @@ Every entry point takes the same settings:
   typing indicators of its own, so the phone keeps its notifications and
   nobody learns that a message was read by a tool. The API terms §1.4 forbid
   tampering with read and online statuses; the service changes nothing the
-  user's own devices show, and marks nothing read unless a tool is called to.
+  user's own devices show, and marks nothing read on its own. Reading through
+  the tools never marks a message read; only the mark-read tool does, up to
+  the message the user names.
 - **Background reads are paced and flood waits are honored.** A flood wait is
   never retried through, since retrying lengthens the wait.
 
@@ -630,6 +632,38 @@ Every entry point takes the same settings:
   them. It decides nothing; the error stays `uncertain`.
 - **The service records its own send** in the mirror as Telegram returns it,
   since mtcute does not dispatch a client's own sends back as updates.
+- **An action is one call too, with no `random_id`.** Editing, deleting,
+  reacting, pinning and marking read go through the same low-level call, in
+  the same queue as sends, with retries and flood sleeps off. None of them can
+  be told apart from a repeat of itself, and mtcute may deliver a call again
+  after a reconnect, so an answer saying the message is already as asked (an
+  unchanged text, reaction or pin, a message already deleted) counts as done:
+  the end state is the one the call asked for. A refusal without a reconnect
+  is its code, with nothing changed; everything else is `uncertain`, checked
+  in the chat before the action is asked again.
+- **Edit and delete take only the user's own messages**, in a chat of the
+  mirror. An edit replaces the text, or a caption, with the rules for a text
+  above; one that changes nothing is refused before anything goes out, and
+  Telegram's edit time limit decides how old a message may be. A delete is
+  always for everyone (`revoke`; supergroups and channels have no other kind),
+  since deleting only from the user's own devices would leave the message with
+  everyone else; it is `administrative`, so it is asked every time.
+- **A reaction is one standard emoji**, replacing the user's earlier one on
+  that message, or removed. Custom-emoji reactions need Premium and paid ones
+  spend Stars, so both are refused; which emoji a chat allows is Telegram's
+  to decide.
+- **A pin is silent and one-sided by default.** Pinning in a group tells the
+  members only when the call asks to, and the prompt says so; in a private
+  chat it pins for the user only unless the call asks for both sides, so the
+  other person's screen changes only when the user meant it to.
+- **Marking read goes up to the message the call names**, never further and
+  never back: the model marks read what it read, and a message that arrived
+  since stays unread. A topic is marked on its own.
+- **The service records its actions in the mirror**, as it does its sends: an
+  edit keeps the earlier version, a delete removes the message as a delete for
+  everyone does, a reaction replaces the user's own, and a read moves the
+  chat's read mark. Whether a message is pinned is not mirrored: mtcute
+  reports no pin as an update, so the mirror could not keep it current.
 - **A text is at most 4096 characters** after trimming, counted in UTF-16
   units as Telegram counts them, and goes out exactly as written, never parsed
   as Markdown or HTML: what the harness showed is what arrives. A caption is
@@ -658,10 +692,20 @@ The facts this package's tools add beside the shared `Size`
   service syncs, and the pin of the prompt would then never hold.
 - **`Chats`** is how many chats a call that names several changes; the headline
   then is the intent, since a count quoted as a headline value reads as a name.
+- **`Message`** is the message an action changes, as `message {id}`, with
+  **`Current`**, its text now as the mirror has it; an edit's prompt shows the
+  new text as its text.
+- **`Replaces`** is the user's reaction a reaction call takes away.
+- **`Notify`** is `Yes` when a pin tells the members, and **`Both sides`** is
+  `Yes` when a pin in a private chat also pins for the other person.
+- **`Up to`** is the message a mark-read call reaches, as `message {id}`. It
+  says no count of what becomes read, since that grows while the service syncs.
 
 A save pins when the message was last edited, since an edit can replace a file
 and keep its name and size. A file send pins each file's hash by its real path,
-since a file can change and keep its name and size.
+since a file can change and keep its name and size. An action pins when the
+message was last edited, and a reaction call the user's current reaction, so a
+message that changed after the prompt stops the call as `stale`.
 
 Values come from the label's mirror (the chat's own title, never the model's
 account of it). A chat the mirror does not have gives no description, so the
