@@ -4,6 +4,7 @@ import { ToolError } from "../errors"
 import { labelPaths, listLabels, pickLabel, type LabelPaths } from "../telegram/labels"
 import { getMeta, MIRROR_VERSION_REFUSALS, openMirrorForRead } from "../telegram/mirror"
 import { META, SYNC_STATUS } from "../telegram/mirror-meta"
+import { missingServiceFiles, readServiceRecord } from "../telegram/service-record"
 import { lockHolder } from "../telegram/sync-lock"
 import { formatLocalTime, localTimeSchema } from "../time"
 import { defineTool } from "../tool"
@@ -73,8 +74,15 @@ function isVersionRefusal(error: unknown): error is ToolError {
   return error instanceof ToolError && error.code === "upstream_error" && MIRROR_VERSION_REFUSALS.has(error.message)
 }
 
-function nextStep(result: Account, mirrorRefused: boolean): void {
-  if (mirrorRefused) {
+function nextStep(result: Account, mirrorRefused: boolean, programGone: boolean): void {
+  if (programGone && result.login === "logged in") {
+    // Ahead of the mirror's refusal and the failure: a restart cannot run without the program, and installing again restarts it.
+    result.action = "start_service"
+    result.hint =
+      result.service === "running" || result.service === "starting"
+        ? "The sync service has not stopped, but the program it was installed with is gone, so it will not start again; install the service again."
+        : "The program the sync service was installed with is gone, as after an update; install the service again."
+  } else if (mirrorRefused) {
     result.action = "start_service"
     result.hint =
       "Restart the sync service to bring the mirror up to date; update the tools first if the mirror is newer."
@@ -170,7 +178,9 @@ function readAccount(paths: LabelPaths): Account {
       }
     }
   }
-  nextStep(result, mirrorRefused)
+  const record = readServiceRecord(paths)
+  const programGone = record !== null && missingServiceFiles(record).length > 0
+  nextStep(result, mirrorRefused, programGone)
   return result
 }
 
