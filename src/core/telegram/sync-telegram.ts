@@ -18,6 +18,7 @@ export type SyncTelegram = Pick<
   | "getForumTopics"
   | "getMessages"
   | "downloadAsIterable"
+  | "uploadFile"
   | "resolvePeer"
   | "call"
   | "handleClientUpdate"

@@ -9,6 +9,7 @@ import {
 } from "@mtcute/core"
 import { fakeAccount } from "./login.testing"
 import { fakeSendMethods, type FakeSendMethods } from "./sync-client-send.testing"
+import { fakeUploadMethods, type FakeUploadMethods } from "./sync-client-upload.testing"
 import type { SyncTelegram } from "./sync-telegram"
 
 /**
@@ -35,6 +36,7 @@ export type FakeMethod =
   | "getForumTopics"
   | "getMessages"
   | "downloadAsIterable"
+  | "uploadFile"
   | "resolvePeer"
   | "call"
   | "handleClientUpdate"
@@ -106,7 +108,7 @@ type FakeScripting = {
 }
 
 /** A fake mtcute client for the sync service, with the scripting and the record of a test. */
-export type FakeSyncClient = SyncTelegram & FakeSendMethods & FakeScripting
+export type FakeSyncClient = SyncTelegram & FakeSendMethods & FakeUploadMethods & FakeScripting
 
 /** A client that answers from what a test scripted, records its calls, and has mtcute's real emitters. */
 export function createFakeSyncClient(): FakeSyncClient {
@@ -148,6 +150,7 @@ export function createFakeSyncClient(): FakeSyncClient {
   const client = {
     ...emitters,
     ...fakeSendMethods(record),
+    ...fakeUploadMethods(record),
     calls,
     listenersAtConnect: undefined as ListenerCounts | undefined,
     listenersAtStart: undefined as ListenerCounts | undefined,
