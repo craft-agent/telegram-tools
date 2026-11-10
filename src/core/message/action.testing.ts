@@ -4,9 +4,10 @@ import type { ToolError } from "../errors"
 import { createSyncFixture, type SyncFixture } from "../sync/sync.testing"
 import type { MessageInput } from "../telegram/mirror-input"
 import { USER } from "../telegram/mirror.testing"
-import type { deleteOutput, editOutput, pinOutput, reactOutput } from "./action-schema"
+import type { deleteOutput, editOutput, markReadOutput, pinOutput, reactOutput } from "./action-schema"
 import { telegramMessageDelete } from "./delete"
 import { telegramMessageEdit } from "./edit"
+import { telegramChatMarkRead } from "./mark-read"
 import { telegramMessagePin } from "./pin"
 import { telegramMessageReact } from "./react"
 
@@ -30,6 +31,9 @@ export const REACTED = { id: THEIR_ID, emoji: THUMBS_UP }
 
 /** What a pin test serves when it asks for nothing else: the message is pinned. */
 export const PINNED = { id: THEIR_ID, pinned: true }
+
+/** What a read mark test serves when it asks for nothing else: the chat is read up to Alice's message. */
+export const MARKED_READ = { chat: USER, up_to: THEIR_ID }
 
 /** A sync fixture and the ways to call the action tools in it, as an entry point would. */
 export type ActionFixture = SyncFixture & {
@@ -61,6 +65,12 @@ export type ActionFixture = SyncFixture & {
   pinFails(args?: Record<string, unknown>): Promise<ToolError>
   /** Serves the label's socket with a `pin` handler, which pins the message unless `answer` says otherwise. */
   servePin(answer?: (params: unknown) => unknown): Promise<ServiceCalls>
+  /** Calls `telegram_chat_mark_read` for `THEIR_ID` in `USER`'s chat, each argument overridden by `args` (`up_to` for the message). */
+  markRead(args?: Record<string, unknown>): Promise<z.output<typeof markReadOutput>>
+  /** The error a read mark throws. */
+  markReadFails(args?: Record<string, unknown>): Promise<ToolError>
+  /** Serves the label's socket with a `mark_read` handler, which marks the chat read unless `answer` says otherwise. */
+  serveMarkRead(answer?: (params: unknown) => unknown): Promise<ServiceCalls>
 }
 
 /** A state directory with one logged-in label `default` and an empty mirror, and the action tools to run in it. */
@@ -92,5 +102,10 @@ export function createActionFixture(): ActionFixture {
     pin: (args: Record<string, unknown> = {}) => t.run(telegramMessagePin, { ...theirTarget, ...args }),
     pinFails: (args: Record<string, unknown> = {}) => t.fail(telegramMessagePin, { ...theirTarget, ...args }),
     servePin: (answer: (params: unknown) => unknown = () => PINNED) => t.serve({ pin: answer }),
+    markRead: (args: Record<string, unknown> = {}) =>
+      t.run(telegramChatMarkRead, { chat: USER, up_to: THEIR_ID, ...args }),
+    markReadFails: (args: Record<string, unknown> = {}) =>
+      t.fail(telegramChatMarkRead, { chat: USER, up_to: THEIR_ID, ...args }),
+    serveMarkRead: (answer: (params: unknown) => unknown = () => MARKED_READ) => t.serve({ mark_read: answer }),
   })
 }

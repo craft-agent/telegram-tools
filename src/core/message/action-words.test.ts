@@ -7,6 +7,7 @@ import { ACTION_TRANSLATIONS } from "./action-words"
 import { createActionFixture, OWN_ID, THUMBS_UP, type ActionFixture } from "./action.testing"
 import { telegramMessageDelete } from "./delete"
 import { telegramMessageEdit } from "./edit"
+import { telegramChatMarkRead } from "./mark-read"
 import { telegramMessagePin } from "./pin"
 import { telegramMessageReact } from "./react"
 
@@ -45,13 +46,20 @@ async function descriptions() {
       callDescription(telegramMessagePin, { chat, id, notify: true, both_sides: chat === USER }, ctx),
     ),
     unpin: await both((chat) => callDescription(telegramMessagePin, { chat, id, unpin: true }, ctx)),
+    markRead: await both((chat) => callDescription(telegramChatMarkRead, { chat, up_to: id }, ctx)),
   }
 }
 
 describe("ACTION_TRANSLATIONS", () => {
   test("has a Japanese word for every word the action tools write", async () => {
     const all = await descriptions()
-    const tools = [telegramMessageEdit, telegramMessageDelete, telegramMessageReact, telegramMessagePin]
+    const tools = [
+      telegramMessageEdit,
+      telegramMessageDelete,
+      telegramMessageReact,
+      telegramMessagePin,
+      telegramChatMarkRead,
+    ]
     const words = [
       ...tools.flatMap(({ title, intent }) => [title, intent!]),
       ...Object.values(all).flatMap(([named, saved]) => [named!.headline!.text, saved!.headline!.text]),
@@ -59,6 +67,7 @@ describe("ACTION_TRANSLATIONS", () => {
       all.edit[0]!.text!.label,
       all.react[0]!.facts[3]!.label,
       ...all.pin[0]!.facts.slice(3).map(({ label }) => label),
+      ...all.markRead[0]!.facts.slice(1).map(({ label }) => label),
     ]
     expect(Object.keys(ACTION_TRANSLATIONS.ja!).sort()).toEqual(words.sort())
   })
@@ -72,7 +81,7 @@ describe("ACTION_TRANSLATIONS", () => {
         expect(ja.template(text)).toContain("{id}")
       }
     }
-    for (const [named] of [all.edit, all.remove, all.react, all.unreact, all.unpin]) {
+    for (const [named] of [all.edit, all.remove, all.react, all.unreact, all.unpin, all.markRead]) {
       expect(ja.template(named!.headline!.text)).toContain("{chat}")
     }
     for (const description of all.react) expect(ja.template(description.headline!.text)).toContain("{emoji}")
