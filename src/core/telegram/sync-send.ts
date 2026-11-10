@@ -1,5 +1,6 @@
-import type { ConnectionState, Long, tl } from "@mtcute/core"
+import type { ConnectionState, Long, RpcCallOptions, tl } from "@mtcute/core"
 import { randomLong } from "@mtcute/core/utils.js"
+import { ToolError } from "../errors"
 import type { Mirror } from "./mirror"
 import { isSessionEnded } from "./rpc-errors"
 import { GENERAL_TOPIC, type SendParams, type SendResult } from "./service-requests"
@@ -12,7 +13,7 @@ import { parseSendParams } from "./sync-request-params"
 import { StorageFailure } from "./sync-ending"
 import type { RequestQueue } from "./sync-request-queue"
 import { checkSendable, deliveredId } from "./sync-send-mirror"
-import { isRandomIdDuplicate, sendFailureOf, sentMessageOf, uncertainSend } from "./sync-send-outcome"
+import { isRandomIdDuplicate, sendFailureOf, sentMessageOf, uncertainSend, type SendTrouble } from "./sync-send-outcome"
 import { readSent, recordSent } from "./sync-send-record"
 import type { ReadMessage } from "./sync-message"
 import type { SyncTelegram } from "./sync-telegram"
@@ -31,9 +32,10 @@ export type SendContext = TelegramCallContext & {
  * The options of the one call: no retry and no sleeping through a flood wait,
  * since either would repeat it. mtcute still delivers a call again after a
  * reconnect or a session reset, with the same bytes and so the same
- * `random_id`; that is what `RANDOM_ID_DUPLICATE` answers.
+ * `random_id`; that is what `RANDOM_ID_DUPLICATE` answers. An action has no
+ * `random_id`, and its repeat is told by the state it asks for.
  */
-const SEND_CALL_OPTIONS = { maxRetryCount: 0, floodSleepThreshold: 0 } as const
+const ONE_CALL_OPTIONS = { maxRetryCount: 0, floodSleepThreshold: 0 } as const
 
 /** The calls a send makes: one text, one file, or a group of files. */
 export type SendRequest =
@@ -59,48 +61,86 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 /**
- * Makes the one call and resolves with Telegram's response, or with undefined
- * when Telegram answers `RANDOM_ID_DUPLICATE`. Any other failure throws what
- * `sendFailureOf` decides, with the connection states seen while the call was
- * out: anything but `connected` marks a reconnect. A session reset that
- * brings no state change cannot be seen, so a refusal that answers such a
- * repeat reads as a first answer.
+ * Makes the one call that `call` starts and resolves with Telegram's answer.
+ * A failure goes to `settle`, with the connection states seen while the call
+ * was out: anything but `connected` marks a reconnect. `settle` returns the
+ * answer to stand for the failure (the failure proves the call landed), or the
+ * error to throw, which is logged as `<what> failed` and, for a session that
+ * ended, ends the run. A session reset that brings no state change cannot be
+ * seen, so a refusal that answers such a repeat reads as a first answer.
  */
-export async function transmit(
+export async function callOnce<Answer>(
   ctx: SendContext,
   signal: AbortSignal,
-  request: SendRequest,
-): Promise<tl.TypeUpdates | undefined> {
+  what: string,
+  call: (options: RpcCallOptions) => Promise<Answer>,
+  settle: (error: unknown, trouble: SendTrouble) => Answer | ToolError,
+): Promise<Answer> {
   let reconnected = false
   const onState = (state: ConnectionState) => {
     if (state !== "connected") reconnected = true
   }
   ctx.client.onConnectionState.add(onState)
   try {
-    return await untilAborted(ctx.client.call(request, { ...SEND_CALL_OPTIONS, abortSignal: signal }), signal)
+    return await untilAborted(call({ ...ONE_CALL_OPTIONS, abortSignal: signal }), signal)
   } catch (error) {
-    if (isRandomIdDuplicate(error)) return undefined
+    const settled = settle(error, { reconnected, aborted: signal.aborted })
+    if (!(settled instanceof ToolError)) return settled
     if (isSessionEnded(error)) ctx.endSession()
-    ctx.settings.log(`send failed: ${errorLabel(error)}`)
-    throw sendFailureOf(error, { reconnected, aborted: signal.aborted })
+    ctx.settings.log(`${what} failed: ${errorLabel(error)}`)
+    throw settled
   } finally {
     ctx.client.onConnectionState.remove(onState)
   }
 }
 
-/** Tells mtcute's update state about the response, as its own text sender does, so that the state stays consistent. */
-export function handOver(ctx: SendContext, response: tl.TypeUpdates): void {
+/**
+ * Makes the one call of a send and resolves with Telegram's response, or with
+ * undefined when Telegram answers `RANDOM_ID_DUPLICATE`. Any other failure
+ * throws what `sendFailureOf` decides (see `callOnce`).
+ */
+export function transmit(
+  ctx: SendContext,
+  signal: AbortSignal,
+  request: SendRequest,
+): Promise<tl.TypeUpdates | undefined> {
+  return callOnce<tl.TypeUpdates | undefined>(
+    ctx,
+    signal,
+    "send",
+    (options) => ctx.client.call(request, options),
+    (error, trouble) => (isRandomIdDuplicate(error) ? undefined : sendFailureOf(error, trouble)),
+  )
+}
+
+/**
+ * Tells mtcute's update state about the response, as its own text sender does,
+ * so that the state stays consistent. `what` names the request in the log.
+ */
+export function handOver(ctx: SendContext, response: tl.TypeUpdates, what = "send"): void {
   try {
     if (response._ !== "updateShortSentMessage") {
       ctx.client.handleClientUpdate(response, true)
       return
     }
-    const { pts, ptsCount } = response
-    const dummy: tl.mtcute.RawDummyUpdate = { _: "mtcute.dummyUpdate", channelId: 0, pts, ptsCount }
-    ctx.client.handleClientUpdate({ _: "updates", seq: 0, date: 0, chats: [], users: [], updates: [dummy] })
+    handOverPts(ctx, response)
   } catch (error) {
-    ctx.settings.log(`send: the update state could not take the response (${errorLabel(error)})`)
+    ctx.settings.log(`${what}: the update state could not take the response (${errorLabel(error)})`)
   }
+}
+
+/**
+ * Tells mtcute's update state of events the response counted but did not
+ * carry, with a dummy update that moves nothing else. `channelId` is the bare
+ * id of the channel whose events they are; 0 for the account's own.
+ */
+export function handOverPts(
+  ctx: SendContext,
+  { pts, ptsCount }: { pts: number; ptsCount: number },
+  channelId = 0,
+): void {
+  const dummy: tl.mtcute.RawDummyUpdate = { _: "mtcute.dummyUpdate", channelId, pts, ptsCount }
+  ctx.client.handleClientUpdate({ _: "updates", seq: 0, date: 0, chats: [], users: [], updates: [dummy] })
 }
 
 /**
