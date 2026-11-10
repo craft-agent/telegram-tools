@@ -9,16 +9,16 @@ const MS_PER_S = 1000
 const RANDOM_ID_DUPLICATE = "RANDOM_ID_DUPLICATE"
 
 /** The pseudo-error mtcute answers with when its own time limit for a call passed: no refusal, an answer that never came. */
-const CALL_TIMEOUT = "TIMEOUT"
+export const CALL_TIMEOUT = "TIMEOUT"
 
 /** The error codes of a refusal: bad request, forbidden and not acceptable. Telegram gives them before it stores anything. */
-const REFUSAL_CODES: readonly number[] = [400, 403, 406]
+export const REFUSAL_CODES: readonly number[] = [400, 403, 406]
 
 /** The flood and slow-mode waits, as mtcute names them once it has taken the seconds out. */
 const RATE_LIMIT_ERRORS: readonly string[] = ["FLOOD_WAIT_%d", "SLOWMODE_WAIT_%d", "FLOOD_PREMIUM_WAIT_%d"]
 
 /** The refusals that say this account may not write here. */
-const FORBIDDEN_ERRORS: readonly string[] = [
+export const FORBIDDEN_ERRORS: readonly string[] = [
   "CHAT_WRITE_FORBIDDEN",
   "CHAT_SEND_PLAIN_FORBIDDEN",
   "CHAT_SEND_MEDIA_FORBIDDEN",
@@ -37,7 +37,7 @@ const FORBIDDEN_ERRORS: readonly string[] = [
  * there for this account. `USER_DEACTIVATED` is not one: it is the account's
  * own, and ends the session.
  */
-const NOT_FOUND_ERRORS: readonly string[] = [
+export const NOT_FOUND_ERRORS: readonly string[] = [
   "PEER_ID_INVALID",
   "CHANNEL_PRIVATE",
   "CHANNEL_INVALID",
@@ -101,7 +101,7 @@ function refusedSend(code: ErrorCode, what: string, name: string): ToolError {
 }
 
 /** The seconds a rate-limit refusal asks to wait, or undefined when the refusal is not one. */
-function rateLimitSecondsOf(error: tl.RpcError): number | undefined {
+export function rateLimitSecondsOf(error: tl.RpcError): number | undefined {
   const text = String(error.text)
   if (!RATE_LIMIT_ERRORS.includes(text.replace(/\d+$/, "%d"))) return undefined
   const digits = /\d+$/.exec(text)

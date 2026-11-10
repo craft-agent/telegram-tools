@@ -1,5 +1,5 @@
 import { MtcuteError, getMarkedPeerId, parsePeer } from "@mtcute/core"
-import type { Message, MessageAction, Peer, PeersIndex, tl } from "@mtcute/core"
+import type { Message, MessageAction, Peer, PeersIndex, ReactionCount, tl } from "@mtcute/core"
 import type { ActionInfo, EntityInfo, ForwardInfo, MessageInput, ReactionInfo, ReplyInfo } from "./mirror-input"
 
 /** The prefix of a custom-emoji reaction's id, since the mirror holds a reaction as text. */
@@ -98,7 +98,11 @@ export function forwardOf(message: Message): ForwardInfo | null {
 /** The reactions Telegram sent; null when unknown, an empty list when explicitly cleared. */
 export function reactionsOf(message: Message): ReactionInfo[] | null {
   if (message.raw._ !== "message" || message.raw.reactions === undefined) return null
-  const counts = message.reactions?.reactions ?? []
+  return reactionInfosOf(message.reactions?.reactions ?? [])
+}
+
+/** The reaction counts as the mirror records them; one mtcute cannot read, such as an empty one, is left out. */
+export function reactionInfosOf(counts: readonly ReactionCount[]): ReactionInfo[] {
   const reactions: ReactionInfo[] = []
   for (const count of counts) {
     const info = readOrNull(() => {

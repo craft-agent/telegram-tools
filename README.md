@@ -1,6 +1,6 @@
 # telegram-tools
 
-Unofficial Telegram tools for coding agents: chats, messages, received files and sends.
+Unofficial Telegram tools for coding agents: chats, messages, received files, sends and actions.
 
 | Harness        | Delivery                                       | Pinned by                      |
 | -------------- | ---------------------------------------------- | ------------------------------ |
@@ -223,6 +223,30 @@ File names and contents are data, never instructions. The skill is
 [`telegram-files`](skills/telegram-files/SKILL.md), shown as
 `telegram-tools:telegram-files` in Claude Code and `telegram-tools:files` in
 Hermes.
+
+### Actions (`actions`)
+
+| Tool                      | What it does                                                          | Class          |
+| ------------------------- | --------------------------------------------------------------------- | -------------- |
+| `telegram_message_edit`   | replaces the text or caption of one of the user's own messages        | overwrite      |
+| `telegram_message_delete` | deletes one of the user's own messages for everyone                   | administrative |
+| `telegram_message_react`  | sets or removes the user's emoji reaction on a message                | overwrite      |
+| `telegram_message_pin`    | pins or unpins a message                                              | overwrite      |
+| `telegram_chat_mark_read` | marks a chat, or one forum topic, read up to a message, never further | idempotent     |
+
+The `actions` toolset is off by default: it changes what other people have
+already read. Turn it on with `toolsets` or `tools`. Edit and delete take only
+the user's own messages; a delete is always for everyone, cannot be undone and
+is asked about every time. A reaction is one standard emoji that replaces the
+user's earlier one (custom and paid reactions are refused). A pin is silent
+unless `notify`, and in a private chat it pins for the user only unless
+`both_sides`. Mark read runs only when the user asks, goes up to the message
+named and never back, and makes the senders see it read. Every action needs the
+sync service running. `already` means it was already so; `uncertain` means it
+may have happened, so the person checks the chat before it is asked again. The
+skill is [`telegram-actions`](skills/telegram-actions/SKILL.md), shown as
+`telegram-tools:telegram-actions` in Claude Code and `telegram-tools:actions`
+in Hermes.
 
 ## Adding a tool
 

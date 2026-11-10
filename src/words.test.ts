@@ -5,6 +5,7 @@ import { CHAT_FACT_TRANSLATIONS } from "./core/chat/facts"
 import { FACT_TRANSLATIONS } from "./core/facts"
 import { FILE_SEND_TRANSLATIONS } from "./core/file/send/words"
 import { FILE_TRANSLATIONS } from "./core/file/words"
+import { ACTION_TRANSLATIONS } from "./core/message/action-words"
 import { MESSAGE_TRANSLATIONS } from "./core/message/words"
 import { SYNC_TRANSLATIONS } from "./core/sync/words"
 import { ALL_TOOLS } from "./tools"
@@ -14,6 +15,7 @@ const TABLES = [
   FACT_TRANSLATIONS,
   CHAT_FACT_TRANSLATIONS,
   MESSAGE_TRANSLATIONS,
+  ACTION_TRANSLATIONS,
   FILE_TRANSLATIONS,
   FILE_SEND_TRANSLATIONS,
   SYNC_TRANSLATIONS,

@@ -13,8 +13,26 @@ export type FakeSend<Request = tl.messages.RawSendMessageRequest> = { request: R
 export type FakeFileRequest =
   tl.messages.RawUploadMediaRequest | tl.messages.RawSendMediaRequest | tl.messages.RawSendMultiMediaRequest
 
+/** The calls an action makes: an edit, a delete, a reaction or a pin of one message, or a read mark of a chat or a topic. */
+export type FakeActionRequest =
+  | tl.messages.RawEditMessageRequest
+  | tl.messages.RawDeleteMessagesRequest
+  | tl.channels.RawDeleteMessagesRequest
+  | tl.messages.RawSendReactionRequest
+  | tl.messages.RawUpdatePinnedMessageRequest
+  | tl.messages.RawReadHistoryRequest
+  | tl.channels.RawReadHistoryRequest
+  | tl.messages.RawReadDiscussionRequest
+
 /** What `call` answers with: a response, an error it throws, or nothing until the call is aborted (the abort reason is thrown). */
 export type FakeCallAnswer = tl.TypeUpdates | Error | "hang"
+
+/** What `call` answers an action with: the updates of an edit, a reaction or a pin, the count of a delete or a read mark, a bool, an error it throws, or nothing until the call is aborted. */
+export type FakeActionAnswer = tl.TypeUpdates | tl.messages.TypeAffectedMessages | boolean | Error | "hang"
+
+/** How `call` answers an action: one answer for every call, or one worked out from the request. */
+export type FakeActionScript =
+  FakeActionAnswer | ((send: FakeSend<FakeActionRequest>) => FakeActionAnswer | Promise<FakeActionAnswer>)
 
 /** How `call` answers: one answer for every call, or one worked out from the request (to echo its `random_id`). */
 export type FakeCallScript = FakeCallAnswer | ((send: FakeSend) => FakeCallAnswer | Promise<FakeCallAnswer>)
@@ -30,10 +48,15 @@ export type FakeSendMethods = {
   setCallAnswer(script: FakeCallScript): void
   /** Sets how every later `call` of a file send's requests answers; an error is thrown by it. */
   setFileAnswer(script: FakeFileScript): void
+  /** Sets how every later `call` of an edit, a delete, a reaction, a pin or a read mark answers; an error is thrown by it. */
+  setActionAnswer(script: FakeActionScript): void
   /** Everything `handleClientUpdate` was given, in order. */
   handled: { update: tl.TypeUpdates; noDispatch?: boolean }[]
   resolvePeer(chat: number): Promise<tl.TypeInputPeer>
-  call(request: tl.messages.RawSendMessageRequest | FakeFileRequest, options?: RpcCallOptions): Promise<tl.TypeUpdates>
+  call(
+    request: tl.messages.RawSendMessageRequest | FakeFileRequest | FakeActionRequest,
+    options?: RpcCallOptions,
+  ): Promise<tl.TypeUpdates | tl.messages.TypeAffectedMessages | boolean>
   handleClientUpdate(update: tl.TypeUpdates, noDispatch?: boolean): void
 }
 
@@ -53,26 +76,46 @@ function inputPeerOf(chat: number): tl.TypeInputPeer {
 export function fakeSendMethods(record: (method: FakeMethod, arg?: unknown) => void): FakeSendMethods {
   let script: FakeCallScript = new Error("no answer was scripted")
   let fileScript: FakeFileScript = () => new Error("no answer was scripted")
+  let actionScript: FakeActionScript = new Error("no answer was scripted")
   const handled: FakeSendMethods["handled"] = []
+
+  /** What the script of the request's kind answers it with. */
+  async function answerOf(
+    request: tl.messages.RawSendMessageRequest | FakeFileRequest | FakeActionRequest,
+    options: RpcCallOptions,
+  ): Promise<FakeActionAnswer | FakeCallAnswer | tl.TypeMessageMedia> {
+    switch (request._) {
+      case "messages.sendMessage":
+        return typeof script === "function" ? script({ request, options }) : script
+      case "messages.editMessage":
+      case "messages.deleteMessages":
+      case "channels.deleteMessages":
+      case "messages.sendReaction":
+      case "messages.updatePinnedMessage":
+      case "messages.readHistory":
+      case "channels.readHistory":
+      case "messages.readDiscussion":
+        return typeof actionScript === "function" ? actionScript({ request, options }) : actionScript
+      default:
+        return fileScript({ request, options })
+    }
+  }
+
   return {
     handled,
     setCallAnswer: (next) => void (script = next),
     setFileAnswer: (next) => void (fileScript = next),
+    setActionAnswer: (next) => void (actionScript = next),
     async resolvePeer(chat) {
       record("resolvePeer", chat)
       return inputPeerOf(chat)
     },
     async call(request, options = {}) {
       record("call", { request, options })
-      const answer =
-        request._ === "messages.sendMessage"
-          ? typeof script === "function"
-            ? await script({ request, options })
-            : script
-          : await fileScript({ request, options })
+      const answer = await answerOf(request, options)
       if (answer === "hang") await untilAborted(options.abortSignal)
       if (answer instanceof Error) throw answer
-      return answer as tl.TypeUpdates
+      return answer as tl.TypeUpdates | tl.messages.TypeAffectedMessages | boolean
     },
     handleClientUpdate(update, noDispatch) {
       record("handleClientUpdate", update)

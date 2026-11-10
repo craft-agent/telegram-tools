@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer"
 import { isAbsolute } from "node:path"
 import { ToolError } from "../errors"
+import { checkEmojiOrRemove, checkPinFlagsWithUnpin, checkReactionEmoji } from "./action-checks"
 import { isChatId, isCount } from "./mirror-input"
 import { isRecord } from "./service-errors"
 import {
@@ -14,9 +15,14 @@ import {
   TEXT_MAX_UNITS,
   TOPICS_LIMIT,
   type AroundParams,
+  type DeleteParams,
   type DownloadParams,
+  type EditParams,
   type FetchParams,
   type HistoryParams,
+  type MarkReadParams,
+  type PinParams,
+  type ReactParams,
   type SendFile,
   type SendFilesParams,
   type SendParams,
@@ -37,6 +43,11 @@ const DOWNLOAD_KEYS = ["chat", "id", "max_bytes"]
 const SEND_KEYS = ["chat", "text", "topic", "reply_to"]
 const SEND_FILES_KEYS = ["chat", "files", "caption", "topic", "reply_to"]
 const SEND_FILE_KEYS = ["path", "name"]
+const EDIT_KEYS = ["chat", "id", "text"]
+const DELETE_KEYS = ["chat", "id"]
+const REACT_KEYS = ["chat", "id", "emoji", "remove"]
+const PIN_KEYS = ["chat", "id", "unpin", "notify", "both_sides"]
+const MARK_READ_KEYS = ["chat", "up_to", "topic"]
 
 /** The most bytes a file name may take: what every file system takes. */
 const FILE_NAME_MAX_BYTES = 255
@@ -168,7 +179,7 @@ export function parseDownloadParams(params: unknown): DownloadParams {
   }
 }
 
-/** The text of a `send` request: not blank, already trimmed, and within Telegram's length. Never echoed in an error. */
+/** The text of a `send` or `edit` request: not blank, already trimmed, and within Telegram's length. Never echoed in an error. */
 function sendTextAt(fields: Record<string, unknown>): string {
   const { text } = fields
   if (typeof text !== "string") throw invalid("text must be a string.")
@@ -186,6 +197,72 @@ export function parseSendParams(params: unknown): SendParams {
   const replyTo = optionalNumberAt(fields, "reply_to", isIdNumber, ID_TEXT)
   if (topic !== undefined) parsed.topic = topic
   if (replyTo !== undefined) parsed.reply_to = replyTo
+  return parsed
+}
+
+/** The parameters of an `edit` request, checked; anything off is `invalid_argument`. */
+export function parseEditParams(params: unknown): EditParams {
+  const fields = recordOf(params, EDIT_KEYS, "The edit parameters")
+  return { chat: chatAt(fields), id: numberAt(fields, "id", isIdNumber, ID_TEXT), text: sendTextAt(fields) }
+}
+
+/** The parameters of a `delete` request, checked; anything off is `invalid_argument`. */
+export function parseDeleteParams(params: unknown): DeleteParams {
+  const fields = recordOf(params, DELETE_KEYS, "The delete parameters")
+  return { chat: chatAt(fields), id: numberAt(fields, "id", isIdNumber, ID_TEXT) }
+}
+
+/** Whether the flag at `key` is set: a missing one is not, and anything but a boolean is refused. */
+function flagAt(fields: Record<string, unknown>, key: string): boolean {
+  const value = fields[key]
+  if (value === undefined) return false
+  if (typeof value !== "boolean") throw invalid(`${key} must be true or false.`)
+  return value
+}
+
+/**
+ * The parameters of a `react` request, checked; anything off is
+ * `invalid_argument`. Exactly one of `emoji` and `remove: true` is given;
+ * `remove: false` counts as not given. The emoji is never echoed.
+ */
+export function parseReactParams(params: unknown): ReactParams {
+  const fields = recordOf(params, REACT_KEYS, "The react parameters")
+  const parsed: ReactParams = { chat: chatAt(fields), id: numberAt(fields, "id", isIdNumber, ID_TEXT) }
+  const { emoji } = fields
+  const remove = flagAt(fields, "remove")
+  checkEmojiOrRemove(emoji !== undefined, remove)
+  if (remove) return { ...parsed, remove }
+  if (typeof emoji !== "string") throw invalid("emoji must be a string.")
+  checkReactionEmoji(emoji)
+  return { ...parsed, emoji }
+}
+
+/**
+ * The parameters of a `pin` request, checked; anything off is
+ * `invalid_argument`. A flag that is `false` counts as not given, and `notify`
+ * and `both_sides` go with a pin only.
+ */
+export function parsePinParams(params: unknown): PinParams {
+  const fields = recordOf(params, PIN_KEYS, "The pin parameters")
+  const unpin = flagAt(fields, "unpin")
+  const notify = flagAt(fields, "notify")
+  const bothSides = flagAt(fields, "both_sides")
+  checkPinFlagsWithUnpin(unpin, notify, bothSides)
+  return {
+    chat: chatAt(fields),
+    id: numberAt(fields, "id", isIdNumber, ID_TEXT),
+    ...(unpin ? { unpin } : {}),
+    ...(notify ? { notify } : {}),
+    ...(bothSides ? { both_sides: bothSides } : {}),
+  }
+}
+
+/** The parameters of a `mark_read` request, checked; anything off is `invalid_argument`. */
+export function parseMarkReadParams(params: unknown): MarkReadParams {
+  const fields = recordOf(params, MARK_READ_KEYS, "The mark_read parameters")
+  const parsed: MarkReadParams = { chat: chatAt(fields), up_to: numberAt(fields, "up_to", isIdNumber, ID_TEXT) }
+  const topic = optionalNumberAt(fields, "topic", isIdNumber, ID_TEXT)
+  if (topic !== undefined) parsed.topic = topic
   return parsed
 }
 

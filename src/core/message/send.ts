@@ -4,8 +4,8 @@ import { pickPaths, readMirror } from "../chat/open"
 import { isToolError } from "../errors"
 import { callService } from "../telegram/service"
 import { SERVICE_REQUESTS, type SendParams, type SendResult, TEXT_MAX_UNITS } from "../telegram/service-requests"
-import { ANY_TARGET } from "../targets"
 import { defineTool } from "../tool"
+import { chatTargets } from "./action-targets"
 import { checkedText } from "./arguments"
 import { MESSAGE_SEND_TOOL_ID, SEND_TIMEOUT_MS } from "./constants"
 import { replyFacts, topicFacts } from "./facts"
@@ -47,14 +47,7 @@ export const telegramMessageSend = defineTool({
       text: { label: "Message text", body: text },
     }
   },
-  async targets(args, ctx) {
-    try {
-      const { label } = await pickPaths(ctx, args.account)
-      return [`${label}/${requireChatId(args.chat, MESSAGE_SEND_TOOL_ID)}`]
-    } catch {
-      return [ANY_TARGET]
-    }
-  },
+  targets: (args, ctx) => chatTargets(MESSAGE_SEND_TOOL_ID, args, ctx),
   async execute(args, ctx): Promise<SendOutput> {
     const chat = requireChatId(args.chat, MESSAGE_SEND_TOOL_ID)
     const text = checkedText(args.text)

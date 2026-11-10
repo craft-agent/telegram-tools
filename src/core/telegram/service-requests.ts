@@ -26,6 +26,16 @@ export const SERVICE_REQUESTS = {
   send: "send",
   /** Files of the label's `outbox/` uploaded and sent to a chat in one call, and recorded in the mirror: `SendFilesParams` → `SendFilesResult`. */
   sendFiles: "send_files",
+  /** The text or caption of one of the user's own messages replaced, and recorded in the mirror: `EditParams` → `EditResult`. */
+  edit: "edit",
+  /** One of the user's own messages deleted for everyone, and removed from the mirror: `DeleteParams` → `DeleteResult`. */
+  delete: "delete",
+  /** The user's own reaction on a message set to one emoji, or removed, and recorded in the mirror: `ReactParams` → `ReactResult`. */
+  react: "react",
+  /** A message pinned or unpinned; a pin that tells the members is recorded in the mirror as the service message it makes: `PinParams` → `PinResult`. */
+  pin: "pin",
+  /** A chat, or one forum topic, marked read up to a message, and the chat's read mark moved in the mirror: `MarkReadParams` → `MarkReadResult`. */
+  markRead: "mark_read",
 } as const
 
 /** The most messages one live read returns. */
@@ -266,3 +276,99 @@ export type SentFile = { id: number; name: string }
  * files the mirror can name, and is left out when it can name none.
  */
 export type SendFilesResult = { messages?: SentFile[]; date?: number; duplicate?: true }
+
+/** The text, or the caption, of one of the user's own messages replaced, exactly as written. */
+export type EditParams = {
+  /** A chat the mirror lists and the account has not left. */
+  chat: string
+  /** The message in that chat: the user's own, which the mirror holds, with a text or a caption. */
+  id: number
+  /** Not blank, equal to itself trimmed, at most `TEXT_MAX_UNITS` UTF-16 units long (`CAPTION_MAX_UNITS` for a caption), and not the text the message has. */
+  text: string
+}
+
+/**
+ * What Telegram accepted: the message's `id` and the time of its edit (Unix
+ * milliseconds). `already` is set when Telegram answered that the message
+ * already has the text, so that an earlier delivery of this call landed; the
+ * time is then left out unless the mirror has the message with this text by
+ * then, since Telegram does not say when the earlier delivery was made.
+ */
+export type EditResult = { id: number; edited?: number; already?: true }
+
+/** One of the user's own messages deleted for everyone. */
+export type DeleteParams = {
+  /** A chat the mirror lists and the account has not left. */
+  chat: string
+  /** The message in that chat: the user's own, which the mirror holds. */
+  id: number
+}
+
+/**
+ * The message `id` is gone. `already` is set when it was gone before this call
+ * deleted anything: the mirror had it as deleted, or Telegram counted no
+ * message deleted.
+ */
+export type DeleteResult = { id: number; deleted: true; already?: true }
+
+/** The most UTF-16 units a reaction's emoji may have: room for a skin tone or a joined sequence, far short of any text. */
+export const REACTION_MAX_UNITS = 64
+
+/** The user's own reaction on a message set to one emoji, replacing the one they had, or removed. */
+export type ReactParams = {
+  /** A chat the mirror lists and the account has not left. */
+  chat: string
+  /** The message in that chat, anyone's, which the mirror holds. */
+  id: number
+  /** One standard emoji, at most `REACTION_MAX_UNITS` UTF-16 units, with no letters, digits or blank space; given exactly when `remove` is not. */
+  emoji?: string
+  /** `true` removes the user's own reaction; given exactly when `emoji` is not. */
+  remove?: boolean
+}
+
+/**
+ * The reaction the message has from the user now: `emoji` when set, `removed`
+ * when taken away. `already` is set when it was so before this call: the
+ * mirror showed the emoji as the user's own, or Telegram answered that the
+ * reaction is unchanged.
+ */
+export type ReactResult = { id: number; emoji?: string; removed?: true; already?: true }
+
+/** A message pinned or unpinned. */
+export type PinParams = {
+  /** A chat the mirror lists and the account has not left. */
+  chat: string
+  /** The message in that chat, anyone's, which the mirror holds. */
+  id: number
+  /** `true` unpins the message; then `notify` and `both_sides` are not given as `true`. */
+  unpin?: boolean
+  /** `true` tells the members of a group that the message was pinned; left out, the pin is silent. */
+  notify?: boolean
+  /** `true` pins in a private chat for the other person too, which only a chat with a person or a bot has; left out, the pin is the user's own. */
+  both_sides?: boolean
+}
+
+/**
+ * Whether the message is pinned now: the opposite of what `unpin` asked.
+ * `already` is set when Telegram answered that the chat is unchanged, so that
+ * the message was in that state before this call.
+ */
+export type PinResult = { id: number; pinned: boolean; already?: true }
+
+/** A chat, or one forum topic of it, marked read up to a message, never further and never back. */
+export type MarkReadParams = {
+  /** A chat the mirror lists and keeps, which the account has not left. */
+  chat: string
+  /** The message in that chat, anyone's, which the mirror holds: what is read is every message up to and including it. */
+  up_to: number
+  /** The forum topic to mark read, on its own; the chat must be a forum, `up_to` must be a message of that topic, and the General topic is `GENERAL_TOPIC`. */
+  topic?: number
+}
+
+/**
+ * What was marked read: the chat, the message `up_to` and the `topic` when the
+ * call named one. `already` is set when the mirror showed the whole chat read
+ * up to that message or beyond, so that no call was made; a topic has no read
+ * mark in the mirror, so the call is always made for one.
+ */
+export type MarkReadResult = { chat: string; up_to: number; topic?: number; already?: true }

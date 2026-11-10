@@ -51,8 +51,8 @@ confirm it did not arrive.
 
 `duplicate: true` means it went out once: do not send it again.
 
-## Not here yet
+## Elsewhere
 
 Sending files is `telegram_file_send` in the `files` toolset (off by default;
-see `telegram-files`). Actions on messages already sent are separate tools that
-are not part of this one.
+see `telegram-files`). Editing, deleting, reacting to, pinning or marking read
+are in the `actions` toolset (off by default; see `telegram-actions`).
