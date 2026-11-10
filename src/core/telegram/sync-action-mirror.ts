@@ -15,6 +15,8 @@ export type StoredMessage = {
   reactions: string | null
   /** When the last edit was made, in milliseconds. */
   edited: number | null
+  /** The forum topic it is in; null for a message of the General topic or of a chat without topics. */
+  topic: number | null
 }
 
 /** The chat an action is aimed at, and its message: null when the mirror was told the message is deleted. */
@@ -28,14 +30,19 @@ type StoredRow = StoredMessage & { from_me: number }
 /** The columns of message `id` of `chat` that an action looks at, or undefined when the mirror has no such message. */
 function storedRow(mirror: Mirror, chat: string, id: number): StoredRow | undefined {
   return mirror
-    .prepare("SELECT from_me, kind, body, media, reactions, edited FROM messages WHERE chat = ? AND id = ?")
+    .prepare("SELECT from_me, kind, body, media, reactions, edited, topic FROM messages WHERE chat = ? AND id = ?")
     .get(chat, id) as StoredRow | undefined
+}
+
+/** What an action looks at of a stored row, without the author. */
+function messageOf({ kind, body, media, reactions, edited, topic }: StoredRow): StoredMessage {
+  return { kind, body, media, reactions, edited, topic }
 }
 
 /** Message `id` of `chat` as the mirror has it now, or null when it has none. */
 export function storedMessageOf(mirror: Mirror, chat: string, id: number): StoredMessage | null {
   const row = storedRow(mirror, chat, id)
-  return row ? { kind: row.kind, body: row.body, media: row.media, reactions: row.reactions, edited: row.edited } : null
+  return row ? messageOf(row) : null
 }
 
 /**
@@ -63,8 +70,7 @@ export function targetOf(
     throw noSuchMessage(id, chat.followed, words.past)
   }
   if (whose === "own" && row.from_me !== 1) throw notOwnMessage(words.past)
-  const { kind, body, media, reactions, edited } = row
-  return { chat, message: { kind, body, media, reactions, edited } }
+  return { chat, message: messageOf(row) }
 }
 
 /**

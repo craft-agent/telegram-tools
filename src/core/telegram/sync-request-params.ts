@@ -20,6 +20,7 @@ import {
   type EditParams,
   type FetchParams,
   type HistoryParams,
+  type MarkReadParams,
   type PinParams,
   type ReactParams,
   type SendFile,
@@ -46,6 +47,7 @@ const EDIT_KEYS = ["chat", "id", "text"]
 const DELETE_KEYS = ["chat", "id"]
 const REACT_KEYS = ["chat", "id", "emoji", "remove"]
 const PIN_KEYS = ["chat", "id", "unpin", "notify", "both_sides"]
+const MARK_READ_KEYS = ["chat", "up_to", "topic"]
 
 /** The most bytes a file name may take: what every file system takes. */
 const FILE_NAME_MAX_BYTES = 255
@@ -253,6 +255,15 @@ export function parsePinParams(params: unknown): PinParams {
     ...(notify ? { notify } : {}),
     ...(bothSides ? { both_sides: bothSides } : {}),
   }
+}
+
+/** The parameters of a `mark_read` request, checked; anything off is `invalid_argument`. */
+export function parseMarkReadParams(params: unknown): MarkReadParams {
+  const fields = recordOf(params, MARK_READ_KEYS, "The mark_read parameters")
+  const parsed: MarkReadParams = { chat: chatAt(fields), up_to: numberAt(fields, "up_to", isIdNumber, ID_TEXT) }
+  const topic = optionalNumberAt(fields, "topic", isIdNumber, ID_TEXT)
+  if (topic !== undefined) parsed.topic = topic
+  return parsed
 }
 
 /** The file name of a `send_files` file: plain, trimmed, and within what file systems and Telegram take. Never echoed in an error. */

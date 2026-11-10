@@ -1,7 +1,7 @@
 import { ToolError } from "../errors"
 import type { ChatKind, ReactionInfo } from "./mirror-input"
 import type { ChatRow } from "./mirror-rows"
-import { CAPTION_MAX_UNITS, REACTION_MAX_UNITS } from "./service-requests"
+import { CAPTION_MAX_UNITS, GENERAL_TOPIC, REACTION_MAX_UNITS } from "./service-requests"
 
 /** The type the mirror records for a message's link preview, which belongs to the text. */
 const LINK_PREVIEW = "webpage"
@@ -19,6 +19,7 @@ export const ACTION_PAST = {
   react: "changed",
   pin: "pinned",
   unpin: "unpinned",
+  markRead: "marked read",
 } as const
 
 /** What an edit looks at of a message: its kind, its text, and whether it has media a caption goes with. */
@@ -71,6 +72,26 @@ export function checkBothSides(kind: ChatKind, bothSides: boolean | undefined): 
       "invalid_argument",
       `A pin can be made for both sides only in a chat with a person or a bot; nothing was ${ACTION_PAST.pin}.`,
     )
+  }
+}
+
+/** Refuses a topic in a chat that is no forum (`invalid_argument`); a call without a topic passes. */
+export function checkTopicChat({ forum }: Pick<ChatRow, "forum">, topic: number | undefined, past: string): void {
+  if (topic !== undefined && !forum) {
+    throw new ToolError("invalid_argument", `This chat has no topics; nothing was ${past}.`)
+  }
+}
+
+/**
+ * Refuses a message that is not in the topic the call names (`invalid_argument`).
+ * `messageTopic` is the topic the mirror holds for the message: none for a
+ * message of the General topic, which carries no topic header. A call without
+ * a topic passes.
+ */
+export function checkInTopic(messageTopic: number | null, topic: number | undefined, past: string): void {
+  if (topic === undefined) return
+  if ((topic === GENERAL_TOPIC ? null : topic) !== messageTopic) {
+    throw new ToolError("invalid_argument", `This message is not in that topic; nothing was ${past}.`)
   }
 }
 

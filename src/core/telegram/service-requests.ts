@@ -34,6 +34,8 @@ export const SERVICE_REQUESTS = {
   react: "react",
   /** A message pinned or unpinned; a pin that tells the members is recorded in the mirror as the service message it makes: `PinParams` → `PinResult`. */
   pin: "pin",
+  /** A chat, or one forum topic, marked read up to a message, and the chat's read mark moved in the mirror: `MarkReadParams` → `MarkReadResult`. */
+  markRead: "mark_read",
 } as const
 
 /** The most messages one live read returns. */
@@ -352,3 +354,21 @@ export type PinParams = {
  * the message was in that state before this call.
  */
 export type PinResult = { id: number; pinned: boolean; already?: true }
+
+/** A chat, or one forum topic of it, marked read up to a message, never further and never back. */
+export type MarkReadParams = {
+  /** A chat the mirror lists and keeps, which the account has not left. */
+  chat: string
+  /** The message in that chat, anyone's, which the mirror holds: what is read is every message up to and including it. */
+  up_to: number
+  /** The forum topic to mark read, on its own; the chat must be a forum, `up_to` must be a message of that topic, and the General topic is `GENERAL_TOPIC`. */
+  topic?: number
+}
+
+/**
+ * What was marked read: the chat, the message `up_to` and the `topic` when the
+ * call named one. `already` is set when the mirror showed the whole chat read
+ * up to that message or beyond, so that no call was made; a topic has no read
+ * mark in the mirror, so the call is always made for one.
+ */
+export type MarkReadResult = { chat: string; up_to: number; topic?: number; already?: true }

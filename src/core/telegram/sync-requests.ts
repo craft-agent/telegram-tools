@@ -35,6 +35,7 @@ import {
 import { RequestQueue } from "./sync-request-queue"
 import { deleteRequest } from "./sync-delete"
 import { editRequest } from "./sync-edit"
+import { markReadRequest } from "./sync-mark-read"
 import { pinRequest } from "./sync-pin"
 import { reactRequest } from "./sync-react"
 import { sendRequest } from "./sync-send"
@@ -320,7 +321,9 @@ async function fetchRequest(
  * on a queue of their own, so that they wait behind neither a fetch nor a
  * download; `edit` and `delete` change one of the user's own messages and
  * record it, `react` changes the user's reaction on a message and records it,
- * and `pin` pins or unpins a message, on that same queue.
+ * `pin` pins or unpins a message, and `mark_read` marks a chat or a forum
+ * topic read up to a message and records the chat's read mark, on that same
+ * queue.
  */
 export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, ServiceHandler> {
   const fetches = new RequestQueue()
@@ -340,5 +343,6 @@ export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, Se
     [SERVICE_REQUESTS.delete]: (params, call) => deleteRequest(callContext(ctx, call), sends, params, call),
     [SERVICE_REQUESTS.react]: (params, call) => reactRequest(callContext(ctx, call), sends, params, call),
     [SERVICE_REQUESTS.pin]: (params, call) => pinRequest(callContext(ctx, call), sends, params, call),
+    [SERVICE_REQUESTS.markRead]: (params, call) => markReadRequest(callContext(ctx, call), sends, params, call),
   }
 }
