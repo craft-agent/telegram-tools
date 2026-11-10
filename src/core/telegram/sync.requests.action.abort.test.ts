@@ -11,7 +11,7 @@ import { RequestQueue } from "./sync-request-queue"
 import { syncRequestHandlers } from "./sync-requests"
 import { FORUM, KEPT } from "./sync-requests.testing"
 import { TEXT, shortSent } from "./sync-send.testing"
-import { NEW_TEXT, OWN, OWN_TEXT, affected, editedInPrivate } from "./sync-action.testing"
+import { NEW_TEXT, OWN, OWN_TEXT, affected, editedInPrivate, updatesGroup } from "./sync-action.testing"
 import { eventually } from "./sync.testing"
 import { answered, type FakeSend } from "./sync-client-send.testing"
 
@@ -65,6 +65,8 @@ const own = { chat: KEPT, id: OWN.text }
 const sendCall = (signal: AbortSignal) => handlers.send!({ chat: KEPT, text: TEXT }, { signal })
 const editCall = (signal: AbortSignal) => handlers.edit!({ ...own, text: NEW_TEXT }, { signal })
 const deleteCall = (signal: AbortSignal) => handlers.delete!(own, { signal })
+const reactCall = (signal: AbortSignal) => handlers.react!({ ...own, emoji: "👍" }, { signal })
+const pinCall = (signal: AbortSignal) => handlers.pin!(own, { signal })
 const calledOnce = () => eventually(() => client.argsOf("call").length === 1)
 const bodies = () => columnOf(mirror.mirror, "SELECT body FROM messages WHERE chat = ? AND id = ?", KEPT, OWN.text)
 const storedIds = () => columnOf(mirror.mirror, "SELECT id FROM messages WHERE chat = ? ORDER BY id", KEPT)
@@ -73,6 +75,8 @@ describe("an action that is cancelled", () => {
   for (const [name, start] of [
     ["edit", editCall],
     ["delete", deleteCall],
+    ["react", reactCall],
+    ["pin", pinCall],
   ] as const) {
     test(`${name} never reaches Telegram when it was cancelled already`, async () => {
       const caller = new AbortController()
@@ -173,6 +177,24 @@ describe("an action that went through", () => {
     expect(failures).toHaveLength(1)
     expect(failures[0]).toBeInstanceOf(StorageFailure)
     expect(bodies()).toEqual([OWN_TEXT])
+  })
+
+  test("a reaction is answered as a success when the mirror cannot be written, and then stops the service", async () => {
+    client.setActionAnswer(updatesGroup([]))
+    mirror.mirror.exec("CREATE TRIGGER refuse BEFORE UPDATE ON messages BEGIN SELECT RAISE(ABORT, 'no'); END")
+
+    const afterwards: (() => void)[] = []
+    const answer = handlers.react!(
+      { ...own, emoji: "👍" },
+      { signal: new AbortController().signal, afterAnswered: (effect) => void afterwards.push(effect) },
+    )
+
+    expect(await answer).toEqual({ id: OWN.text, emoji: "👍" })
+
+    expect(failures).toEqual([])
+    for (const effect of afterwards) effect()
+    expect(failures).toHaveLength(1)
+    expect(failures[0]).toBeInstanceOf(StorageFailure)
   })
 
   test("a delete is answered as a success when the mirror cannot be written, and then stops the service", async () => {
