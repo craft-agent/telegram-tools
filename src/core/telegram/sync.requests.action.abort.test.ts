@@ -67,6 +67,7 @@ const editCall = (signal: AbortSignal) => handlers.edit!({ ...own, text: NEW_TEX
 const deleteCall = (signal: AbortSignal) => handlers.delete!(own, { signal })
 const reactCall = (signal: AbortSignal) => handlers.react!({ ...own, emoji: "👍" }, { signal })
 const pinCall = (signal: AbortSignal) => handlers.pin!(own, { signal })
+const markReadCall = (signal: AbortSignal) => handlers.mark_read!({ chat: KEPT, up_to: OWN.text }, { signal })
 const calledOnce = () => eventually(() => client.argsOf("call").length === 1)
 const bodies = () => columnOf(mirror.mirror, "SELECT body FROM messages WHERE chat = ? AND id = ?", KEPT, OWN.text)
 const storedIds = () => columnOf(mirror.mirror, "SELECT id FROM messages WHERE chat = ? ORDER BY id", KEPT)
@@ -77,6 +78,7 @@ describe("an action that is cancelled", () => {
     ["delete", deleteCall],
     ["react", reactCall],
     ["pin", pinCall],
+    ["mark read", markReadCall],
   ] as const) {
     test(`${name} never reaches Telegram when it was cancelled already`, async () => {
       const caller = new AbortController()
@@ -214,6 +216,24 @@ describe("an action that went through", () => {
     expect(failures).toHaveLength(1)
     expect(failures[0]).toBeInstanceOf(StorageFailure)
     expect(storedIds()).toEqual([OWN.text])
+  })
+
+  test("a read mark is answered as a success when the mirror cannot be written, and then stops the service", async () => {
+    client.setActionAnswer(affected())
+    mirror.mirror.exec("CREATE TRIGGER refuse BEFORE UPDATE ON chats BEGIN SELECT RAISE(ABORT, 'no'); END")
+
+    const afterwards: (() => void)[] = []
+    const answer = handlers.mark_read!(
+      { chat: KEPT, up_to: OWN.text },
+      { signal: new AbortController().signal, afterAnswered: (effect) => void afterwards.push(effect) },
+    )
+
+    expect(await answer).toEqual({ chat: KEPT, up_to: OWN.text })
+
+    expect(failures).toEqual([])
+    for (const effect of afterwards) effect()
+    expect(failures).toHaveLength(1)
+    expect(failures[0]).toBeInstanceOf(StorageFailure)
   })
 
   test("is answered as a success when mtcute's update state cannot take the response", async () => {
