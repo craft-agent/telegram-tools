@@ -1,6 +1,7 @@
 import { Buffer } from "node:buffer"
 import { isAbsolute } from "node:path"
 import { ToolError } from "../errors"
+import { checkEmojiOrRemove, checkPinFlagsWithUnpin, checkReactionEmoji } from "./action-checks"
 import { isChatId, isCount } from "./mirror-input"
 import { isRecord } from "./service-errors"
 import {
@@ -19,6 +20,8 @@ import {
   type EditParams,
   type FetchParams,
   type HistoryParams,
+  type PinParams,
+  type ReactParams,
   type SendFile,
   type SendFilesParams,
   type SendParams,
@@ -41,6 +44,8 @@ const SEND_FILES_KEYS = ["chat", "files", "caption", "topic", "reply_to"]
 const SEND_FILE_KEYS = ["path", "name"]
 const EDIT_KEYS = ["chat", "id", "text"]
 const DELETE_KEYS = ["chat", "id"]
+const REACT_KEYS = ["chat", "id", "emoji", "remove"]
+const PIN_KEYS = ["chat", "id", "unpin", "notify", "both_sides"]
 
 /** The most bytes a file name may take: what every file system takes. */
 const FILE_NAME_MAX_BYTES = 255
@@ -203,6 +208,51 @@ export function parseEditParams(params: unknown): EditParams {
 export function parseDeleteParams(params: unknown): DeleteParams {
   const fields = recordOf(params, DELETE_KEYS, "The delete parameters")
   return { chat: chatAt(fields), id: numberAt(fields, "id", isIdNumber, ID_TEXT) }
+}
+
+/** Whether the flag at `key` is set: a missing one is not, and anything but a boolean is refused. */
+function flagAt(fields: Record<string, unknown>, key: string): boolean {
+  const value = fields[key]
+  if (value === undefined) return false
+  if (typeof value !== "boolean") throw invalid(`${key} must be true or false.`)
+  return value
+}
+
+/**
+ * The parameters of a `react` request, checked; anything off is
+ * `invalid_argument`. Exactly one of `emoji` and `remove: true` is given;
+ * `remove: false` counts as not given. The emoji is never echoed.
+ */
+export function parseReactParams(params: unknown): ReactParams {
+  const fields = recordOf(params, REACT_KEYS, "The react parameters")
+  const parsed: ReactParams = { chat: chatAt(fields), id: numberAt(fields, "id", isIdNumber, ID_TEXT) }
+  const { emoji } = fields
+  const remove = flagAt(fields, "remove")
+  checkEmojiOrRemove(emoji !== undefined, remove)
+  if (remove) return { ...parsed, remove }
+  if (typeof emoji !== "string") throw invalid("emoji must be a string.")
+  checkReactionEmoji(emoji)
+  return { ...parsed, emoji }
+}
+
+/**
+ * The parameters of a `pin` request, checked; anything off is
+ * `invalid_argument`. A flag that is `false` counts as not given, and `notify`
+ * and `both_sides` go with a pin only.
+ */
+export function parsePinParams(params: unknown): PinParams {
+  const fields = recordOf(params, PIN_KEYS, "The pin parameters")
+  const unpin = flagAt(fields, "unpin")
+  const notify = flagAt(fields, "notify")
+  const bothSides = flagAt(fields, "both_sides")
+  checkPinFlagsWithUnpin(unpin, notify, bothSides)
+  return {
+    chat: chatAt(fields),
+    id: numberAt(fields, "id", isIdNumber, ID_TEXT),
+    ...(unpin ? { unpin } : {}),
+    ...(notify ? { notify } : {}),
+    ...(bothSides ? { both_sides: bothSides } : {}),
+  }
 }
 
 /** The file name of a `send_files` file: plain, trimmed, and within what file systems and Telegram take. Never echoed in an error. */

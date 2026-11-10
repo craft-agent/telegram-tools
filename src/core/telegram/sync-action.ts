@@ -23,6 +23,19 @@ export function performAction<Answer>(
   )
 }
 
+/** The updates an answer carries: an updates group's, or the one of a short update; none for any other form. */
+export function updatesOf(response: tl.TypeUpdates): readonly tl.TypeUpdate[] {
+  switch (response._) {
+    case "updates":
+    case "updatesCombined":
+      return response.updates
+    case "updateShort":
+      return [response.update]
+    default:
+      return []
+  }
+}
+
 /**
  * Tells mtcute's update state of the events an action answered with a count
  * and no updates (`messages.affectedMessages`), the way its own delete does.

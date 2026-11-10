@@ -13,14 +13,18 @@ export type FakeSend<Request = tl.messages.RawSendMessageRequest> = { request: R
 export type FakeFileRequest =
   tl.messages.RawUploadMediaRequest | tl.messages.RawSendMediaRequest | tl.messages.RawSendMultiMediaRequest
 
-/** The calls an action makes: an edit or a delete of one message. */
+/** The calls an action makes: an edit, a delete, a reaction or a pin of one message. */
 export type FakeActionRequest =
-  tl.messages.RawEditMessageRequest | tl.messages.RawDeleteMessagesRequest | tl.channels.RawDeleteMessagesRequest
+  | tl.messages.RawEditMessageRequest
+  | tl.messages.RawDeleteMessagesRequest
+  | tl.channels.RawDeleteMessagesRequest
+  | tl.messages.RawSendReactionRequest
+  | tl.messages.RawUpdatePinnedMessageRequest
 
 /** What `call` answers with: a response, an error it throws, or nothing until the call is aborted (the abort reason is thrown). */
 export type FakeCallAnswer = tl.TypeUpdates | Error | "hang"
 
-/** What `call` answers an action with: the updates of an edit, the count of a delete, an error it throws, or nothing until the call is aborted. */
+/** What `call` answers an action with: the updates of an edit, a reaction or a pin, the count of a delete, an error it throws, or nothing until the call is aborted. */
 export type FakeActionAnswer = tl.TypeUpdates | tl.messages.TypeAffectedMessages | Error | "hang"
 
 /** How `call` answers an action: one answer for every call, or one worked out from the request. */
@@ -41,7 +45,7 @@ export type FakeSendMethods = {
   setCallAnswer(script: FakeCallScript): void
   /** Sets how every later `call` of a file send's requests answers; an error is thrown by it. */
   setFileAnswer(script: FakeFileScript): void
-  /** Sets how every later `call` of an edit or a delete answers; an error is thrown by it. */
+  /** Sets how every later `call` of an edit, a delete, a reaction or a pin answers; an error is thrown by it. */
   setActionAnswer(script: FakeActionScript): void
   /** Everything `handleClientUpdate` was given, in order. */
   handled: { update: tl.TypeUpdates; noDispatch?: boolean }[]
@@ -83,6 +87,8 @@ export function fakeSendMethods(record: (method: FakeMethod, arg?: unknown) => v
       case "messages.editMessage":
       case "messages.deleteMessages":
       case "channels.deleteMessages":
+      case "messages.sendReaction":
+      case "messages.updatePinnedMessage":
         return typeof actionScript === "function" ? actionScript({ request, options }) : actionScript
       default:
         return fileScript({ request, options })

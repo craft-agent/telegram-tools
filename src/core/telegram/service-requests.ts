@@ -30,6 +30,10 @@ export const SERVICE_REQUESTS = {
   edit: "edit",
   /** One of the user's own messages deleted for everyone, and removed from the mirror: `DeleteParams` → `DeleteResult`. */
   delete: "delete",
+  /** The user's own reaction on a message set to one emoji, or removed, and recorded in the mirror: `ReactParams` → `ReactResult`. */
+  react: "react",
+  /** A message pinned or unpinned; a pin that tells the members is recorded in the mirror as the service message it makes: `PinParams` → `PinResult`. */
+  pin: "pin",
 } as const
 
 /** The most messages one live read returns. */
@@ -304,3 +308,47 @@ export type DeleteParams = {
  * message deleted.
  */
 export type DeleteResult = { id: number; deleted: true; already?: true }
+
+/** The most UTF-16 units a reaction's emoji may have: room for a skin tone or a joined sequence, far short of any text. */
+export const REACTION_MAX_UNITS = 64
+
+/** The user's own reaction on a message set to one emoji, replacing the one they had, or removed. */
+export type ReactParams = {
+  /** A chat the mirror lists and the account has not left. */
+  chat: string
+  /** The message in that chat, anyone's, which the mirror holds. */
+  id: number
+  /** One standard emoji, at most `REACTION_MAX_UNITS` UTF-16 units, with no letters, digits or blank space; given exactly when `remove` is not. */
+  emoji?: string
+  /** `true` removes the user's own reaction; given exactly when `emoji` is not. */
+  remove?: boolean
+}
+
+/**
+ * The reaction the message has from the user now: `emoji` when set, `removed`
+ * when taken away. `already` is set when it was so before this call: the
+ * mirror showed the emoji as the user's own, or Telegram answered that the
+ * reaction is unchanged.
+ */
+export type ReactResult = { id: number; emoji?: string; removed?: true; already?: true }
+
+/** A message pinned or unpinned. */
+export type PinParams = {
+  /** A chat the mirror lists and the account has not left. */
+  chat: string
+  /** The message in that chat, anyone's, which the mirror holds. */
+  id: number
+  /** `true` unpins the message; then `notify` and `both_sides` are not given as `true`. */
+  unpin?: boolean
+  /** `true` tells the members of a group that the message was pinned; left out, the pin is silent. */
+  notify?: boolean
+  /** `true` pins in a private chat for the other person too, which only a chat with a person or a bot has; left out, the pin is the user's own. */
+  both_sides?: boolean
+}
+
+/**
+ * Whether the message is pinned now: the opposite of what `unpin` asked.
+ * `already` is set when Telegram answered that the chat is unchanged, so that
+ * the message was in that state before this call.
+ */
+export type PinResult = { id: number; pinned: boolean; already?: true }

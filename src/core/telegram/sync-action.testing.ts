@@ -71,9 +71,19 @@ export function seedActionChats(fixture: SyncFixture): void {
   })
 }
 
+/** Asks the running service for the write `request` with `params`. */
+export function askWrite<Result>(
+  fixture: SyncFixture,
+  request: string,
+  params: Record<string, unknown>,
+  signal?: AbortSignal,
+): Promise<Result> {
+  return callService<Result>(fixture.paths.socket, request, params, { effect: "write", signal })
+}
+
 /** Asks the running service to edit `params`. */
 export function edit(fixture: SyncFixture, params: Record<string, unknown>, signal?: AbortSignal): Promise<EditResult> {
-  return callService<EditResult>(fixture.paths.socket, "edit", params, { effect: "write", signal })
+  return askWrite<EditResult>(fixture, "edit", params, signal)
 }
 
 /** Asks the running service to delete `params`. */
@@ -82,7 +92,7 @@ export function remove(
   params: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<DeleteResult> {
-  return callService<DeleteResult>(fixture.paths.socket, "delete", params, { effect: "write", signal })
+  return askWrite<DeleteResult>(fixture, "delete", params, signal)
 }
 
 /** Every call the service made to edit or delete, with the options it made it with. */
@@ -119,6 +129,18 @@ export function editedInForum(id: number, text: string): tl.RawUpdates {
     updates: [{ _: "updateEditChannelMessage", message, pts: 51, ptsCount: 1 }],
     users: [fakeUser(), fakeSelf()],
     chats: [fakeSupergroup({ forum: true })],
+    date: EDIT_DATE,
+    seq: 0,
+  }
+}
+
+/** An updates group holding `updates`, with the peers of `KEPT`, or of `FORUM` when `forum` is set. */
+export function updatesGroup(updates: tl.TypeUpdate[], forum = false): tl.RawUpdates {
+  return {
+    _: "updates",
+    updates,
+    users: [fakeUser(), fakeSelf()],
+    chats: forum ? [fakeSupergroup({ forum: true })] : [],
     date: EDIT_DATE,
     seq: 0,
   }
