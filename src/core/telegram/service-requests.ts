@@ -24,6 +24,8 @@ export const SERVICE_REQUESTS = {
   download: "download",
   /** One text sent to a chat, with one `random_id`, and recorded in the mirror: `SendParams` → `SendResult`. */
   send: "send",
+  /** Files of the label's `outbox/` uploaded and sent to a chat in one call, and recorded in the mirror: `SendFilesParams` → `SendFilesResult`. */
+  sendFiles: "send_files",
 } as const
 
 /** The most messages one live read returns. */
@@ -221,3 +223,46 @@ export type SendParams = {
  * message, and `date` is left out.
  */
 export type SendResult = { id?: number; date?: number; duplicate?: true }
+
+/** The most UTF-16 units a caption may have, as Telegram counts it (the limit of an account without Premium). */
+export const CAPTION_MAX_UNITS = 1024
+
+/** The most files one send carries: Telegram groups at most 10. */
+export const SEND_FILES_MAX = 10
+
+/** The most bytes the files of one send may have together. */
+export const SEND_FILES_MAX_BYTES = 100 * BYTES_PER_MB
+
+/** One file of a send: where it is, and the name it arrives with. */
+export type SendFile = {
+  /** An absolute path of a regular file in the label's `outbox/`; links are refused. */
+  path: string
+  /** A plain file name: no `/`, not `.` or `..`, equal to itself trimmed, at most 255 bytes. */
+  name: string
+}
+
+/** Files sent to a chat as files, in one group, with an optional caption on the last. */
+export type SendFilesParams = {
+  /** A chat the mirror lists. */
+  chat: string
+  /** 1 to `SEND_FILES_MAX` files with distinct paths, each not empty, `SEND_FILES_MAX_BYTES` together. */
+  files: SendFile[]
+  /** Not blank, equal to itself trimmed, and at most `CAPTION_MAX_UNITS` UTF-16 units long. */
+  caption?: string
+  /** The forum topic to send to; the chat must be a forum, and the General topic is `GENERAL_TOPIC`. */
+  topic?: number
+  /** The message in that chat to reply to. */
+  reply_to?: number
+}
+
+/** One message of a file send Telegram accepted: its id, and the file name it carries. */
+export type SentFile = { id: number; name: string }
+
+/**
+ * What Telegram accepted: the sent messages' ids by file name, in the order of
+ * the files, and the time of the first (Unix milliseconds). `duplicate` is set
+ * when Telegram answered `RANDOM_ID_DUPLICATE`: an earlier delivery of this
+ * call landed and no second message exists; `messages` then holds only the
+ * files the mirror can name, and is left out when it can name none.
+ */
+export type SendFilesResult = { messages?: SentFile[]; date?: number; duplicate?: true }
