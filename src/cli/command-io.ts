@@ -63,8 +63,11 @@ export type CommandIo = {
   readHidden?(prompt: string): Promise<string | undefined>
   /** Reads standard input to its end; an empty string when there is none. */
   readStdin?(): Promise<string>
-  /** The node binary and the CLI script to put in the service; default `process.execPath` and the realpath of `process.argv[1]`. */
-  self?: { program: string; script: string }
+  /**
+   * The node binary and the CLI script to put in the service, and the version of that binary;
+   * default `process.execPath`, the realpath of `process.argv[1]` and `process.versions.node`.
+   */
+  self?: { program: string; script: string; version?: string }
   /** Injectable service host for managing system services; defaults to the operating system host. */
   serviceHost?: ServiceHost
   /** Builds the client of a label; replaced by a test, defaults to `createTelegramClient`. */
