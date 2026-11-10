@@ -35,6 +35,7 @@ import {
 import { RequestQueue } from "./sync-request-queue"
 import { deleteRequest } from "./sync-delete"
 import { editRequest } from "./sync-edit"
+import { reactRequest } from "./sync-react"
 import { sendRequest } from "./sync-send"
 import { sendFilesRequest } from "./sync-send-files"
 import type { SyncTelegram } from "./sync-telegram"
@@ -317,7 +318,8 @@ async function fetchRequest(
  * and `send_files` uploads and sends files and records them, one send at a time
  * on a queue of their own, so that they wait behind neither a fetch nor a
  * download; `edit` and `delete` change one of the user's own messages and
- * record it, on that same queue.
+ * record it, `react` changes the user's reaction on a message and records it,
+ * and `pin` pins or unpins a message, on that same queue.
  */
 export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, ServiceHandler> {
   const fetches = new RequestQueue()
@@ -335,5 +337,6 @@ export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, Se
     [SERVICE_REQUESTS.sendFiles]: (params, call) => sendFilesRequest(callContext(ctx, call), sends, params, call),
     [SERVICE_REQUESTS.edit]: (params, call) => editRequest(callContext(ctx, call), sends, params, call),
     [SERVICE_REQUESTS.delete]: (params, call) => deleteRequest(callContext(ctx, call), sends, params, call),
+    [SERVICE_REQUESTS.react]: (params, call) => reactRequest(callContext(ctx, call), sends, params, call),
   }
 }
