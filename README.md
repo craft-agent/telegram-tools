@@ -443,9 +443,15 @@ one `default`), and every command takes `--state-dir` like the tools.
   to `~/Library/Application Support/io.github.craft-agent.telegram-tools/` and
   `service uninstall` deletes. Switching the item off there stops syncing.
 - **Service updates and restarts**: `service install` records this package's
-  executable path, so run `service install` again after updating the package or
-  changing `keep_disappearing` or `channels`. The service restarts after a
-  failure a minute later, but stays down after Telegram ends the session.
+  executable path and Node's, so run `service install` again after updating
+  either, or changing `keep_disappearing` or `channels`. Where Node's path
+  holds its version, as under a version manager, `service install` records a
+  `node` on `PATH` at a path without it that starts the same Node, and warns
+  when there is none. That `node` then runs whichever Node the manager makes
+  current. `service status` and `telegram_account_read` say when the recorded
+  program is gone, once the service has been installed with this version. The
+  service restarts after a failure a minute later, but stays down after
+  Telegram ends the session.
 - **One connection per label**: Telegram can revoke an auth key that connects
   from two places at once. `login`, `logout` and `remove` refuse while the
   service runs; stop it first (`service uninstall`, or stop foreground `sync`).
