@@ -13,19 +13,22 @@ export type FakeSend<Request = tl.messages.RawSendMessageRequest> = { request: R
 export type FakeFileRequest =
   tl.messages.RawUploadMediaRequest | tl.messages.RawSendMediaRequest | tl.messages.RawSendMultiMediaRequest
 
-/** The calls an action makes: an edit, a delete, a reaction or a pin of one message. */
+/** The calls an action makes: an edit, a delete, a reaction or a pin of one message, or a read mark of a chat or a topic. */
 export type FakeActionRequest =
   | tl.messages.RawEditMessageRequest
   | tl.messages.RawDeleteMessagesRequest
   | tl.channels.RawDeleteMessagesRequest
   | tl.messages.RawSendReactionRequest
   | tl.messages.RawUpdatePinnedMessageRequest
+  | tl.messages.RawReadHistoryRequest
+  | tl.channels.RawReadHistoryRequest
+  | tl.messages.RawReadDiscussionRequest
 
 /** What `call` answers with: a response, an error it throws, or nothing until the call is aborted (the abort reason is thrown). */
 export type FakeCallAnswer = tl.TypeUpdates | Error | "hang"
 
-/** What `call` answers an action with: the updates of an edit, a reaction or a pin, the count of a delete, an error it throws, or nothing until the call is aborted. */
-export type FakeActionAnswer = tl.TypeUpdates | tl.messages.TypeAffectedMessages | Error | "hang"
+/** What `call` answers an action with: the updates of an edit, a reaction or a pin, the count of a delete or a read mark, a bool, an error it throws, or nothing until the call is aborted. */
+export type FakeActionAnswer = tl.TypeUpdates | tl.messages.TypeAffectedMessages | boolean | Error | "hang"
 
 /** How `call` answers an action: one answer for every call, or one worked out from the request. */
 export type FakeActionScript =
@@ -45,7 +48,7 @@ export type FakeSendMethods = {
   setCallAnswer(script: FakeCallScript): void
   /** Sets how every later `call` of a file send's requests answers; an error is thrown by it. */
   setFileAnswer(script: FakeFileScript): void
-  /** Sets how every later `call` of an edit, a delete, a reaction or a pin answers; an error is thrown by it. */
+  /** Sets how every later `call` of an edit, a delete, a reaction, a pin or a read mark answers; an error is thrown by it. */
   setActionAnswer(script: FakeActionScript): void
   /** Everything `handleClientUpdate` was given, in order. */
   handled: { update: tl.TypeUpdates; noDispatch?: boolean }[]
@@ -53,7 +56,7 @@ export type FakeSendMethods = {
   call(
     request: tl.messages.RawSendMessageRequest | FakeFileRequest | FakeActionRequest,
     options?: RpcCallOptions,
-  ): Promise<tl.TypeUpdates | tl.messages.TypeAffectedMessages>
+  ): Promise<tl.TypeUpdates | tl.messages.TypeAffectedMessages | boolean>
   handleClientUpdate(update: tl.TypeUpdates, noDispatch?: boolean): void
 }
 
@@ -89,6 +92,9 @@ export function fakeSendMethods(record: (method: FakeMethod, arg?: unknown) => v
       case "channels.deleteMessages":
       case "messages.sendReaction":
       case "messages.updatePinnedMessage":
+      case "messages.readHistory":
+      case "channels.readHistory":
+      case "messages.readDiscussion":
         return typeof actionScript === "function" ? actionScript({ request, options }) : actionScript
       default:
         return fileScript({ request, options })
@@ -109,7 +115,7 @@ export function fakeSendMethods(record: (method: FakeMethod, arg?: unknown) => v
       const answer = await answerOf(request, options)
       if (answer === "hang") await untilAborted(options.abortSignal)
       if (answer instanceof Error) throw answer
-      return answer as tl.TypeUpdates | tl.messages.TypeAffectedMessages
+      return answer as tl.TypeUpdates | tl.messages.TypeAffectedMessages | boolean
     },
     handleClientUpdate(update, noDispatch) {
       record("handleClientUpdate", update)
