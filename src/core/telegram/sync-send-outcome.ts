@@ -21,6 +21,8 @@ const RATE_LIMIT_ERRORS: readonly string[] = ["FLOOD_WAIT_%d", "SLOWMODE_WAIT_%d
 const FORBIDDEN_ERRORS: readonly string[] = [
   "CHAT_WRITE_FORBIDDEN",
   "CHAT_SEND_PLAIN_FORBIDDEN",
+  "CHAT_SEND_MEDIA_FORBIDDEN",
+  "CHAT_SEND_DOCS_FORBIDDEN",
   "CHAT_RESTRICTED",
   "USER_BANNED_IN_CHANNEL",
   "CHAT_ADMIN_REQUIRED",
@@ -48,6 +50,9 @@ const NOT_FOUND_ERRORS: readonly string[] = [
 
 /** The refusals that say the text cannot be sent. */
 const INVALID_TEXT_ERRORS: readonly string[] = ["MESSAGE_TOO_LONG", "MESSAGE_EMPTY"]
+
+/** The refusals that say the caption cannot be sent. */
+const INVALID_CAPTION_ERRORS: readonly string[] = ["MEDIA_CAPTION_TOO_LONG"]
 
 /** What went with a send besides the answer. */
 export type SendTrouble = {
@@ -77,6 +82,9 @@ export type SentMessage =
       message: Message
     }
 
+/** The message of a response that holds the message itself. */
+export type FullSentMessage = Extract<SentMessage, { form: "full" }>
+
 /** Whether Telegram answered that an earlier delivery of this very call already landed. */
 export function isRandomIdDuplicate(error: unknown): boolean {
   return tl.RpcError.is(error, RANDOM_ID_DUPLICATE)
@@ -101,7 +109,7 @@ function rateLimitSecondsOf(error: tl.RpcError): number | undefined {
 }
 
 /** The error for a refusal that Telegram gave, when it can be told from its name; undefined for any other. */
-function refusalOf(error: tl.RpcError): ToolError | undefined {
+export function refusalOf(error: tl.RpcError): ToolError | undefined {
   const name = String(error.text)
   const seconds = rateLimitSecondsOf(error)
   if (seconds !== undefined) {
@@ -117,6 +125,9 @@ function refusalOf(error: tl.RpcError): ToolError | undefined {
     return refusedSend("not_found", "Telegram has no such chat, topic or message to reply to", name)
   }
   if (INVALID_TEXT_ERRORS.includes(name)) return refusedSend("invalid_argument", "Telegram refused the text", name)
+  if (INVALID_CAPTION_ERRORS.includes(name)) {
+    return refusedSend("invalid_argument", "Telegram refused the caption", name)
+  }
   if (REFUSAL_CODES.includes(error.code) && name !== CALL_TIMEOUT) {
     return refusedSend("upstream_error", "Telegram refused the send", name)
   }
@@ -158,6 +169,22 @@ export function sentMessageOf(response: tl.TypeUpdates, randomId: Long): SentMes
       entities: response.entities ?? [],
     }
   }
+  return fullSentMessageOf(response, randomId)
+}
+
+/**
+ * The message of a file send, one for each of `randomIds` in their order,
+ * found in the response by its own `random_id`; undefined when the response
+ * does not name every one. Media never comes in the short form, which would
+ * carry no file: it names none.
+ */
+export function sentFilesOf(response: tl.TypeUpdates, randomIds: readonly Long[]): FullSentMessage[] | undefined {
+  const found = randomIds.map((randomId) => fullSentMessageOf(response, randomId))
+  return found.every((sent) => sent !== undefined) ? found : undefined
+}
+
+/** The message of an updates group that the `updateMessageID` carrying `randomId` names, with the message itself. */
+function fullSentMessageOf(response: tl.TypeUpdates, randomId: Long): FullSentMessage | undefined {
   if (response._ !== "updates" && response._ !== "updatesCombined") return undefined
   const named = response.updates.find(
     (update): update is tl.RawUpdateMessageID => update._ === "updateMessageID" && update.randomId.eq(randomId),

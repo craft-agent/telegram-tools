@@ -13,8 +13,9 @@ import { parseSendParams } from "./sync-request-params"
 import { StorageFailure } from "./sync-ending"
 import type { RequestQueue } from "./sync-request-queue"
 import { checkSendable, deliveredId } from "./sync-send-mirror"
-import { isRandomIdDuplicate, sendFailureOf, sentMessageOf, uncertainSend, type SentMessage } from "./sync-send-outcome"
+import { isRandomIdDuplicate, sendFailureOf, sentMessageOf, uncertainSend } from "./sync-send-outcome"
 import { readSent, recordSent } from "./sync-send-record"
+import type { ReadMessage } from "./sync-message"
 import type { SyncTelegram } from "./sync-telegram"
 import { onAbort } from "./sync-wait"
 
@@ -35,8 +36,15 @@ export type SendContext = TelegramCallContext & {
  */
 const SEND_CALL_OPTIONS = { maxRetryCount: 0, floodSleepThreshold: 0 } as const
 
+/** The calls a send makes: one text, one file, or a group of files. */
+export type SendRequest =
+  tl.messages.RawSendMessageRequest | tl.messages.RawSendMediaRequest | tl.messages.RawSendMultiMediaRequest
+
 /** The reply header of a send: the message replied to, in the topic. The General topic is no topic to Telegram's header. */
-function replyToOf({ topic, reply_to }: SendParams): tl.TypeInputReplyTo | undefined {
+export function replyToOf({
+  topic,
+  reply_to,
+}: Pick<SendParams, "topic" | "reply_to">): tl.TypeInputReplyTo | undefined {
   const inTopic = topic === GENERAL_TOPIC ? undefined : topic
   const replyToMsgId = reply_to ?? inTopic
   if (replyToMsgId === undefined) return undefined
@@ -59,10 +67,10 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
  * brings no state change cannot be seen, so a refusal that answers such a
  * repeat reads as a first answer.
  */
-async function transmit(
+export async function transmit(
   ctx: SendContext,
   signal: AbortSignal,
-  request: tl.messages.RawSendMessageRequest,
+  request: SendRequest,
 ): Promise<tl.TypeUpdates | undefined> {
   let reconnected = false
   const onState = (state: ConnectionState) => {
@@ -82,7 +90,7 @@ async function transmit(
 }
 
 /** Tells mtcute's update state about the response, as its own text sender does, so that the state stays consistent. */
-function handOver(ctx: SendContext, response: tl.TypeUpdates): void {
+export function handOver(ctx: SendContext, response: tl.TypeUpdates): void {
   try {
     if (response._ !== "updateShortSentMessage") {
       ctx.client.handleClientUpdate(response, true)
@@ -97,25 +105,27 @@ function handOver(ctx: SendContext, response: tl.TypeUpdates): void {
 }
 
 /**
- * Records the sent message in the mirror. It never fails the send, which went
- * out: a message that cannot be read is left for the gap filling to bring, and
- * a mirror that cannot be written stops the service, as it does for a received
- * message, once the answer has been written.
+ * Records the sent message `read` gives in the mirror. It never fails the
+ * send, which went out: a message that cannot be read is left for the gap
+ * filling to bring, and a mirror that cannot be written stops the service, as
+ * it does for a received message, once the answer has been written. False
+ * when the mirror cannot be written, so that nothing more is recorded.
  */
-function record(ctx: SendContext, params: SendParams, sent: SentMessage): void {
+export function record(ctx: SendContext, read: () => ReadMessage | null): boolean {
   const { mirror, settings } = ctx
   try {
-    const read = readSent(sent, params, settings.channels)
-    if (!read) return
-    recordSent(mirror, { now: settings.now(), keepDisappearing: settings.keepDisappearing }, read, settings.channels)
+    const message = read()
+    if (!message) return true
+    recordSent(mirror, { now: settings.now(), keepDisappearing: settings.keepDisappearing }, message, settings.channels)
   } catch (error) {
     if (error instanceof StorageFailure) {
       // After this handler returns, so that the answer is written before the service closes its sockets.
       setImmediate(() => ctx.failRun(error))
-      return
+      return false
     }
     settings.log(`send: the sent message could not be read (${errorLabel(error)})`)
   }
+  return true
 }
 
 /** What a `RANDOM_ID_DUPLICATE` answer gives: the message's id when the mirror has it, never the time. */
@@ -134,7 +144,7 @@ function acceptedResult(ctx: SendContext, params: SendParams, response: tl.TypeU
   handOver(ctx, response)
   const sent = sentMessageOf(response, randomId)
   if (!sent) throw uncertainSend("Telegram's answer did not name the message")
-  record(ctx, params, sent)
+  record(ctx, () => readSent(sent, params, ctx.settings.channels))
   return { id: sent.id, date: sent.date }
 }
 
