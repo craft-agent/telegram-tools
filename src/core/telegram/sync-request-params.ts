@@ -14,7 +14,9 @@ import {
   TEXT_MAX_UNITS,
   TOPICS_LIMIT,
   type AroundParams,
+  type DeleteParams,
   type DownloadParams,
+  type EditParams,
   type FetchParams,
   type HistoryParams,
   type SendFile,
@@ -37,6 +39,8 @@ const DOWNLOAD_KEYS = ["chat", "id", "max_bytes"]
 const SEND_KEYS = ["chat", "text", "topic", "reply_to"]
 const SEND_FILES_KEYS = ["chat", "files", "caption", "topic", "reply_to"]
 const SEND_FILE_KEYS = ["path", "name"]
+const EDIT_KEYS = ["chat", "id", "text"]
+const DELETE_KEYS = ["chat", "id"]
 
 /** The most bytes a file name may take: what every file system takes. */
 const FILE_NAME_MAX_BYTES = 255
@@ -168,7 +172,7 @@ export function parseDownloadParams(params: unknown): DownloadParams {
   }
 }
 
-/** The text of a `send` request: not blank, already trimmed, and within Telegram's length. Never echoed in an error. */
+/** The text of a `send` or `edit` request: not blank, already trimmed, and within Telegram's length. Never echoed in an error. */
 function sendTextAt(fields: Record<string, unknown>): string {
   const { text } = fields
   if (typeof text !== "string") throw invalid("text must be a string.")
@@ -187,6 +191,18 @@ export function parseSendParams(params: unknown): SendParams {
   if (topic !== undefined) parsed.topic = topic
   if (replyTo !== undefined) parsed.reply_to = replyTo
   return parsed
+}
+
+/** The parameters of an `edit` request, checked; anything off is `invalid_argument`. */
+export function parseEditParams(params: unknown): EditParams {
+  const fields = recordOf(params, EDIT_KEYS, "The edit parameters")
+  return { chat: chatAt(fields), id: numberAt(fields, "id", isIdNumber, ID_TEXT), text: sendTextAt(fields) }
+}
+
+/** The parameters of a `delete` request, checked; anything off is `invalid_argument`. */
+export function parseDeleteParams(params: unknown): DeleteParams {
+  const fields = recordOf(params, DELETE_KEYS, "The delete parameters")
+  return { chat: chatAt(fields), id: numberAt(fields, "id", isIdNumber, ID_TEXT) }
 }
 
 /** The file name of a `send_files` file: plain, trimmed, and within what file systems and Telegram take. Never echoed in an error. */

@@ -1,0 +1,62 @@
+import { ToolError } from "../errors"
+import type { ChatRow } from "./mirror-rows"
+import { CAPTION_MAX_UNITS } from "./service-requests"
+
+/** The type the mirror records for a message's link preview, which belongs to the text. */
+const LINK_PREVIEW = "webpage"
+
+/** The action as a refusal says it was (not) done. */
+export const ACTION_PAST = { edit: "edited", delete: "deleted" } as const
+
+/** What an edit looks at of a message: its kind, its text, and whether it has media a caption goes with. */
+export type EditableMessage = { kind: "message" | "service"; body: string | null; captioned: boolean }
+
+/** Whether media of `type` is one a caption goes with: a link preview is part of a text, not media of its own. */
+export function takesCaption(type: string): boolean {
+  return type !== LINK_PREVIEW
+}
+
+/** The refusal for a chat the account has left. */
+export function leftChat(past: string): ToolError {
+  return new ToolError("forbidden", `You are no longer in this chat; nothing was ${past}.`)
+}
+
+/** The refusal for a message the mirror does not hold and was not told is deleted. */
+export function noSuchMessage(id: number, followed: ChatRow["followed"], past: string): ToolError {
+  return new ToolError(
+    "not_found",
+    followed
+      ? `No message ${id} in this chat; nothing was ${past}.`
+      : `This chat is not mirrored, so its messages cannot be checked; nothing was ${past}.`,
+  )
+}
+
+/** The refusal for a message that is not the user's own. */
+export function notOwnMessage(past: string): ToolError {
+  return new ToolError("forbidden", `Only your own messages can be ${past}.`)
+}
+
+/** The refusal for an edit of a message the mirror was told is deleted. */
+export function deletedMessage(): ToolError {
+  return new ToolError("not_found", "This message was deleted; nothing was edited.")
+}
+
+/**
+ * Refuses an edit of a message the mirror shows cannot succeed: one with no
+ * text and no media to caption (a service message), the text it already has,
+ * or a caption over `CAPTION_MAX_UNITS` (`invalid_argument`).
+ */
+export function checkEditable({ kind, body, captioned }: EditableMessage, text: string): void {
+  if (kind === "service" || (body === null && !captioned)) {
+    throw new ToolError("invalid_argument", "This message has no text or caption to edit; nothing was edited.")
+  }
+  if (body === text) {
+    throw new ToolError("invalid_argument", "The text is the same as the message's; nothing to edit.")
+  }
+  if (captioned && text.length > CAPTION_MAX_UNITS) {
+    throw new ToolError(
+      "invalid_argument",
+      `A caption must be at most ${CAPTION_MAX_UNITS} characters; nothing was edited.`,
+    )
+  }
+}

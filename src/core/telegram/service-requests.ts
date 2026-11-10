@@ -26,6 +26,10 @@ export const SERVICE_REQUESTS = {
   send: "send",
   /** Files of the label's `outbox/` uploaded and sent to a chat in one call, and recorded in the mirror: `SendFilesParams` → `SendFilesResult`. */
   sendFiles: "send_files",
+  /** The text or caption of one of the user's own messages replaced, and recorded in the mirror: `EditParams` → `EditResult`. */
+  edit: "edit",
+  /** One of the user's own messages deleted for everyone, and removed from the mirror: `DeleteParams` → `DeleteResult`. */
+  delete: "delete",
 } as const
 
 /** The most messages one live read returns. */
@@ -266,3 +270,37 @@ export type SentFile = { id: number; name: string }
  * files the mirror can name, and is left out when it can name none.
  */
 export type SendFilesResult = { messages?: SentFile[]; date?: number; duplicate?: true }
+
+/** The text, or the caption, of one of the user's own messages replaced, exactly as written. */
+export type EditParams = {
+  /** A chat the mirror lists and the account has not left. */
+  chat: string
+  /** The message in that chat: the user's own, which the mirror holds, with a text or a caption. */
+  id: number
+  /** Not blank, equal to itself trimmed, at most `TEXT_MAX_UNITS` UTF-16 units long (`CAPTION_MAX_UNITS` for a caption), and not the text the message has. */
+  text: string
+}
+
+/**
+ * What Telegram accepted: the message's `id` and the time of its edit (Unix
+ * milliseconds). `already` is set when Telegram answered that the message
+ * already has the text, so that an earlier delivery of this call landed; the
+ * time is then left out unless the mirror has the message with this text by
+ * then, since Telegram does not say when the earlier delivery was made.
+ */
+export type EditResult = { id: number; edited?: number; already?: true }
+
+/** One of the user's own messages deleted for everyone. */
+export type DeleteParams = {
+  /** A chat the mirror lists and the account has not left. */
+  chat: string
+  /** The message in that chat: the user's own, which the mirror holds. */
+  id: number
+}
+
+/**
+ * The message `id` is gone. `already` is set when it was gone before this call
+ * deleted anything: the mirror had it as deleted, or Telegram counted no
+ * message deleted.
+ */
+export type DeleteResult = { id: number; deleted: true; already?: true }
