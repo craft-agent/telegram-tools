@@ -1,4 +1,3 @@
-import { setImmediate } from "node:timers"
 import type { ConnectionState, Long, tl } from "@mtcute/core"
 import { randomLong } from "@mtcute/core/utils.js"
 import type { Mirror } from "./mirror"
@@ -119,8 +118,8 @@ export function record(ctx: SendContext, read: () => ReadMessage | null): boolea
     recordSent(mirror, { now: settings.now(), keepDisappearing: settings.keepDisappearing }, message, settings.channels)
   } catch (error) {
     if (error instanceof StorageFailure) {
-      // After this handler returns, so that the answer is written before the service closes its sockets.
-      setImmediate(() => ctx.failRun(error))
+      // The call's context holds the run's end back until the answer has been written.
+      ctx.failRun(error)
       return false
     }
     settings.log(`send: the sent message could not be read (${errorLabel(error)})`)

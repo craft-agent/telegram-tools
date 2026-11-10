@@ -1,4 +1,3 @@
-import { setImmediate } from "node:timers"
 import type { Long, tl } from "@mtcute/core"
 import { randomLong } from "@mtcute/core/utils.js"
 import { labelPaths } from "./labels"
@@ -37,9 +36,7 @@ type Prepared = {
 /**
  * Checks the files against the outbox, then uploads each in order and, for a
  * group, turns each into a document. Nothing is sent by any of it, so every
- * failure here is one that says nothing was sent. A session found ended ends
- * the run after this handler returns, so that the answer is written before
- * the service closes its sockets.
+ * failure here is one that says nothing was sent.
  */
 async function prepare(
   ctx: SendFilesContext,
@@ -48,14 +45,13 @@ async function prepare(
   params: SendFilesParams,
 ): Promise<Prepared> {
   const { stateDir, label } = ctx.settings
-  const stepCtx: SendFilesContext = { ...ctx, endSession: () => void setImmediate(() => ctx.endSession()) }
   return withOutboxFiles(labelPaths(stateDir, label).outbox, params.files, async (files) => {
-    const peer = await viaTelegram(stepCtx, call, "send", () => ctx.client.resolvePeer(Number(params.chat)))
+    const peer = await viaTelegram(ctx, call, "send", () => ctx.client.resolvePeer(Number(params.chat)))
     if (signal.aborted) throw cancelled()
-    const uploaded = await uploadFiles(stepCtx, signal, files)
+    const uploaded = await uploadFiles(ctx, signal, files)
     const media: tl.TypeInputMedia[] = []
     if (uploaded.length === 1) media.push(uploadedDocumentOf(uploaded[0]!))
-    else for (const file of uploaded) media.push(await documentOf(stepCtx, signal, peer, file))
+    else for (const file of uploaded) media.push(await documentOf(ctx, signal, peer, file))
     return { peer, media, facts: files.map(({ name, size }) => ({ name, size })) }
   })
 }
