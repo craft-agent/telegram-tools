@@ -102,6 +102,17 @@ describe("service install", () => {
     expect(t.out()).not.toContain("Warning")
   })
 
+  test("tells the person to install again after updating Node or the package", async () => {
+    const t = setUp()
+    t.addLabel("default", true)
+
+    await runServiceCommand(["install", "--state-dir", t.stateDir], t.io)
+
+    expect(t.out()).toContain(
+      "Install the service again after updating Node or this package, as it records both paths.",
+    )
+  })
+
   test("refuses a label that is not logged in, naming the login command", async () => {
     const t = setUp()
     t.addLabel("work", false)

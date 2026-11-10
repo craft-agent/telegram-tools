@@ -5,16 +5,24 @@ import {
   defaultServiceHost,
   installService,
   serviceStatus,
+  serviceWorkingDirectory,
   uninstallService,
   type ServiceHost,
   type ServiceName,
   type ServiceSpec,
 } from "../core/telegram/service-host"
+import {
+  missingServiceFiles,
+  readServiceRecord,
+  removeServiceRecord,
+  writeServiceRecord,
+} from "../core/telegram/service-record"
 import { lockHolder } from "../core/telegram/sync-lock"
 import type { ServiceSettings } from "../entry/settings"
 import { PROJECT } from "../project"
 import { handleCommandError, parseCommandServiceSettings, parseFlagArgs, usageError } from "./command-args"
 import { EXIT_OK, type CommandIo } from "./command-io"
+import { pickStableProgram } from "./service-program"
 
 /** The service's identity for the service manager; the label is appended to it. */
 export const SERVICE_ID = "io.github.craft-agent.telegram-tools"
@@ -97,28 +105,46 @@ async function install(label: string, settings: ServiceSettings, host: ServiceHo
   }
 
   const self = resolveSelf(io.self)
+  const path = io.env.PATH ?? process.env.PATH ?? ""
+  const picked = await pickStableProgram({
+    program: self.program,
+    version: io.self?.version ?? process.versions.node,
+    path,
+    home: host.home,
+    cwd: serviceWorkingDirectory(host),
+    volatileRoots: [io.env.TMPDIR ?? "", io.env.XDG_RUNTIME_DIR ?? ""],
+  })
   const spec: ServiceSpec = {
     ...SERVICE_NAME,
     label,
     description: SERVICE_DESCRIPTION,
-    program: self.program,
+    program: picked.program,
     args: syncArgs(self.script, label, settings),
-    path: io.env.PATH ?? process.env.PATH ?? "",
+    path,
   }
 
+  // Removed first, so an install that fails part way leaves no record of an older program.
+  const paths = labelPaths(settings.state_dir, label)
+  await removeServiceRecord(paths)
   const result = await installService(spec, host)
+  await writeServiceRecord(paths, { program: picked.program, script: self.script })
   io.stdout(`Installed sync service for "${label}" (${result.file}).\n`)
   if (result.log) {
     io.stdout(`${host.platform === "darwin" ? "Logs are written to" : "View logs with"}: ${result.log}\n`)
   }
   io.stdout("The service starts automatically at logon and restarts after a failure.\n")
-  io.stdout("Install the service again after updating this package, as it records the package path.\n")
+  io.stdout("Install the service again after updating Node or this package, as it records both paths.\n")
   if (host.platform === "linux") {
     io.stdout('Run "loginctl enable-linger" to keep the service running while logged out.\n')
   }
+  if (picked.versioned) {
+    io.stderr(
+      `Warning: the service runs Node at a path that holds its version (${picked.program}); removing that version stops the service. Install the service again after updating Node, or put a node at a path without the version first on PATH.\n`,
+    )
+  }
 }
 
-async function status(label: string, host: ServiceHost, io: CommandIo): Promise<void> {
+async function status(label: string, settings: ServiceSettings, host: ServiceHost, io: CommandIo): Promise<void> {
   const result = await serviceStatus(SERVICE_ID, label, host)
   io.stdout(`Sync service for "${label}":\n`)
   io.stdout(`  Installed: ${result.installed ? "yes" : "no"}\n`)
@@ -127,6 +153,21 @@ async function status(label: string, host: ServiceHost, io: CommandIo): Promise<
   if (result.lastExit !== undefined) io.stdout(`  Last exit: ${result.lastExit}\n`)
   io.stdout(`  File: ${result.file}\n`)
   if (result.log) io.stdout(`  Log: ${result.log}\n`)
+
+  const record = readServiceRecord(labelPaths(settings.state_dir, label))
+  if (record) {
+    io.stdout(`  Program: ${record.program}\n`)
+    io.stdout(`  Script: ${record.script}\n`)
+    const missing = missingServiceFiles(record)
+    for (const name of missing) {
+      io.stdout(`  Missing: ${record[name]}\n`)
+    }
+    if (missing.length > 0) {
+      io.stdout(
+        `The ${missing.join(" and ")} it was installed with ${missing.length > 1 ? "are" : "is"} gone, as after updating Node or this package; install it again with: ${PROJECT.cli} service install --account ${label}\n`,
+      )
+    }
+  }
 }
 
 /**
@@ -158,9 +199,10 @@ export async function runServiceCommand(argv: string[], io: CommandIo): Promise<
       await install(label, settings, host, io)
     } else if (action === "uninstall") {
       await uninstallService(SERVICE_NAME, label, host)
+      await removeServiceRecord(labelPaths(settings.state_dir, label))
       io.stdout(`Uninstalled sync service for "${label}".\n`)
     } else {
-      await status(label, host, io)
+      await status(label, settings, host, io)
     }
     return EXIT_OK
   } catch (error) {

@@ -66,6 +66,8 @@ export type LabelPaths = {
   kept: string
   /** `<dir>/sync.lock` */
   syncLock: string
+  /** `<dir>/service.json` (what the installed sync service starts: program and script paths) */
+  serviceRecord: string
 }
 
 /**
@@ -91,6 +93,7 @@ export function labelPaths(stateDir: string, label: string): LabelPaths {
     incoming: join(dir, "incoming"),
     kept: join(dir, "kept"),
     syncLock: join(dir, "sync.lock"),
+    serviceRecord: join(dir, "service.json"),
   }
   const socketBytes = Buffer.byteLength(paths.socket, "utf8")
   if (socketBytes > MAX_SOCKET_PATH_BYTES) {
