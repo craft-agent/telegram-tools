@@ -30,8 +30,11 @@ export const MESSAGE_REACT_TOOL_ID = "telegram_message_react"
 /** The ID of the tool that pins or unpins a message. */
 export const MESSAGE_PIN_TOOL_ID = "telegram_message_pin"
 
+/** The ID of the tool that marks a chat, or one forum topic, read up to a message. */
+export const CHAT_MARK_READ_TOOL_ID = "telegram_chat_mark_read"
+
 /**
- * How long one edit, delete, reaction or pin may take, in milliseconds. The
+ * How long one edit, delete, reaction, pin or read mark may take, in milliseconds. The
  * service runs actions in the queue the sends share, so one can wait behind a
  * send before its own call to Telegram begins.
  */
@@ -60,6 +63,15 @@ export const UNPIN_DONE_NOTE = "Telegram unpinned the message."
 
 /** Said by a result for a message whose pin was already as asked. */
 export const PIN_ALREADY_NOTE = "The message was already so; nothing changed."
+
+/** Said by a result for a read mark Telegram accepted, followed by the message's id and `MARK_READ_REACH_NOTE`. */
+export const MARK_READ_DONE_NOTE = "Telegram marked the messages read up to message"
+
+/** Follows the message's id in the note of a read mark Telegram accepted: who sees it. */
+export const MARK_READ_REACH_NOTE = ": their senders can see they were read, and the user's other devices clear them."
+
+/** Said by a result for a chat that was already read up to the message or beyond. */
+export const MARK_READ_ALREADY_NOTE = "The chat was already read up to here; nothing changed."
 
 /** Said by a result for an edit Telegram accepted. */
 export const EDIT_ACCEPTED_NOTE = "Telegram accepted the edit; the chat shows the new text, marked edited."

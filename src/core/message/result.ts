@@ -1,6 +1,13 @@
-import type { DeleteResult, EditResult, PinResult, ReactResult, SendResult } from "../telegram/service-requests"
+import type {
+  DeleteResult,
+  EditResult,
+  MarkReadResult,
+  PinResult,
+  ReactResult,
+  SendResult,
+} from "../telegram/service-requests"
 import { formatLocalTime } from "../time"
-import type { DeleteOutput, EditOutput, PinOutput, ReactOutput } from "./action-schema"
+import type { DeleteOutput, EditOutput, MarkReadOutput, PinOutput, ReactOutput } from "./action-schema"
 import {
   ACCEPTED_NOTE,
   DELETE_ALREADY_NOTE,
@@ -9,6 +16,9 @@ import {
   DUPLICATE_UNKNOWN_ID_NOTE,
   EDIT_ACCEPTED_NOTE,
   EDIT_ALREADY_NOTE,
+  MARK_READ_ALREADY_NOTE,
+  MARK_READ_DONE_NOTE,
+  MARK_READ_REACH_NOTE,
   PIN_ALREADY_NOTE,
   PIN_DONE_NOTE,
   PIN_ONE_SIDED_NOTE,
@@ -64,6 +74,21 @@ export function reactResult(chat: string, reacted: ReactResult): ReactOutput {
   if (reacted.already) {
     result.already = true
     result.note = REACT_ALREADY_NOTE
+  }
+  return result
+}
+
+/** The result of a read mark: what was marked read, and `already` when the chat was read this far before this call. */
+export function markReadResult({ chat, up_to, topic, already }: MarkReadResult): MarkReadOutput {
+  const result: MarkReadOutput = {
+    chat,
+    up_to,
+    note: `${MARK_READ_DONE_NOTE} ${up_to}${MARK_READ_REACH_NOTE}`,
+  }
+  if (topic !== undefined) result.topic = topic
+  if (already) {
+    result.already = true
+    result.note = MARK_READ_ALREADY_NOTE
   }
   return result
 }

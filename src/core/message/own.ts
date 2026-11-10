@@ -29,6 +29,8 @@ export type OwnMessage = {
   edited: number | null
   /** The reactions it has, as the mirror keeps them; none for a message without. */
   reactions: ReactionInfo[]
+  /** The forum topic it is in; null for a message of the General topic or of a chat without topics. */
+  topic: number | null
 }
 
 /** The chat an action is aimed at, and its message: null when the mirror was told the message is deleted. */
@@ -43,6 +45,7 @@ type StoredOwn = {
   kind: OwnMessage["kind"]
   body: string | null
   reactions: string | null
+  topic: number | null
 }
 
 /**
@@ -59,7 +62,7 @@ function findMessage(mirror: Mirror, chatId: string, id: number, past: string, w
   const chat = existingChat(mirror, chatId)
   if (chat.left) throw leftChat(past)
   const row = mirror
-    .prepare("SELECT ts, from_me, kind, body, reactions FROM messages WHERE chat = ? AND id = ?")
+    .prepare("SELECT ts, from_me, kind, body, reactions, topic FROM messages WHERE chat = ? AND id = ?")
     .get(chatId, id) as StoredOwn | undefined
   if (!row) {
     if (isDeleted(mirror, chat, id)) return { chat, message: null }
@@ -67,8 +70,8 @@ function findMessage(mirror: Mirror, chatId: string, id: number, past: string, w
   }
   if (whose === "own" && row.from_me !== 1) throw notOwnMessage(past)
   const { media, edited } = messageMedia(mirror, chatId, id)!
-  const { ts, kind, body } = row
-  return { chat, message: { ts, kind, body, media, edited, reactions: storedReactions(row.reactions) } }
+  const { ts, kind, body, topic } = row
+  return { chat, message: { ts, kind, body, media, edited, reactions: storedReactions(row.reactions), topic } }
 }
 
 /** The chat and the user's own message an edit or a delete is aimed at; see `findMessage` for what is refused. */

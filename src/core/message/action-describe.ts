@@ -2,6 +2,7 @@ import { chatFact } from "../chat/facts"
 import { cut, MAX_VALUE_LENGTH } from "../describe"
 import type { ChatRow } from "../telegram/mirror-rows"
 import type { CallDescription, CallFact, CallHeadline } from "../tool"
+import { topicFacts } from "./facts"
 import type { OwnMessage } from "./own"
 
 /** The headline templates of an action: for a chat the mirror names, and for Saved Messages. */
@@ -41,6 +42,12 @@ export const PIN_HEADLINES: ActionHeadlines = {
 export const UNPIN_HEADLINES: ActionHeadlines = {
   named: "About to unpin message {id} in {chat}",
   saved: "About to unpin message {id} in Saved Messages",
+}
+
+/** The headlines of a read mark; `{id}` is the message it reaches. */
+export const MARK_READ_HEADLINES: ActionHeadlines = {
+  named: "About to mark {chat} read up to message {id}",
+  saved: "About to mark Saved Messages read up to message {id}",
 }
 
 /** What an action adds to the description beside the chat, the message and its text: the values its headline template holds besides `id` and `chat`, facts after `Current`, and pins beside the last edit. */
@@ -92,5 +99,28 @@ export function describeAction(
       ...(extras.facts ?? []),
     ],
     ...(message && { pins: { edited: String(message.edited ?? message.ts), ...extras.pins } }),
+  }
+}
+
+/**
+ * What a read mark says of itself for the approval prompt: the chat's kind, the
+ * topic when the call names one (its title in the mirror, else its id), and
+ * the message it reaches. It says no count of what becomes read, since that
+ * grows while the service syncs, and pins nothing: the call neither changes a
+ * message nor depends on one's text.
+ */
+export function describeMarkRead(
+  chat: Pick<ChatRow, "kind" | "name">,
+  upTo: number,
+  topic: { id: number | undefined; title: string | undefined },
+): CallDescription {
+  const headline = actionHeadline(MARK_READ_HEADLINES, chat, upTo, {})
+  return {
+    ...(headline && { headline }),
+    facts: [
+      chatFact(chat.kind),
+      ...topicFacts(topic.id, topic.title),
+      { label: "Up to", value: { text: "message {id}", values: { id: upTo } } },
+    ],
   }
 }

@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { accountArgument } from "../chat/schema"
-import { CAPTION_MAX_UNITS, REACTION_MAX_UNITS, TEXT_MAX_UNITS } from "../telegram/service-requests"
+import { CAPTION_MAX_UNITS, GENERAL_TOPIC, REACTION_MAX_UNITS, TEXT_MAX_UNITS } from "../telegram/service-requests"
 import { localTimeSchema } from "../time"
 
 const chatArgument = z
@@ -140,3 +140,33 @@ export const pinOutput = z.strictObject({
 
 /** What `telegram_message_pin` returns. */
 export type PinOutput = z.input<typeof pinOutput>
+
+/** The input schema for `telegram_chat_mark_read`. */
+export const markReadInput = z.object({
+  account: accountArgument,
+  chat: chatArgument,
+  up_to: messageIdArgument("the last message to mark read"),
+  topic: z
+    .number()
+    .int()
+    .positive()
+    .optional()
+    .describe(
+      `Mark only this forum topic read, an id from \`telegram_chat_read\` \`topics\`; the General topic is ${GENERAL_TOPIC}. \`up_to\` must be a message of that topic. Only for a chat with topics; left out, the whole chat is marked read.`,
+    ),
+})
+
+/** The output schema for `telegram_chat_mark_read`. */
+export const markReadOutput = z.strictObject({
+  chat: z.string().describe("The chat that was marked read."),
+  up_to: z.number().int().describe("The id of the last message marked read."),
+  topic: z.number().int().optional().describe("The forum topic that was marked read, when one was named."),
+  already: z
+    .literal(true)
+    .optional()
+    .describe("Set when the chat was already read up to that message or beyond, so nothing was asked of Telegram."),
+  note: z.string().describe("What the result means."),
+})
+
+/** What `telegram_chat_mark_read` returns. */
+export type MarkReadOutput = z.input<typeof markReadOutput>
