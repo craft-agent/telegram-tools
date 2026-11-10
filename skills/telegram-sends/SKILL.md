@@ -53,5 +53,6 @@ confirm it did not arrive.
 
 ## Not here yet
 
-Sending files, and actions on messages already sent, are separate tools that
+Sending files is `telegram_file_send` in the `files` toolset (off by default;
+see `telegram-files`). Actions on messages already sent are separate tools that
 are not part of this one.

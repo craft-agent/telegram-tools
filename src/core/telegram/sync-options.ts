@@ -82,7 +82,7 @@ export type SyncOptions = {
   fillLimit?: number
   /** The shortest and the longest random pause before a background fetch; 0.5 and 1.5 seconds by default. */
   paceMs?: readonly [number, number]
-  /** How long a download may receive nothing before it stops; 60 seconds by default. */
+  /** How long a download may receive nothing, or an upload move no byte, before it stops; 60 seconds by default. */
   downloadStallMs?: number
 }
 

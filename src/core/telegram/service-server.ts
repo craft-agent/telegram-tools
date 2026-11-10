@@ -14,6 +14,19 @@ const SOCKET_FILE_MODE = 0o600
 export type ServiceCall = {
   /** Aborted when the client that sent the request disconnects, and when the service closes. */
   signal: AbortSignal
+  /**
+   * Runs `effect` once this call's answer has been written to its socket, or
+   * at once when it already has been, or when the client is gone and no answer
+   * can be. Whatever ends the service belongs here: closing the sockets first
+   * would lose the answer. Absent when a handler is called without a connection.
+   */
+  afterAnswered?(effect: () => void): void
+}
+
+/** Runs `effect` once `call`'s answer is written (see `ServiceCall.afterAnswered`); at once for a call without a connection. */
+export function afterAnswered(call: ServiceCall, effect: () => void): void {
+  if (call.afterAnswered) call.afterAnswered(effect)
+  else effect()
 }
 
 /** Answers one method: resolves with the result, or throws a `ToolError` the client receives as that code. */
@@ -107,6 +120,15 @@ function frame(reply: Record<string, unknown>): string {
   return `${JSON.stringify({ jsonrpc: "2.0", ...reply })}\n`
 }
 
+/** Runs an effect that waited for an answer; its own failure is not the answer's. */
+function runEffect(effect: () => void): void {
+  try {
+    effect()
+  } catch {
+    // The effect reports its own failures.
+  }
+}
+
 /** One client's connection: reads its request lines and answers each by id, calls running concurrently. */
 class Connection {
   private readonly socket: Socket
@@ -161,14 +183,23 @@ class Connection {
   }
 
   private async run(id: string | number, method: string, handler: ServiceHandler, params: unknown): Promise<void> {
+    const effects: (() => void)[] = []
+    let answered = false
+    const call: ServiceCall = {
+      signal: this.calls.signal,
+      afterAnswered: (effect) => (answered ? runEffect(effect) : void effects.push(effect)),
+    }
     let text: string
     try {
-      const result = await handler(params, { signal: this.calls.signal })
+      const result = await handler(params, call)
       text = frame({ id, result: result ?? null })
     } catch (error) {
       text = frame({ id, error: this.failure(error, method) })
     }
-    this.write(text)
+    this.write(text, () => {
+      answered = true
+      for (const effect of effects.splice(0)) runEffect(effect)
+    })
   }
 
   /** The error reply for a failed handler; only a `ToolError`'s own message and code leave the service. */
@@ -187,13 +218,21 @@ class Connection {
     this.write(frame(fields))
   }
 
-  /** Writes a reply line unless the client is gone; a write that fails on the way is the client's loss. */
+  /**
+   * Writes a reply line unless the client is gone; a write that fails on the
+   * way is the client's loss. `onWritten` runs once the line is flushed, or
+   * when it cannot be.
+   */
   private write(text: string, onWritten?: () => void): void {
-    if (!this.socket.writable) return
+    if (!this.socket.writable) {
+      onWritten?.()
+      return
+    }
     try {
       this.socket.write(text, onWritten)
     } catch {
       this.socket.destroy()
+      onWritten?.()
     }
   }
 }

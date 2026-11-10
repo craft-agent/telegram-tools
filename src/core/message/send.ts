@@ -5,22 +5,13 @@ import { isToolError } from "../errors"
 import { callService } from "../telegram/service"
 import { SERVICE_REQUESTS, type SendParams, type SendResult, TEXT_MAX_UNITS } from "../telegram/service-requests"
 import { ANY_TARGET } from "../targets"
-import { type CallFact, defineTool } from "../tool"
+import { defineTool } from "../tool"
 import { checkedText } from "./arguments"
 import { MESSAGE_SEND_TOOL_ID, SEND_TIMEOUT_MS } from "./constants"
+import { replyFacts, topicFacts } from "./facts"
 import { sendResult } from "./result"
 import { input, output, type SendOutput } from "./schema"
 import { withSentLike } from "./uncertain"
-
-/** The `Topic` fact of a call that names a topic: its title, or the id when the mirror has no title. */
-function topicFacts(topic: number | undefined, title: string | undefined): CallFact[] {
-  return topic === undefined ? [] : [{ label: "Topic", value: title ?? String(topic) }]
-}
-
-/** The `Reply to` fact of a call that replies to a message. */
-function replyFacts(replyTo: number | undefined): CallFact[] {
-  return replyTo === undefined ? [] : [{ label: "Reply to", value: { text: "message {id}", values: { id: replyTo } } }]
-}
 
 /** The `telegram_message_send` tool definition. */
 export const telegramMessageSend = defineTool({

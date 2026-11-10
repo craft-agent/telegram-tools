@@ -5,7 +5,7 @@ import type { IngestContext, MessageInput, ReplyInfo } from "./mirror-input"
 import { GENERAL_TOPIC, type SendParams } from "./service-requests"
 import { writing } from "./sync-ending"
 import { readMessage, writeMessage, type ReadMessage } from "./sync-message"
-import type { SentMessage } from "./sync-send-outcome"
+import type { FullSentMessage, SentMessage } from "./sync-send-outcome"
 
 /** The topic a message of the send is in, as the mirror records it: the General topic's messages carry none. */
 function topicOfSend({ topic }: SendParams): number | null {
@@ -57,8 +57,13 @@ function shortInput(params: SendParams, sent: Extract<SentMessage, { form: "shor
  * the message is not for the mirror (a channel with `channels` off).
  */
 export function readSent(sent: SentMessage, params: SendParams, channels: boolean): ReadMessage | null {
-  if (sent.form === "full") return readMessage(sent.message, channels)
+  if (sent.form === "full") return readFullSent(sent, channels)
   return { chat: null, message: shortInput(params, sent), topic: null }
+}
+
+/** A sent message that came as itself, as the mirror takes it: its file's facts are stored as a received file's are. */
+export function readFullSent(sent: FullSentMessage, channels: boolean): ReadMessage | null {
+  return readMessage(sent.message, channels)
 }
 
 /**

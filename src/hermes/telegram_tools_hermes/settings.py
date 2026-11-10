@@ -36,6 +36,27 @@ def state_dir_flags(ctx: PluginContext) -> list[str]:
     return ["--state-dir", state_dir]
 
 
+def _is_path_item(item: Any) -> bool:
+    """Whether ``item`` is a non-empty string that survives the flag's comma-separated form whole."""
+    return isinstance(item, str) and bool(item.strip()) and "," not in item
+
+
+def send_dirs_flags(ctx: PluginContext) -> list[str]:
+    """Read ``send_dirs`` and return ``["--send-dirs", "a,b"]``, or ``[]`` when absent or empty.
+
+    The flag is comma-separated, so a path holding a comma is refused rather than split in two.
+
+    Raises:
+        SettingsError: the setting is present but not a list of non-empty strings without commas.
+    """
+    value = ctx.get_config("send_dirs")
+    if value is None:
+        return []
+    if not isinstance(value, list) or not all(_is_path_item(item) for item in value):
+        raise SettingsError('setting "send_dirs" must be a list of paths without commas')
+    return ["--send-dirs", ",".join(value)] if value else []
+
+
 def language_setting(ctx: PluginContext) -> str | None:
     """The ``language`` setting, stripped; ``None`` when it is absent, blank or not a string.
 
@@ -92,5 +113,7 @@ def settings_flags(ctx: PluginContext) -> list[str]:
         if type(download_max_mb) is not int or not 1 <= download_max_mb <= MAX_DOWNLOAD_MB:
             raise SettingsError(f'setting "download_max_mb" must be an integer from 1 to {MAX_DOWNLOAD_MB}')
         flags += ["--download-max-mb", str(download_max_mb)]
+
+    flags += send_dirs_flags(ctx)
 
     return flags

@@ -170,4 +170,28 @@ describe("target", () => {
     const runSelection = await cli([...argv, "--read-only", "--toolsets", "all"], "", { specs: [checkTool] })
     expect(runSelection.code).toBe(EXIT_OK)
   })
+
+  test("accepts --send-dirs and passes sendDirs into context for targets", async () => {
+    let seen: string[] | undefined
+    const checkTool: ToolSpec = {
+      ...specs[1]!,
+      id: "demo_target_send",
+      async targets(_args, ctx) {
+        seen = ctx.sendDirs
+        return [...(ctx.sendDirs ?? [])]
+      },
+    }
+    const argv = ["target", "demo_target_send", "--cwd", "/x"]
+
+    const run = await cli([...argv, "--send-dirs", "/a,/b"], "", {
+      specs: [checkTool],
+      env: { DEMO_SEND_DIRS: "/env/a" },
+    })
+    expect(run.code).toBe(EXIT_OK)
+    expect(seen).toEqual(["/a", "/b"])
+
+    const runEnv = await cli(argv, "", { specs: [checkTool], env: { DEMO_SEND_DIRS: "/env/a" } })
+    expect(runEnv.code).toBe(EXIT_OK)
+    expect(seen).toEqual(["/env/a"])
+  })
 })

@@ -173,10 +173,17 @@ describe("a send that went out", () => {
   test("is answered as a success when the mirror cannot be written, and then stops the service", async () => {
     mirror.mirror.exec("CREATE TRIGGER refuse BEFORE INSERT ON messages BEGIN SELECT RAISE(ABORT, 'no'); END")
 
-    expect(await call(new AbortController().signal)).toEqual({ id: 5, date: expect.any(Number) })
+    const afterwards: (() => void)[] = []
+    const answered = handlers.send!(PARAMS, {
+      signal: new AbortController().signal,
+      afterAnswered: (effect) => void afterwards.push(effect),
+    })
+
+    expect(await answered).toEqual({ id: 5, date: expect.any(Number) })
 
     expect(failures).toEqual([])
-    await eventually(() => failures.length === 1)
+    for (const effect of afterwards) effect()
+    expect(failures).toHaveLength(1)
     expect(failures[0]).toBeInstanceOf(StorageFailure)
     expect(storedIds()).toEqual([])
   })

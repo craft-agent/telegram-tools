@@ -16,7 +16,7 @@ import {
   type TopicInfo,
   type TopicsResult,
 } from "./service-requests"
-import type { ServiceCall, ServiceHandler } from "./service-server"
+import { afterAnswered, type ServiceCall, type ServiceHandler } from "./service-server"
 import type { ChatListRefresh } from "./sync-chat-refresh"
 import { pace, storeFetched } from "./sync-fetch"
 import { downloadRequest } from "./sync-download"
@@ -34,6 +34,7 @@ import {
 } from "./sync-request-params"
 import { RequestQueue } from "./sync-request-queue"
 import { sendRequest } from "./sync-send"
+import { sendFilesRequest } from "./sync-send-files"
 import type { SyncTelegram } from "./sync-telegram"
 
 const SECOND_MS = 1000
@@ -54,6 +55,26 @@ export type SyncRequestsContext = {
   failRun(error: unknown): void
   /** Removes the kept files of chats whose messages the mirror no longer has. */
   forgetChats(chats: readonly string[]): void
+}
+
+/**
+ * `ctx` for one call: whatever it does to end the run (the session found
+ * ended, a mirror that cannot be written) waits until the call's answer has
+ * been written, since ending the run closes the sockets and would lose it.
+ * A session found ended still stops the rest of this call at once, as ending
+ * the run did: its `signal` aborts, while the run itself ends after the answer.
+ */
+function callContext(ctx: SyncRequestsContext, call: ServiceCall): SyncRequestsContext {
+  const sessionEnded = new AbortController()
+  return {
+    ...ctx,
+    signal: AbortSignal.any([ctx.signal, sessionEnded.signal]),
+    endSession: () => {
+      sessionEnded.abort()
+      afterAnswered(call, ctx.endSession)
+    },
+    failRun: (error) => afterAnswered(call, () => ctx.failRun(error)),
+  }
 }
 
 /** Milliseconds as the Telegram second at or after them. */
@@ -291,21 +312,23 @@ async function fetchRequest(
  * takes one message's file into the label's `incoming/`, from the copy kept as
  * it arrived or from Telegram, one download at a time (shared with the files
  * being kept) and apart from the fetches; `send` sends one text and records it,
- * one send at a time on a queue of its own, so that it waits behind neither a
- * fetch nor a download.
+ * and `send_files` uploads and sends files and records them, one send at a time
+ * on a queue of their own, so that they wait behind neither a fetch nor a
+ * download.
  */
 export function syncRequestHandlers(ctx: SyncRequestsContext): Record<string, ServiceHandler> {
   const fetches = new RequestQueue()
   const sends = new RequestQueue()
   return {
-    [SERVICE_REQUESTS.history]: (params, call) => history(ctx, params, call),
-    [SERVICE_REQUESTS.topics]: (params, call) => topics(ctx, params, call),
-    [SERVICE_REQUESTS.refresh]: (params, call) => refresh(ctx, params, call),
-    [SERVICE_REQUESTS.around]: (params, call) => around(ctx, params, call),
-    [SERVICE_REQUESTS.fetch]: (params, call) => fetchRequest(ctx, fetches, params, call),
-    [SERVICE_REQUESTS.sync_add]: (params) => syncAdd(ctx, params),
-    [SERVICE_REQUESTS.sync_remove]: (params) => syncRemove(ctx, params),
-    [SERVICE_REQUESTS.download]: (params, call) => downloadRequest(ctx, ctx.downloads, params, call),
-    [SERVICE_REQUESTS.send]: (params, call) => sendRequest(ctx, sends, params, call),
+    [SERVICE_REQUESTS.history]: (params, call) => history(callContext(ctx, call), params, call),
+    [SERVICE_REQUESTS.topics]: (params, call) => topics(callContext(ctx, call), params, call),
+    [SERVICE_REQUESTS.refresh]: (params, call) => refresh(callContext(ctx, call), params, call),
+    [SERVICE_REQUESTS.around]: (params, call) => around(callContext(ctx, call), params, call),
+    [SERVICE_REQUESTS.fetch]: (params, call) => fetchRequest(callContext(ctx, call), fetches, params, call),
+    [SERVICE_REQUESTS.sync_add]: (params, call) => syncAdd(callContext(ctx, call), params),
+    [SERVICE_REQUESTS.sync_remove]: (params, call) => syncRemove(callContext(ctx, call), params),
+    [SERVICE_REQUESTS.download]: (params, call) => downloadRequest(callContext(ctx, call), ctx.downloads, params, call),
+    [SERVICE_REQUESTS.send]: (params, call) => sendRequest(callContext(ctx, call), sends, params, call),
+    [SERVICE_REQUESTS.sendFiles]: (params, call) => sendFilesRequest(callContext(ctx, call), sends, params, call),
   }
 }

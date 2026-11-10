@@ -1,6 +1,7 @@
 import { telegramAccountRead } from "./core/account/read"
 import { telegramChatRead } from "./core/chat/read"
 import { telegramFileSave } from "./core/file/save"
+import { telegramFileSend } from "./core/file/send/tool"
 import { telegramMessageSend } from "./core/message/send"
 import { telegramSyncAdd } from "./core/sync/add"
 import { telegramSyncRead } from "./core/sync/read"
@@ -12,6 +13,7 @@ export const ALL_TOOLS: ToolSpec[] = [
   telegramAccountRead,
   telegramChatRead,
   telegramFileSave,
+  telegramFileSend,
   telegramSyncRead,
   telegramSyncAdd,
   telegramSyncRemove,

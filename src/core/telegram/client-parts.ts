@@ -1,7 +1,8 @@
 import { arch, type } from "node:os"
 import { version } from "node:process"
+import { Readable } from "node:stream"
 import { format } from "node:util"
-import { connectTcp } from "@fuman/node"
+import { connectTcp, nodeReadableToFuman } from "@fuman/node"
 import { IntermediatePacketCodec, type ICorePlatform, type TelegramTransport } from "@mtcute/core"
 import { LogManager, type BasicDcOption } from "@mtcute/core/utils.js"
 import { NodeCryptoProvider } from "@mtcute/node/utils.js"
@@ -71,12 +72,14 @@ const LEVEL_NAMES = { [LogManager.ERROR]: "error", [LogManager.WARN]: "warning" 
  * The part of mtcute's platform the client needs: a device model, its log
  * level (left to mtcute's default, warnings and errors), and `log`, which
  * gets one line per warning or error with phone-number-like text masked and
- * nothing of the lower levels. `normalizeFile`, which uploads from a path or a
- * stream need, is left out: nothing uploads yet.
+ * nothing of the lower levels. `normalizeFile` takes a Node stream and nothing
+ * else (the sender hands the upload an open descriptor's stream, never a path
+ * for mtcute to open again); the size comes from the caller.
  */
 export function createPlatform(log: (line: string) => void): ICorePlatform {
   return {
     beforeExit,
+    normalizeFile: (file) => (file instanceof Readable ? { file: nodeReadableToFuman(file) } : null),
     getDeviceModel: () => `Node.js/${version} (${type()} ${arch()})`,
     getDefaultLogLevel: () => null,
     log: (_color, level, tag, fmt, args) => {

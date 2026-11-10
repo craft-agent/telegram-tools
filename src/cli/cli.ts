@@ -67,6 +67,7 @@ type ToolCall = {
   stateDir: string
   downloadDir: string
   downloadMaxMb: number
+  sendDirs: string[]
 }
 
 type Command =
@@ -81,6 +82,7 @@ function toolContext(command: ToolCall, io: CliIo): ToolContext {
     stateDir: command.stateDir,
     downloadDir: command.downloadDir,
     downloadMaxMb: command.downloadMaxMb,
+    sendDirs: command.sendDirs,
     programName: PROJECT.name,
     signal: io.signal,
   }
@@ -138,6 +140,7 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile
       stateDir: settings.state_dir,
       downloadDir: settings.download_dir,
       downloadMaxMb: settings.download_max_mb,
+      sendDirs: settings.send_dirs,
       language: promptLanguage(language, io.env, harnessLanguage, profile),
     }
   }
@@ -156,6 +159,7 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile
     stateDir: settings.state_dir,
     downloadDir: settings.download_dir,
     downloadMaxMb: settings.download_max_mb,
+    sendDirs: settings.send_dirs,
   }
 }
 

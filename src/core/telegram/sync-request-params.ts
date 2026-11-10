@@ -1,11 +1,15 @@
+import { Buffer } from "node:buffer"
+import { isAbsolute } from "node:path"
 import { ToolError } from "../errors"
 import { isChatId, isCount } from "./mirror-input"
 import { isRecord } from "./service-errors"
 import {
   AROUND_LIMIT,
+  CAPTION_MAX_UNITS,
   DOWNLOAD_MAX_BYTES,
   FETCH_PAGE_LIMIT,
   HISTORY_LIMIT,
+  SEND_FILES_MAX,
   SYNC_LIST_LIMIT,
   TEXT_MAX_UNITS,
   TOPICS_LIMIT,
@@ -13,6 +17,8 @@ import {
   type DownloadParams,
   type FetchParams,
   type HistoryParams,
+  type SendFile,
+  type SendFilesParams,
   type SendParams,
   type SyncChangeParams,
   type TopicsOffset,
@@ -29,6 +35,11 @@ const AROUND_KEYS = ["chat", "id", "before_count", "after_count", "topic"]
 const FETCH_KEYS = ["chat", "pages"]
 const DOWNLOAD_KEYS = ["chat", "id", "max_bytes"]
 const SEND_KEYS = ["chat", "text", "topic", "reply_to"]
+const SEND_FILES_KEYS = ["chat", "files", "caption", "topic", "reply_to"]
+const SEND_FILE_KEYS = ["path", "name"]
+
+/** The most bytes a file name may take: what every file system takes. */
+const FILE_NAME_MAX_BYTES = 255
 const SYNC_CHANGE_KEYS = ["chats"]
 
 function invalid(message: string): ToolError {
@@ -173,6 +184,65 @@ export function parseSendParams(params: unknown): SendParams {
   const parsed: SendParams = { chat: chatAt(fields), text: sendTextAt(fields) }
   const topic = optionalNumberAt(fields, "topic", isIdNumber, ID_TEXT)
   const replyTo = optionalNumberAt(fields, "reply_to", isIdNumber, ID_TEXT)
+  if (topic !== undefined) parsed.topic = topic
+  if (replyTo !== undefined) parsed.reply_to = replyTo
+  return parsed
+}
+
+/** The file name of a `send_files` file: plain, trimmed, and within what file systems and Telegram take. Never echoed in an error. */
+function fileNameAt(file: Record<string, unknown>, position: number): string {
+  const { name } = file
+  const what = `The name of file ${position}`
+  if (typeof name !== "string" || name === "") throw invalid(`${what} must be a file name.`)
+  if (name !== name.trim()) throw invalid(`${what} must not start or end with blank space.`)
+  if (name === "." || name === ".." || name.includes("/") || name.includes("\0")) {
+    throw invalid(`${what} must be a plain file name.`)
+  }
+  if (Buffer.byteLength(name) > FILE_NAME_MAX_BYTES) {
+    throw invalid(`${what} must be at most ${FILE_NAME_MAX_BYTES} bytes.`)
+  }
+  return name
+}
+
+/** The files of a `send_files` request: 1 to `SEND_FILES_MAX`, each an absolute path and a plain name, no path twice. */
+function sendFilesAt(fields: Record<string, unknown>): SendFile[] {
+  const { files } = fields
+  if (!Array.isArray(files) || files.length < 1 || files.length > SEND_FILES_MAX) {
+    throw invalid(`files must be a list of 1 to ${SEND_FILES_MAX} files.`)
+  }
+  const parsed = files.map((entry: unknown, index): SendFile => {
+    const file = recordOf(entry, SEND_FILE_KEYS, `File ${index + 1}`)
+    const { path } = file
+    if (typeof path !== "string" || !isAbsolute(path) || path.includes("\0")) {
+      throw invalid(`The path of file ${index + 1} must be an absolute path.`)
+    }
+    return { path, name: fileNameAt(file, index + 1) }
+  })
+  if (new Set(parsed.map((file) => file.path)).size !== parsed.length) {
+    throw invalid("files must not name a path twice.")
+  }
+  return parsed
+}
+
+/** The caption of a `send_files` request: not blank, already trimmed, and within Telegram's length. Never echoed in an error. */
+function captionAt(fields: Record<string, unknown>): string | undefined {
+  const { caption } = fields
+  if (caption === undefined) return undefined
+  if (typeof caption !== "string") throw invalid("caption must be a string.")
+  if (caption.trim() === "") throw invalid("caption must not be blank.")
+  if (caption !== caption.trim()) throw invalid("caption must not start or end with blank space.")
+  if (caption.length > CAPTION_MAX_UNITS) throw invalid(`caption must be at most ${CAPTION_MAX_UNITS} characters.`)
+  return caption
+}
+
+/** The parameters of a `send_files` request, checked; anything off is `invalid_argument`. */
+export function parseSendFilesParams(params: unknown): SendFilesParams {
+  const fields = recordOf(params, SEND_FILES_KEYS, "The send_files parameters")
+  const parsed: SendFilesParams = { chat: chatAt(fields), files: sendFilesAt(fields) }
+  const caption = captionAt(fields)
+  const topic = optionalNumberAt(fields, "topic", isIdNumber, ID_TEXT)
+  const replyTo = optionalNumberAt(fields, "reply_to", isIdNumber, ID_TEXT)
+  if (caption !== undefined) parsed.caption = caption
   if (topic !== undefined) parsed.topic = topic
   if (replyTo !== undefined) parsed.reply_to = replyTo
   return parsed

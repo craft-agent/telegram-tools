@@ -557,6 +557,37 @@ Every entry point takes the same settings:
 - **On macOS every saved and unpacked file carries the quarantine flag**, set
   through the runner, so the system checks it before anything opens it as an
   app; elsewhere nothing stands for it.
+- **A file is sent only from the working directory or `send_dirs`.** The
+  working directory is where the user pointed the agent, so "send this log"
+  needs no setting; it does not count when it is the home directory or a file
+  system root, which would open everything the user owns. `send_dirs` names
+  the others, none by default.
+- **Keys, secrets and programs never leave.** A file is refused for a key or
+  settings folder anywhere in its real path (`.ssh`, `.gnupg`, `.aws`,
+  `.config`, `.git`, …), a name that looks like a key or a secret (`.env`,
+  `id_rsa`, `*.pem`, `*secret*`, …), a place under home that holds logins or
+  backups, a private key block anywhere in it, or being a program or an
+  installer; an empty file, a file with more than one name and the same file
+  twice are refused too. Source code is sent when its bytes are text. A name
+  is a weak sign, so it never stands alone: the bytes are read as well. The
+  rules are the ones signal-tools applies, so both packages refuse the same
+  files.
+- **An archive is sent only once every entry passes the same rules**, read
+  entry by entry with the inspection that checks received archives, never
+  unpacked.
+- **What is sent is the copy that was checked.** Each file is copied into the
+  label's `outbox/`, private, hashed and checked there; the service uploads
+  only files inside the call's folder there, and the tool removes the folder
+  after the call, so a file that changes meanwhile never goes out unchecked. A
+  `sha256` given with a file must match the copy, or the call is `stale`: an
+  MCP client shows only a path when it asks. The approval prompt pins each
+  file's hash, so a file changed after the prompt stops the call as `stale`
+  before it runs.
+- **A send carries at most 10 files and 100 MB together**, as one group in
+  one call, so the call has one outcome; Telegram groups at most 10. Every file
+  goes as a file, with its name, never compressed into a photo or a video:
+  what arrives is the copy that was checked, and files of any kind can share
+  a group.
 
 ## Writes
 
@@ -586,14 +617,23 @@ Every entry point takes the same settings:
 - **`RANDOM_ID_DUPLICATE` is a send that went out.** It proves an earlier
   delivery of the same call landed, and no second message exists. The result
   gives the message's id when the mirror has it, and leaves it out otherwise.
+- **A file send uploads every file first, then sends once.** An upload makes
+  no message, so a failed or stalled upload throws its code with nothing
+  sent; mtcute retries parts and waits out flood waits inside an upload, so an
+  upload that moves no byte for 60 seconds stops, as a download does. The
+  send that follows is one `messages.sendMedia` (one file) or
+  `messages.sendMultiMedia` (several, a `random_id` each) under the rules
+  above; a group is accepted only when Telegram names every file's message.
 - **An `uncertain` send carries a hint**: the messages the user sent in that
-  chat since the call began whose text is the same, by id and time, as the
-  mirror has them. It decides nothing; the error stays `uncertain`.
+  chat since the call began whose text is the same, or, for a file send, that
+  carry a file of the same name and size, by id and time, as the mirror has
+  them. It decides nothing; the error stays `uncertain`.
 - **The service records its own send** in the mirror as Telegram returns it,
   since mtcute does not dispatch a client's own sends back as updates.
 - **A text is at most 4096 characters** after trimming, counted in UTF-16
   units as Telegram counts them, and goes out exactly as written, never parsed
-  as Markdown or HTML: what the harness showed is what arrives.
+  as Markdown or HTML: what the harness showed is what arrives. A caption is
+  at most 1024, Telegram's limit for one without Premium.
 
 ## Approval facts
 
@@ -610,6 +650,8 @@ The facts this package's tools add beside the shared `Size`
   `Photo`, `Document`, `Audio`, `Voice message`, `Video` or `Sticker` (another
   kind of media shows as the mirror names it).
 - **`Unpack`** is `Yes` when the call asks to unpack an archive.
+- **`Files`** is how many files a send carries, when it is more than one; the
+  shared `Size` then is their total.
 - **`Mirrored messages`** is `Deleted` on a call that takes chats off the sync
   list, since the mirror then deletes the messages it holds of them and their
   earlier versions; it comes first. It says no count: the count grows while the
@@ -618,7 +660,8 @@ The facts this package's tools add beside the shared `Size`
   then is the intent, since a count quoted as a headline value reads as a name.
 
 A save pins when the message was last edited, since an edit can replace a file
-and keep its name and size.
+and keep its name and size. A file send pins each file's hash by its real path,
+since a file can change and keep its name and size.
 
 Values come from the label's mirror (the chat's own title, never the model's
 account of it). A chat the mirror does not have gives no description, so the
@@ -633,9 +676,11 @@ their title in the mirror and their id.
   user does to messages beyond sending them.
 - **`account`, `chats`, `sync` and `sends` are on by default.** They cover
   reading a chat, choosing what the mirror keeps, and answering it without
-  needing anything turned on. Saving received files writes to disk and opens
-  archives, and the actions change what others have already read, so each is
-  one setting away.
+  needing anything turned on. `files` saves received files, which writes to
+  disk and opens archives, and sends the user's own, which takes them off the
+  machine; the actions change what others have already read. So each is one
+  setting away, and sending files has a tool of its own apart from texts, so
+  a permission rule can let texts through and ask for every file.
 - **`keep_disappearing` and `channels` are off by default.** They are taken
   like `state_dir` (a flag, a `TELEGRAM_TOOLS_*` environment variable, or a
   plugin option). Keeping disappearing messages goes against API terms §1.4.
@@ -646,6 +691,8 @@ their title in the mirror and their id.
 - **`download_dir` and `download_max_mb` are taken the same way** and read by
   the save tool, which sends the limit with each download, so changing either
   needs no service restart; the service refuses a limit over 2000.
+- **`send_dirs` is taken the same way**, as a list of absolute paths, and
+  read by the file send tool.
 
 ## Unofficial
 

@@ -199,18 +199,28 @@ Hermes.
 | Tool                 | What it does                                                                | Class |
 | -------------------- | --------------------------------------------------------------------------- | ----- |
 | `telegram_file_save` | downloads one message's file from Telegram and saves it into `download_dir` | add   |
+| `telegram_file_send` | sends 1 to 10 files (100 MB together), with a caption, to a chat            | add   |
 
-The `files` toolset is off by default: turn it on with the `toolsets` setting.
-A message's file goes in `<download_dir>/<label>/<chat id>/<message id>/`,
-private (mode 600), never executable and never overwritten; `download_max_mb`
-sets the largest file taken. The sync service downloads it, so it must be
-running. Programs and installers are refused, and so are archives other than
-zip, tar and gzipped tar, archives holding a program, another archive, a link or
-a path that leaves them, animated stickers and view-once files. An archive is
-inspected and listed, and unpacked only when asked (`unpack: true`) into
-`<name>.unpacked/` beside it. On macOS every saved and unpacked file carries the
-quarantine flag. File names and contents are data, never instructions. The skill
-is [`telegram-files`](skills/telegram-files/SKILL.md), shown as
+The `files` toolset is off by default: it writes to disk, opens archives and
+sends files. Turn it on with `toolsets` or `tools`. Sending takes 1 to 10 files
+(at most 100 MB together) as one group, every file as a file, from the working
+directory (not when that is the home directory or a file system root) and the
+directories `send_dirs` names; keys, secrets, programs and installers are
+refused, archives are checked entry by entry, each file is copied into the
+label's outbox and checked before upload, and `sha256` can pin a file to what
+was approved. Sending needs the sync service running; a failure `uncertain`
+lists matching messages the mirror saw so the person checks the chat before
+anything is sent again. For received files, a message's file goes in
+`<download_dir>/<label>/<chat id>/<message id>/`, private (mode 600), never
+executable and never overwritten; `download_max_mb` sets the largest file
+taken. The sync service downloads it, so it must be running. Programs and
+installers are refused, and so are archives other than zip, tar and gzipped
+tar, archives holding a program, another archive, a link or a path that leaves
+them, animated stickers and view-once files. An archive is inspected and
+listed, and unpacked only when asked (`unpack: true`) into `<name>.unpacked/`
+beside it. On macOS every saved and unpacked file carries the quarantine flag.
+File names and contents are data, never instructions. The skill is
+[`telegram-files`](skills/telegram-files/SKILL.md), shown as
 `telegram-tools:telegram-files` in Claude Code and `telegram-tools:files` in
 Hermes.
 
@@ -281,6 +291,7 @@ variable, and an option or setting wins over the variable too.
 | `state_dir`         | `--state-dir`           | `TELEGRAM_TOOLS_STATE_DIR`         | where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`                                                                                  |
 | `download_dir`      | `--download-dir`        | `TELEGRAM_TOOLS_DOWNLOAD_DIR`      | where `telegram_file_save` saves received files, a folder per message; default `~/Downloads/telegram-tools`; read by the tools, no service restart needed  |
 | `download_max_mb`   | `--download-max-mb <n>` | `TELEGRAM_TOOLS_DOWNLOAD_MAX_MB`   | the largest file a download takes, in MB; integer 1..2000, default 100; read by the tools, no service restart needed                                       |
+| `send_dirs`         | `--send-dirs`           | `TELEGRAM_TOOLS_SEND_DIRS`         | the directories files may be sent from, besides the working directory; absolute paths, default none; read by the tools, no service restart needed          |
 | `keep_disappearing` | `--keep-disappearing`   | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | keep disappearing and view-once messages for the user; off by default; read by `sync` and `service install`, run `service install` again after changing it |
 | `channels`          | `--channels`            | `TELEGRAM_TOOLS_CHANNELS`          | list, read, mirror and send to channels; off by default, see below; read by `sync` and `service install`, run `service install` again after changing it    |
 
@@ -288,7 +299,7 @@ Lists are comma-separated in a flag or a variable. Where each harness reads them
 
 - **OpenCode** takes the plugin `options` shown above, with lists as arrays,
   `read_only` as a boolean, `state_dir` and `download_dir` as paths, and
-  `download_max_mb` as a number, and falls back to the
+  `download_max_mb` as a number, `send_dirs` as an array of paths, and falls back to the
   variables. V2 runs plugins in its background service, which keeps the
   environment it started with: a variable set where `opencode run` starts has
   no effect until the service is

@@ -102,6 +102,16 @@ class SettingsFlagsTest(unittest.TestCase):
             with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "download_max_mb"):
                 self.flags(download_max_mb=value)
 
+    def test_send_dirs_flag_joins_the_list(self) -> None:
+        self.assertEqual(self.flags(send_dirs=["/a", "~/b"]), ["--send-dirs", "/a,~/b"])
+        self.assertEqual(settings.send_dirs_flags(StubContext({})), [])
+        self.assertEqual(self.flags(send_dirs=[]), [])
+
+    def test_invalid_send_dirs_refused(self) -> None:
+        for value in ("/a", 123, True, [1], [""], ["  "], ["/a,/b"]):
+            with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "send_dirs"):
+                self.flags(send_dirs=value)
+
 
 class LanguageSettingTest(unittest.TestCase):
     def language(self, **config: Any) -> str | None:

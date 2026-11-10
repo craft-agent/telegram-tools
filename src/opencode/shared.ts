@@ -68,7 +68,7 @@ export function selectedTools(
   deps: PluginDeps,
 ): { tools: ToolSpec[]; stateDir: string; translator: Translator } & Pick<
   ToolContext,
-  "downloadDir" | "downloadMaxMb" | "programName"
+  "downloadDir" | "downloadMaxMb" | "sendDirs" | "programName"
 > {
   const profile = deps.profile ?? PROJECT_PROFILE
   const settings = settingsFromOptions(options, deps.env ?? process.env, profile)
@@ -77,6 +77,7 @@ export function selectedTools(
     stateDir: settings.state_dir,
     downloadDir: settings.download_dir,
     downloadMaxMb: settings.download_max_mb,
+    sendDirs: settings.send_dirs,
     programName: PROJECT.name,
     translator: promptTranslator(deps.translations ?? {}, settings.language),
   }

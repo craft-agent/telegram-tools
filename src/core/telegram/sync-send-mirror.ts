@@ -1,6 +1,6 @@
 import { ToolError } from "../errors"
 import type { Mirror } from "./mirror"
-import type { SendParams } from "./service-requests"
+import type { SendParams, SentFile } from "./service-requests"
 import { listedChat } from "./sync-request-calls"
 
 /** How long before a call started a message of the user's still counts as that call's own delivery, in milliseconds. */
@@ -20,7 +20,10 @@ function hasMessage(mirror: Mirror, chat: string, id: number): boolean {
  * only in a chat the mirror keeps: of any other it holds no messages, and
  * Telegram decides.
  */
-export function checkSendable(mirror: Mirror, { chat, topic, reply_to }: SendParams): void {
+export function checkSendable(
+  mirror: Mirror,
+  { chat, topic, reply_to }: Pick<SendParams, "chat" | "topic" | "reply_to">,
+): void {
   const row = listedChat(mirror, chat)
   if (row.left) throw new ToolError("forbidden", "You are no longer in this chat; nothing was sent.")
   if (row.can_send === 0) throw new ToolError("forbidden", "You cannot write in this chat; nothing was sent.")
@@ -43,4 +46,34 @@ export function deliveredId(mirror: Mirror, chat: string, text: string, startedA
     .prepare("SELECT id FROM messages WHERE chat = ? AND from_me = 1 AND body = ? AND ts >= ? LIMIT 2")
     .all(chat, text, startedAt - DUPLICATE_LOOKBACK_MS) as { id: number }[]
   return rows.length === 1 ? rows[0]!.id : undefined
+}
+
+/** A file a send carried, as the mirror records it. */
+export type FileFacts = { name: string; size: number }
+
+/**
+ * The ids of the messages an earlier delivery of a file send left in the
+ * mirror, by file name, in the order of `files`: of each file the only message
+ * the user sent in `chat` carrying a file of that name and size since a minute
+ * before the call began (`startedAt`, in milliseconds). A file is left out
+ * when the mirror has none or several, or when another file of the send has
+ * the same name and size, since the messages cannot be told apart.
+ */
+export function deliveredFileIds(
+  mirror: Mirror,
+  chat: string,
+  files: readonly FileFacts[],
+  startedAt: number,
+): SentFile[] {
+  const query = mirror.prepare(
+    `SELECT id FROM messages WHERE chat = ? AND from_me = 1 AND ts >= ?
+       AND json_extract(media, '$.name') = ? AND json_extract(media, '$.size') = ? LIMIT 2`,
+  )
+  const delivered: SentFile[] = []
+  for (const { name, size } of files) {
+    if (files.filter((other) => other.name === name && other.size === size).length > 1) continue
+    const rows = query.all(chat, startedAt - DUPLICATE_LOOKBACK_MS, name, size) as { id: number }[]
+    if (rows.length === 1) delivered.push({ id: rows[0]!.id, name })
+  }
+  return delivered
 }
