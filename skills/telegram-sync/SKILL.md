@@ -1,6 +1,8 @@
 ---
 name: telegram-sync
 description: "Use when keeping a supergroup or channel in the mirror, managing the sync list, mirroring a group, or inspecting which chats are kept."
+metadata:
+  toolset: sync
 ---
 
 # The sync list

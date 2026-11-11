@@ -1,6 +1,8 @@
 ---
 name: telegram-chats
 description: "Use when finding a Telegram chat, reading its messages, forum topics, searching what people wrote, reading around a message, or fetching older history."
+metadata:
+  toolset: chats
 ---
 
 # Chats and messages

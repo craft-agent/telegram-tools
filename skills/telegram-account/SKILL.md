@@ -1,6 +1,8 @@
 ---
 name: telegram-account
 description: "Use when checking which Telegram accounts are logged in, whether the sync service is receiving, or what setup needs attention."
+metadata:
+  toolset: account
 ---
 
 # Account status

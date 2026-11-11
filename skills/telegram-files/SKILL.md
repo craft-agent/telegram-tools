@@ -1,6 +1,8 @@
 ---
 name: telegram-files
 description: "Use when saving or downloading a file, photo, video, voice note or document someone sent in Telegram, opening an attachment, unpacking a received zip, or sending or attaching files to a chat."
+metadata:
+  toolset: files
 ---
 
 # Files

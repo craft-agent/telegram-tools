@@ -1,6 +1,8 @@
 ---
 name: telegram-sends
 description: 'Use when sending, replying to or posting a message in Telegram, writing to a person, a group, a forum topic or Saved Messages, or when the user says "send this to …".'
+metadata:
+  toolset: sends
 ---
 
 # Sending messages

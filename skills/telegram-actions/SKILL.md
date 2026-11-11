@@ -1,6 +1,8 @@
 ---
 name: telegram-actions
 description: "Use when editing a Telegram message the user sent, deleting one for everyone, reacting to a message or removing a reaction, pinning or unpinning a message, or marking a chat read; also when such an action fails or its outcome is unclear."
+metadata:
+  toolset: actions
 ---
 
 # Actions
