@@ -19,7 +19,7 @@ export const KEPT_MAX_BYTES = 100 * BYTES_PER_MB
 /** What keeping a file works with: the download's context, the mirror, and the queue the downloads share. */
 export type KeepContext = DownloadStreamContext & {
   mirror: Mirror
-  settings: Pick<ResolvedSyncOptions, "stateDir" | "label" | "log" | "downloadStallMs">
+  settings: Pick<ResolvedSyncOptions, "stateDir" | "label" | "log" | "transferStallMs">
   /** The queue of `download` requests: keeping a file waits its turn in it. */
   queue: RequestQueue
 }

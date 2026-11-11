@@ -1,4 +1,4 @@
-import { readMirror } from "../chat/open"
+import { readMirror } from "../open"
 import { ToolError, type JsonValue } from "../errors"
 import type { LabelPaths } from "../telegram/labels"
 import { formatLocalTime } from "../time"

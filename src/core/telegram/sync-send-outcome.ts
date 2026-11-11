@@ -1,9 +1,8 @@
 import { Message, PeersIndex, tl, type Long } from "@mtcute/core"
 import { ToolError, type ErrorCode } from "../errors"
+import { MS_PER_S } from "../time"
 import { floodWaitSecondsOf, isSessionEnded } from "./rpc-errors"
 import { UNCERTAIN_ADVICE } from "./service-errors"
-
-const MS_PER_S = 1000
 
 /** Telegram's answer to a send whose `random_id` an earlier delivery of the same call already used. */
 const RANDOM_ID_DUPLICATE = "RANDOM_ID_DUPLICATE"

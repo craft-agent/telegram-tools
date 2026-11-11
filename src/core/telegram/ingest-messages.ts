@@ -1,3 +1,4 @@
+import { MS_PER_S } from "../time"
 import { isCount, isMessageInput, type IngestContext, type MessageInput } from "./mirror-input"
 import type { Mirror } from "./mirror"
 import { findChat, isDeleted, toJson } from "./mirror-rows"
@@ -15,9 +16,6 @@ type StoredVersion = {
   edited: number | null
   expires: number | null
 }
-
-/** Milliseconds in a second: `ttl` is in seconds, times in milliseconds. */
-const MS_PER_S = 1000
 
 /** When the message disappears by its chat's timer, or null. */
 function expiryOf(msg: MessageInput): number | null {

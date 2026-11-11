@@ -5,6 +5,7 @@ import {
   AROUND_LIMIT,
   FETCH_PAGE_LIMIT,
   FETCH_PAGE_SIZE,
+  GENERAL_TOPIC,
   HISTORY_LIMIT,
   TOPICS_LIMIT,
 } from "../telegram/service-requests"
@@ -15,9 +16,6 @@ import { messageEntry } from "./message-schema"
 export const METHODS = ["list", "view", "topics", "search", "around", "fetch"] as const
 /** A method supported by `telegram_chat_read`. */
 export type Method = (typeof METHODS)[number]
-
-/** The id of a forum's General topic, whose messages are stored with no topic. */
-export const GENERAL_TOPIC = 1
 
 /** The default and the largest `limit` of each method that pages. */
 export const LIMITS = {

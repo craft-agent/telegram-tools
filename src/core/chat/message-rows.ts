@@ -2,7 +2,7 @@ import type { Mirror } from "../telegram/mirror"
 import type { MessageInput } from "../telegram/mirror-input"
 import type { ChatRow } from "../telegram/mirror-rows"
 import { findChats } from "./chat-rows"
-import { GENERAL_TOPIC } from "./schema"
+import { GENERAL_TOPIC } from "../telegram/service-requests"
 import { placeholders } from "./sql"
 
 /** The columns of `messages` that a message entry is built from. */

@@ -1,10 +1,9 @@
 import type { Message, MessageMedia } from "@mtcute/core"
+import { MS_PER_S } from "../time"
 import { mediaOf } from "./from-mtcute-media"
 import { readOrNull } from "./from-mtcute-parts"
 import { isCount } from "./mirror-input"
 import type { DeclaredFile } from "./service-requests"
-
-const MS_PER_S = 1000
 
 /** The kinds of media (`MediaInfo.type`) that are a file Telegram serves. */
 const FILE_KINDS = ["photo", "document", "audio", "voice", "video", "sticker"] as const

@@ -1,5 +1,5 @@
 import { requireChatId } from "../chat/chat-rows"
-import { pickPaths } from "../chat/open"
+import { pickPaths } from "../open"
 import { ANY_TARGET } from "../targets"
 import type { ToolContext } from "../tool"
 

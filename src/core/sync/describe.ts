@@ -1,6 +1,6 @@
 import { existingChat } from "../chat/chat-rows"
 import { chatFact } from "../chat/facts"
-import { pickPaths, readMirror } from "../chat/open"
+import { pickPaths, readMirror } from "../open"
 import type { CallDescription, CallFact, CallHeadline, ToolContext } from "../tool"
 import { requireChatIds } from "./change"
 

@@ -1,10 +1,10 @@
 import { checkEditable, deletedMessage, takesCaption } from "../telegram/action-checks"
 import type { Mirror } from "../telegram/mirror"
 import type { ChatRow } from "../telegram/mirror-rows"
-import { findOwnMessage, type OwnMessage } from "./own"
+import { findOwnMessage, type ActionMessage } from "./own"
 
 /** The chat and the message of an edit the mirror shows can be made. */
-export type EditTarget = { chat: ChatRow; message: OwnMessage }
+export type EditTarget = { chat: ChatRow; message: ActionMessage }
 
 /**
  * Checks in the mirror, as the sync service does, that the user's message can

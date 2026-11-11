@@ -1,7 +1,7 @@
 import { z } from "zod"
 import { shownName } from "../chat/chat-rows"
 import { DATA_NOTE } from "../chat/message-schema"
-import { pickPaths, readMirror } from "../chat/open"
+import { pickPaths, readMirror } from "../open"
 import { nameCut } from "../chat/schema"
 import type { Mirror } from "../telegram/mirror"
 import { CHAT_KINDS, type ChatKind } from "../telegram/mirror-input"

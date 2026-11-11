@@ -1,13 +1,22 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { existsSync, readFileSync, statSync } from "node:fs"
+import { existsSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { fakePhotoMedia, fakeViewOncePhotoMedia } from "./fake-telegram-media.testing"
 import { FAKE_DATE } from "./fake-telegram.testing"
 import { messageRow } from "./mirror.testing"
 import type { KeptMeta } from "./sync-kept-store"
-import { DOWNLOAD_STALL_MS } from "./sync-download"
+import { TRANSFER_STALL_MS } from "./sync-options"
 import { CHAT, download, fileMedia, mediaMessage } from "./sync-download.testing"
-import { CHUNK, arriving, keptFolder, keptTree, push, selfDestructingVideo, waitKept } from "./sync-keep.testing"
+import {
+  CHUNK,
+  arriving,
+  keptFolder,
+  keptTree,
+  modeOf,
+  push,
+  selfDestructingVideo,
+  waitKept,
+} from "./sync-keep.testing"
 import { KEPT, request, seedKeptMessages, seedListedChats } from "./sync-requests.testing"
 import { eventually, syncFixture, type SyncFixture } from "./sync.testing"
 
@@ -20,7 +29,6 @@ beforeEach(() => {
 
 afterEach(() => fixture.close())
 
-const modeOf = (path: string) => statSync(path).mode & 0o777
 const downloads = () => fixture.client.argsOf("downloadAsIterable").length
 const metaOf = (id: number): KeptMeta =>
   JSON.parse(readFileSync(join(keptFolder(fixture, KEPT, id), "meta.json"), "utf8"))
@@ -84,7 +92,7 @@ describe("a disappearing file that arrives with keeping on", () => {
     push(fixture, arriving(1, fakeViewOncePhotoMedia()))
     await waitKept(fixture, KEPT, 1)
 
-    expect(fixture.client.argsOf("downloadAsIterable")).toEqual([{ kind: "photo", stallTimeout: DOWNLOAD_STALL_MS }])
+    expect(fixture.client.argsOf("downloadAsIterable")).toEqual([{ kind: "photo", stallTimeout: TRANSFER_STALL_MS }])
   })
 
   test("keeps each file under its own message", async () => {

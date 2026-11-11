@@ -1,3 +1,4 @@
+import { MS_PER_S } from "../time"
 import type { MessageInput } from "../telegram/mirror-input"
 import { toJson } from "../telegram/mirror-rows"
 import { callService } from "../telegram/service"
@@ -20,9 +21,6 @@ export const REFRESH_TIMEOUT_MS = 120_000
 
 /** How long a history fetch may take: up to five pages from Telegram, paced. */
 export const FETCH_TIMEOUT_MS = 180_000
-
-/** Milliseconds in a second: `ttl` is in seconds, times in milliseconds. */
-const MS_PER_S = 1000
 
 /** A live read of a chat the mirror does not keep. */
 export function requestHistory(socket: string, params: HistoryParams, signal?: AbortSignal): Promise<HistoryResult> {

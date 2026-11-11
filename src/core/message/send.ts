@@ -1,6 +1,6 @@
 import { existingChat, requireChatId, topicTitle } from "../chat/chat-rows"
 import { chatFact } from "../chat/facts"
-import { pickPaths, readMirror } from "../chat/open"
+import { pickPaths, readMirror } from "../open"
 import { isToolError } from "../errors"
 import { callService } from "../telegram/service"
 import { SERVICE_REQUESTS, type SendParams, type SendResult, TEXT_MAX_UNITS } from "../telegram/service-requests"

@@ -1,5 +1,5 @@
 import { requireChatId } from "../chat/chat-rows"
-import { pickPaths, readMirror } from "../chat/open"
+import { pickPaths, readMirror } from "../open"
 import { callService } from "../telegram/service"
 import {
   CAPTION_MAX_UNITS,

@@ -1,13 +1,14 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { readFileSync, statSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { basename, dirname, join } from "node:path"
 import { fakePhotoMedia } from "./fake-telegram-media.testing"
 import { FAKE_DATE } from "./fake-telegram.testing"
 import type { DownloadResult, SavedFile } from "./service-requests"
-import { DOWNLOAD_STALL_MS } from "./sync-download"
+import { TRANSFER_STALL_MS } from "./sync-options"
 import { CHAT, download, fileMedia, incomingFolders, mediaMessage } from "./sync-download.testing"
 import { syncFixture, type SyncFixture } from "./sync.testing"
 import { seedListedChats } from "./sync-requests.testing"
+import { modeOf } from "./sync-keep.testing"
 
 let fixture: SyncFixture
 
@@ -20,7 +21,6 @@ beforeEach(async () => {
 afterEach(() => fixture.close())
 
 const MAX = 1000
-const modeOf = (path: string) => statSync(path).mode & 0o777
 
 function savedOf(result: DownloadResult): SavedFile {
   if (!("saved" in result)) throw new Error(`expected a saved file, got ${JSON.stringify(result)}`)
@@ -101,7 +101,7 @@ describe("a photo that is downloaded", () => {
     const saved = savedOf(await download(fixture, 1, 200_000))
 
     expect(saved).toEqual({ path: saved.path, name: null, type: "image/jpeg", size: 2, kind: "photo" })
-    expect(fixture.client.argsOf("downloadAsIterable")).toEqual([{ kind: "photo", stallTimeout: DOWNLOAD_STALL_MS }])
+    expect(fixture.client.argsOf("downloadAsIterable")).toEqual([{ kind: "photo", stallTimeout: TRANSFER_STALL_MS }])
   })
 })
 

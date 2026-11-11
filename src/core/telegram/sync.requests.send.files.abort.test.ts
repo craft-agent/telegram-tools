@@ -51,7 +51,7 @@ beforeEach(() => {
     log: () => {},
     now: () => NOW,
     pause: async () => {},
-    downloadStallMs: STALL_MS,
+    transferStallMs: STALL_MS,
   })
   const context = { client, mirror: mirror.mirror, settings, signal: run.signal }
   handlers = syncRequestHandlers({

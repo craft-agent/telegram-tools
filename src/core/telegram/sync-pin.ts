@@ -2,11 +2,9 @@ import { Message, PeersIndex, type tl } from "@mtcute/core"
 import { ACTION_PAST, checkBothSides, isPrivateChat } from "./action-checks"
 import type { PinParams, PinResult } from "./service-requests"
 import type { ServiceCall } from "./service-server"
-import { performAction, recordAction, type ActionContext } from "./sync-action"
+import { performAction, recordAction, resolveChatPeer, runAction, type ActionContext } from "./sync-action"
 import { anyMessageOf } from "./sync-action-mirror"
 import { MESSAGE_GONE, type ActionRefusals, type ActionWords } from "./sync-action-outcome"
-import { viaTelegram } from "./sync-request-calls"
-import { cancelled } from "./sync-request-errors"
 import { parsePinParams } from "./sync-request-params"
 import type { RequestQueue } from "./sync-request-queue"
 import { handOver } from "./sync-send"
@@ -80,8 +78,7 @@ async function pinMessage(
   const unpin = params.unpin === true
   const { chat } = anyMessageOf(ctx.mirror, params.chat, params.id, unpin ? UNPIN_WORDS : PIN_WORDS)
   checkBothSides(chat.kind, params.both_sides)
-  const peer = await viaTelegram(ctx, call, "pin", () => ctx.client.resolvePeer(Number(params.chat)))
-  if (signal.aborted) throw cancelled()
+  const peer = await resolveChatPeer(ctx, call, signal, "pin", params.chat)
 
   // Silent unless asked to notify, and in a private chat for the user only unless asked for both sides; a flag that is off is left out.
   const request: tl.messages.RawUpdatePinnedMessageRequest = {
@@ -92,9 +89,7 @@ async function pinMessage(
     ...(unpin ? { unpin } : {}),
     ...(isPrivateChat(chat.kind) && !params.both_sides ? { pmOneside: true } : {}),
   }
-  const response = await performAction(ctx, signal, unpin ? UNPIN_REFUSALS : PIN_REFUSALS, (options) =>
-    ctx.client.call(request, options),
-  )
+  const response = await performAction(ctx, signal, unpin ? UNPIN_REFUSALS : PIN_REFUSALS, request)
   if (response === undefined) return { id: params.id, pinned: !unpin, already: true }
   handOver(ctx, response, "pin")
   recordServiceMessages(ctx, params.chat, response)
@@ -117,7 +112,5 @@ export function pinRequest(
   raw: unknown,
   call: ServiceCall,
 ): Promise<PinResult> {
-  const params = parsePinParams(raw)
-  const signal = AbortSignal.any([call.signal, ctx.signal])
-  return queue.run(signal, () => pinMessage(ctx, call, signal, params))
+  return runAction(ctx, queue, raw, call, parsePinParams, (params, signal) => pinMessage(ctx, call, signal, params))
 }

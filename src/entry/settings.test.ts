@@ -8,7 +8,7 @@ import {
   parseToolSettings,
   settingVariables,
 } from "./settings"
-import { DOWNLOAD_SETTINGS, failure, profile } from "./settings.testing"
+import { FILE_SETTINGS, failure, profile } from "./settings.testing"
 
 const parse = (argv: string[], env: Record<string, string | undefined> = {}) => parseSettings(argv, env, profile)
 const parseTool = (argv: string[], env: Record<string, string | undefined> = {}) =>
@@ -48,7 +48,7 @@ describe("forwardedVariables", () => {
 
 describe("parseSettings", () => {
   test("defaults to the harness confirming and no other setting", () => {
-    expect(parse([])).toEqual({ confirm: "harness", state_dir: expect.any(String), ...DOWNLOAD_SETTINGS })
+    expect(parse([])).toEqual({ confirm: "harness", state_dir: expect.any(String), ...FILE_SETTINGS })
   })
 
   test("reads each flag", () => {
@@ -73,7 +73,7 @@ describe("parseSettings", () => {
       exclude_tools: ["demo_thing_merge"],
       confirm: "elicitation",
       state_dir: "/custom/state",
-      ...DOWNLOAD_SETTINGS,
+      ...FILE_SETTINGS,
     })
   })
 
@@ -94,7 +94,7 @@ describe("parseSettings", () => {
       read_only: true,
       confirm: "elicitation",
       state_dir: "/custom/state",
-      ...DOWNLOAD_SETTINGS,
+      ...FILE_SETTINGS,
     })
   })
 
@@ -115,7 +115,7 @@ describe("parseSettings", () => {
       exclude_tools: ["y", "z"],
       confirm: "elicitation",
       state_dir: "/env/state",
-      ...DOWNLOAD_SETTINGS,
+      ...FILE_SETTINGS,
     })
   })
 
@@ -180,7 +180,7 @@ describe("parseSettings", () => {
       confirm: "harness",
       read_only: true,
       state_dir: "/flag/state",
-      ...DOWNLOAD_SETTINGS,
+      ...FILE_SETTINGS,
     })
   })
 
@@ -188,7 +188,7 @@ describe("parseSettings", () => {
     expect(parse([], { DEMO_TOOLSETS: "", DEMO_CONFIRM: " " })).toEqual({
       confirm: "harness",
       state_dir: expect.any(String),
-      ...DOWNLOAD_SETTINGS,
+      ...FILE_SETTINGS,
     })
   })
 
@@ -295,7 +295,7 @@ describe("parseServiceSettings", () => {
 
 describe("parseToolSettings", () => {
   test("reads the tool settings and gives no confirm setting", () => {
-    expect(parseTool([])).toEqual({ state_dir: expect.any(String), ...DOWNLOAD_SETTINGS })
+    expect(parseTool([])).toEqual({ state_dir: expect.any(String), ...FILE_SETTINGS })
     expect(
       parseTool(["--toolsets=gamma", "--read-only", "--tools", "a", "--state-dir=/tool/state"], {
         DEMO_EXCLUDE_TOOLS: "b",
@@ -306,7 +306,7 @@ describe("parseToolSettings", () => {
       tools: ["a"],
       exclude_tools: ["b"],
       state_dir: "/tool/state",
-      ...DOWNLOAD_SETTINGS,
+      ...FILE_SETTINGS,
     })
   })
 
@@ -316,6 +316,6 @@ describe("parseToolSettings", () => {
   })
 
   test("ignores DEMO_CONFIRM, even a bad one", () => {
-    expect(parseTool([], { DEMO_CONFIRM: "ask" })).toEqual({ state_dir: expect.any(String), ...DOWNLOAD_SETTINGS })
+    expect(parseTool([], { DEMO_CONFIRM: "ask" })).toEqual({ state_dir: expect.any(String), ...FILE_SETTINGS })
   })
 })

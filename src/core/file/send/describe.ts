@@ -1,6 +1,6 @@
 import { existingChat, requireChatId, topicTitle } from "../../chat/chat-rows"
 import { chatFact } from "../../chat/facts"
-import { pickPaths, readMirror } from "../../chat/open"
+import { pickPaths, readMirror } from "../../open"
 import { sizeFact } from "../../facts"
 import { checkedCaption } from "../../message/arguments"
 import { replyFacts, topicFacts } from "../../message/facts"

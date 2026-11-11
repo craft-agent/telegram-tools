@@ -10,7 +10,8 @@ export const profile: EntryProfile = {
   toolsets: { names: ["alpha", "beta", "gamma"], defaults: ["alpha"] },
 }
 
-export const DOWNLOAD_SETTINGS = { download_dir: expect.any(String), download_max_mb: 100, send_dirs: [] }
+/** The file settings' defaults: download_dir, download_max_mb and send_dirs. */
+export const FILE_SETTINGS = { download_dir: expect.any(String), download_max_mb: 100, send_dirs: [] }
 
 export function failure(run: () => unknown): Error {
   try {

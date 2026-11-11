@@ -1,21 +1,18 @@
 import { Message, PeersIndex, type tl } from "@mtcute/core"
+import { MS_PER_S } from "../time"
 import { ACTION_PAST, checkEditable, deletedMessage, takesCaption } from "./action-checks"
 import type { MediaInfo } from "./mirror-input"
 import type { EditParams, EditResult } from "./service-requests"
 import type { ServiceCall } from "./service-server"
-import { performAction, recordAction, type ActionContext } from "./sync-action"
+import { performAction, recordAction, resolveChatPeer, runAction, type ActionContext } from "./sync-action"
 import { storedMessageOf, targetOf, type ActionTarget } from "./sync-action-mirror"
 import { MESSAGE_GONE, uncertainAction, type ActionRefusals, type ActionWords } from "./sync-action-outcome"
 import { errorLabel } from "./sync-outcome"
-import { viaTelegram } from "./sync-request-calls"
-import { cancelled } from "./sync-request-errors"
 import { parseEditParams } from "./sync-request-params"
 import type { RequestQueue } from "./sync-request-queue"
 import { handOver } from "./sync-send"
 import { readMessage } from "./sync-message"
 import { recordSent } from "./sync-send-record"
-
-const MS_PER_S = 1000
 
 const EDIT_WORDS: ActionWords = {
   name: "edit",
@@ -121,8 +118,7 @@ async function editText(
   params: EditParams,
 ): Promise<EditResult> {
   refuseUneditable(targetOf(ctx.mirror, params.chat, params.id, EDIT_WORDS), params.text)
-  const peer = await viaTelegram(ctx, call, "edit", () => ctx.client.resolvePeer(Number(params.chat)))
-  if (signal.aborted) throw cancelled()
+  const peer = await resolveChatPeer(ctx, call, signal, "edit", params.chat)
 
   // As a send does: no entities, no Markdown and `noWebpage` unset, so the text goes out as written with Telegram's own preview.
   const request: tl.messages.RawEditMessageRequest = {
@@ -131,7 +127,7 @@ async function editText(
     id: params.id,
     message: params.text,
   }
-  const response = await performAction(ctx, signal, EDIT_REFUSALS, (options) => ctx.client.call(request, options))
+  const response = await performAction(ctx, signal, EDIT_REFUSALS, request)
   return response === undefined ? alreadyResult(ctx, params) : acceptedResult(ctx, params, response)
 }
 
@@ -151,7 +147,5 @@ export function editRequest(
   raw: unknown,
   call: ServiceCall,
 ): Promise<EditResult> {
-  const params = parseEditParams(raw)
-  const signal = AbortSignal.any([call.signal, ctx.signal])
-  return queue.run(signal, () => editText(ctx, call, signal, params))
+  return runAction(ctx, queue, raw, call, parseEditParams, (params, signal) => editText(ctx, call, signal, params))
 }

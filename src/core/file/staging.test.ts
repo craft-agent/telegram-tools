@@ -1,18 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  rmSync,
-  statSync,
-  symlinkSync,
-  writeFileSync,
-} from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { NotAFolder } from "./fs-safe"
 import { Staging } from "./staging"
+import { modeOf as mode } from "../telegram/sync-keep.testing"
 
 let root: string
 let outside: string
@@ -31,8 +23,6 @@ afterEach(() => rmSync(join(root, ".."), { recursive: true, force: true }))
 async function* chunks(...parts: string[]) {
   for (const part of parts) yield Buffer.from(part)
 }
-
-const mode = (path: string) => statSync(path).mode & 0o777
 
 describe("writing an unpacked tree", () => {
   test("makes each folder 0700 and each file 0600, never executable", async () => {

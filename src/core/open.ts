@@ -1,7 +1,8 @@
-import { ToolError } from "../errors"
-import { pickLabel, type LabelPaths } from "../telegram/labels"
-import { openMirrorForRead, type Mirror } from "../telegram/mirror"
-import type { ToolContext } from "../tool"
+/** Every tool reads labels and the mirror through this module. */
+import { ToolError } from "./errors"
+import { pickLabel, type LabelPaths } from "./telegram/labels"
+import { openMirrorForRead, type Mirror } from "./telegram/mirror"
+import type { ToolContext } from "./tool"
 
 /** The paths of the account `account` picks (see `pickLabel`). */
 export async function pickPaths(ctx: Pick<ToolContext, "stateDir">, account: string | undefined): Promise<LabelPaths> {

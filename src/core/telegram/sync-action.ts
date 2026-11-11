@@ -1,25 +1,76 @@
-import type { RpcCallOptions, tl } from "@mtcute/core"
+import type { tl } from "@mtcute/core"
+import type { ServiceCall } from "./service-server"
 import { actionFailureOf, type ActionRefusals } from "./sync-action-outcome"
 import { StorageFailure } from "./sync-ending"
 import { errorLabel } from "./sync-outcome"
+import { viaTelegram } from "./sync-request-calls"
+import { cancelled } from "./sync-request-errors"
+import type { RequestQueue } from "./sync-request-queue"
 import { callOnce, handOverPts, type SendContext } from "./sync-send"
 
 /** What an action works with; the sync requests' context holds all of it. */
 export type ActionContext = SendContext
 
 /**
+ * Parses an action's `raw` params, then runs `act` on `queue` with the signal
+ * of the call joined to the run's: one at a time, and not at all when the call
+ * is cancelled while it waits (`RequestQueue.run`). `parse` throws the
+ * refusal for params it does not take, before anything is queued.
+ */
+export function runAction<Params, Result>(
+  ctx: ActionContext,
+  queue: RequestQueue,
+  raw: unknown,
+  call: ServiceCall,
+  parse: (raw: unknown) => Params,
+  act: (params: Params, signal: AbortSignal) => Promise<Result>,
+): Promise<Result> {
+  const params = parse(raw)
+  const signal = AbortSignal.any([call.signal, ctx.signal])
+  return queue.run(signal, () => act(params, signal))
+}
+
+/**
+ * The input peer of `chat`, a chat id of the mirror, as Telegram knows it.
+ * `what` names the request in the log. A call cancelled meanwhile throws
+ * `cancelled()`, so that no call to Telegram follows.
+ */
+export async function resolveChatPeer(
+  ctx: ActionContext,
+  call: ServiceCall,
+  signal: AbortSignal,
+  what: string,
+  chat: string,
+): Promise<tl.TypeInputPeer> {
+  const peer = await viaTelegram(ctx, call, what, () => ctx.client.resolvePeer(Number(chat)))
+  if (signal.aborted) throw cancelled()
+  return peer
+}
+
+/** The channel a supergroup's or channel's `peer` is, for the methods of `channels.*`; undefined for any other peer. */
+export function inputChannelOf(peer: tl.TypeInputPeer): tl.RawInputChannel | undefined {
+  if (peer._ !== "inputPeerChannel") return undefined
+  const { channelId, accessHash } = peer
+  return { _: "inputChannel", channelId, accessHash }
+}
+
+/**
  * Makes the one call of an action and resolves with Telegram's answer, or
  * with undefined when Telegram answers that the message is already as asked.
  * Any other failure throws what `actionFailureOf` decides (see `callOnce`).
  */
-export function performAction<Answer>(
+export function performAction<Request extends tl.RpcMethod>(
   ctx: ActionContext,
   signal: AbortSignal,
   refusals: ActionRefusals,
-  call: (options: RpcCallOptions) => Promise<Answer>,
-): Promise<Answer | undefined> {
-  return callOnce<Answer | undefined>(ctx, signal, refusals.words.name, call, (error, trouble) =>
-    actionFailureOf(error, trouble, refusals),
+  request: Request,
+): Promise<tl.RpcCallReturn[Request["_"]] | undefined> {
+  return callOnce<tl.RpcCallReturn[Request["_"]] | undefined>(
+    ctx,
+    signal,
+    refusals.words.name,
+    (options) => ctx.client.call(request, options),
+    (error, trouble) => actionFailureOf(error, trouble, refusals),
   )
 }
 

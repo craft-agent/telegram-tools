@@ -1,5 +1,5 @@
 import { requireChatId } from "../chat/chat-rows"
-import { pickPaths, readMirror } from "../chat/open"
+import { pickPaths, readMirror } from "../open"
 import { callService } from "../telegram/service"
 import { type DeleteParams, type DeleteResult, SERVICE_REQUESTS } from "../telegram/service-requests"
 import { confirmWrite, defineTool } from "../tool"

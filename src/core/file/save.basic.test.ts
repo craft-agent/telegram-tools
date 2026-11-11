@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
 import { createHash } from "node:crypto"
-import { chmodSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs"
+import { chmodSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { USER } from "../telegram/mirror.testing"
 import { BYTES_PER_MB } from "../telegram/service-requests"
+import { modeOf as mode } from "../telegram/sync-keep.testing"
 import { annotations, type ToolContext } from "../tool"
 import { writeTargets } from "../targets"
 import { RESULT_NOTE } from "./constants"
@@ -18,7 +19,6 @@ beforeEach(() => {
 afterEach(() => t.close())
 
 const sha256 = (content: string | Buffer) => createHash("sha256").update(content).digest("hex")
-const mode = (path: string) => statSync(path).mode & 0o777
 
 describe("the tool", () => {
   test("is in the files toolset and adds files, so it is never a read tool", () => {

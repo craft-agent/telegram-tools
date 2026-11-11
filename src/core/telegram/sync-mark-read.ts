@@ -5,12 +5,18 @@ import { inTransaction, type Mirror } from "./mirror"
 import { findChat } from "./mirror-rows"
 import type { MarkReadParams, MarkReadResult } from "./service-requests"
 import type { ServiceCall } from "./service-server"
-import { handOverAffected, performAction, recordAction, type ActionContext } from "./sync-action"
+import {
+  handOverAffected,
+  inputChannelOf,
+  performAction,
+  recordAction,
+  resolveChatPeer,
+  runAction,
+  type ActionContext,
+} from "./sync-action"
 import { anyMessageOf } from "./sync-action-mirror"
 import { MESSAGE_GONE, type ActionRefusals, type ActionWords } from "./sync-action-outcome"
 import { writing } from "./sync-ending"
-import { viaTelegram } from "./sync-request-calls"
-import { cancelled } from "./sync-request-errors"
 import { parseMarkReadParams } from "./sync-request-params"
 import type { RequestQueue } from "./sync-request-queue"
 
@@ -42,9 +48,9 @@ type MarkReadAnswer = tl.messages.TypeAffectedMessages | boolean
 /** The call that reads up to message `up_to`: of the topic when one is named (the General topic included), else of the whole chat. */
 function requestOf(peer: tl.TypeInputPeer, { up_to, topic }: MarkReadParams): MarkReadRequest {
   if (topic !== undefined) return { _: "messages.readDiscussion", peer, msgId: topic, readMaxId: up_to }
-  if (peer._ !== "inputPeerChannel") return { _: "messages.readHistory", peer, maxId: up_to }
-  const { channelId, accessHash } = peer
-  return { _: "channels.readHistory", channel: { _: "inputChannel", channelId, accessHash }, maxId: up_to }
+  const channel = inputChannelOf(peer)
+  if (!channel) return { _: "messages.readHistory", peer, maxId: up_to }
+  return { _: "channels.readHistory", channel, maxId: up_to }
 }
 
 /** How many messages of `chat` the mirror holds from others past `readMax`: the ones the chat shows unread. */
@@ -90,12 +96,13 @@ async function markRead(
   // Never back: a read mark only moves forward, so a chat read this far is done. A topic has no mark in the mirror to look at.
   if (topic === undefined && row.read_max !== null && row.read_max >= up_to) return { ...done, already: true }
 
-  const peer = await viaTelegram(ctx, call, "mark read", () => ctx.client.resolvePeer(Number(chat)))
-  if (signal.aborted) throw cancelled()
+  const peer = await resolveChatPeer(ctx, call, signal, "mark read", chat)
 
-  const request = requestOf(peer, params)
-  const answer: MarkReadAnswer | undefined = await performAction(ctx, signal, MARK_READ_REFUSALS, (options) =>
-    ctx.client.call(request, options),
+  const answer: MarkReadAnswer | undefined = await performAction(
+    ctx,
+    signal,
+    MARK_READ_REFUSALS,
+    requestOf(peer, params),
   )
   // Only the account's own chats answer with events counted; a supergroup's, a channel's and a topic's answer is a bool.
   if (typeof answer === "object") handOverAffected(ctx, "mark read", answer)
@@ -120,7 +127,5 @@ export function markReadRequest(
   raw: unknown,
   call: ServiceCall,
 ): Promise<MarkReadResult> {
-  const params = parseMarkReadParams(raw)
-  const signal = AbortSignal.any([call.signal, ctx.signal])
-  return queue.run(signal, () => markRead(ctx, call, signal, params))
+  return runAction(ctx, queue, raw, call, parseMarkReadParams, (params, signal) => markRead(ctx, call, signal, params))
 }

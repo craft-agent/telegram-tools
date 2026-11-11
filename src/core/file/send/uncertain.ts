@@ -1,4 +1,4 @@
-import { readMirror } from "../../chat/open"
+import { readMirror } from "../../open"
 import type { ToolError } from "../../errors"
 import { MAX_SENT_LIKE, SENT_LOOKBACK_MS } from "../../message/constants"
 import { withFound } from "../../message/uncertain"

@@ -1,6 +1,9 @@
 import { z } from "zod"
 import { ToolError } from "./errors"
 
+/** Milliseconds in a second: durations in seconds become times in milliseconds. */
+export const MS_PER_S = 1000
+
 const MS_PER_MINUTE = 60_000
 const MINUTES_PER_HOUR = 60
 
