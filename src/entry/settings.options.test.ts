@@ -7,8 +7,8 @@ const fromOptions = (options: Record<string, unknown> | undefined, env: Record<s
 
 describe("settingsFromOptions", () => {
   test("gives no setting for no options", () => {
-    expect(fromOptions(undefined)).toEqual({ state_dir: expect.any(String), ...FILE_SETTINGS })
-    expect(fromOptions({})).toEqual({ state_dir: expect.any(String), ...FILE_SETTINGS })
+    expect(fromOptions(undefined)).toEqual({ options: {}, state_dir: expect.any(String), ...FILE_SETTINGS })
+    expect(fromOptions({})).toEqual({ options: {}, state_dir: expect.any(String), ...FILE_SETTINGS })
   })
 
   test("reads each option", () => {
@@ -25,6 +25,7 @@ describe("settingsFromOptions", () => {
       read_only: true,
       tools: ["demo_thing_read"],
       exclude_tools: ["a"],
+      options: {},
       state_dir: "/custom/state",
       ...FILE_SETTINGS,
     })
@@ -44,6 +45,7 @@ describe("settingsFromOptions", () => {
       toolsets: ["gamma"],
       read_only: true,
       tools: ["a", "b"],
+      options: {},
       state_dir: "/env/state",
       ...FILE_SETTINGS,
     })
@@ -53,6 +55,7 @@ describe("settingsFromOptions", () => {
       toolsets: ["beta"],
       read_only: false,
       tools: ["a", "b"],
+      options: {},
       state_dir: "/opt/state",
       ...FILE_SETTINGS,
     })
@@ -78,6 +81,7 @@ describe("settingsFromOptions", () => {
 
   test("reads keep_disappearing and channels from options and the environment", () => {
     expect(fromOptions({ keep_disappearing: true, channels: false })).toEqual({
+      options: {},
       state_dir: expect.any(String),
       ...FILE_SETTINGS,
       keep_disappearing: true,
