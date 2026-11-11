@@ -1,6 +1,6 @@
 {
   "name": "telegram-tools",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Unofficial Telegram tools for coding agents: chats, messages, received files and sends.",
   "author": {
     "name": "craftsamo",
