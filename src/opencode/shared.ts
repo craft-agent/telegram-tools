@@ -58,7 +58,8 @@ export function needsPermission(spec: Pick<ToolSpec, "class">): boolean {
 }
 
 /**
- * The tools, the resolved state and download settings and the program name the
+ * The tools, the resolved state and download settings, the package's own
+ * settings (`options`) and the program name the
  * plugin options (and the environment behind them) select from `specs`, and the
  * translator of the prompt language they set over the plugin's translations.
  */
@@ -68,7 +69,7 @@ export function selectedTools(
   deps: PluginDeps,
 ): { tools: ToolSpec[]; stateDir: string; translator: Translator } & Pick<
   ToolContext,
-  "downloadDir" | "downloadMaxMb" | "sendDirs" | "programName"
+  "downloadDir" | "downloadMaxMb" | "sendDirs" | "programName" | "options"
 > {
   const profile = deps.profile ?? PROJECT_PROFILE
   const settings = settingsFromOptions(options, deps.env ?? process.env, profile)
@@ -80,6 +81,7 @@ export function selectedTools(
     sendDirs: settings.send_dirs,
     programName: PROJECT.name,
     translator: promptTranslator(deps.translations ?? {}, settings.language),
+    options: settings.options,
   }
 }
 
