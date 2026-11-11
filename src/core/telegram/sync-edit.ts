@@ -1,4 +1,5 @@
 import { Message, PeersIndex, type tl } from "@mtcute/core"
+import { MS_PER_S } from "../time"
 import { ACTION_PAST, checkEditable, deletedMessage, takesCaption } from "./action-checks"
 import type { MediaInfo } from "./mirror-input"
 import type { EditParams, EditResult } from "./service-requests"
@@ -14,8 +15,6 @@ import type { RequestQueue } from "./sync-request-queue"
 import { handOver } from "./sync-send"
 import { readMessage } from "./sync-message"
 import { recordSent } from "./sync-send-record"
-
-const MS_PER_S = 1000
 
 const EDIT_WORDS: ActionWords = {
   name: "edit",

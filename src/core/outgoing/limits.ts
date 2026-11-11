@@ -1,5 +1,4 @@
-/** Bytes in one megabyte, as this package counts one (1024 × 1024). */
-const BYTES_PER_MB = 1024 * 1024
+import { BYTES_PER_MB } from "../telegram/service-requests"
 
 /** The most files one send carries: what the messaging service takes in one message. */
 export const MAX_FILES = 10
