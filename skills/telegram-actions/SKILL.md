@@ -52,6 +52,8 @@ description: "Use when editing a Telegram message the user sent, deleting one fo
   no `emoji`.
 - Custom and paid reactions are refused, and each chat decides which emoji it
   allows: when one is refused, try another only if the user agrees.
+- In Saved Messages a reaction is a tag, which Telegram keeps for Premium
+  accounts; without Premium the call is `forbidden` and nothing changes.
 
 ## Pin
 
