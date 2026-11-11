@@ -1,5 +1,6 @@
 import { mergeTranslations, type Translations } from "./core"
 import { CHAT_FACT_TRANSLATIONS } from "./core/chat/facts"
+import { MEDIA_FACT_TRANSLATIONS } from "./core/chat/media-facts"
 import { FACT_TRANSLATIONS } from "./core/facts"
 import { FILE_SEND_TRANSLATIONS } from "./core/file/send/words"
 import { FILE_TRANSLATIONS } from "./core/file/words"
@@ -11,6 +12,7 @@ import { SYNC_TRANSLATIONS } from "./core/sync/words"
 export const ALL_TRANSLATIONS: Translations = mergeTranslations(
   FACT_TRANSLATIONS,
   CHAT_FACT_TRANSLATIONS,
+  MEDIA_FACT_TRANSLATIONS,
   MESSAGE_TRANSLATIONS,
   ACTION_TRANSLATIONS,
   FILE_TRANSLATIONS,

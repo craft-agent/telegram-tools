@@ -26,7 +26,7 @@ describe("delete: the approval description", () => {
     t.own({ ts: NOW - 5000 })
     expect(await describeCall({})).toEqual({
       headline: {
-        text: "About to delete message {id} from {chat}",
+        text: "About to delete message {id} from {chat} for everyone",
         values: { id: String(OWN_ID), chat: "Alice Example" },
       },
       facts: [
@@ -57,7 +57,7 @@ describe("delete: the approval description", () => {
 
   test("shows the kind of the media of a message with no caption", async () => {
     t.own({ body: null, media: { type: "voice" } })
-    expect((await describeCall({}))?.facts[2]).toEqual({ label: "Current", value: "voice" })
+    expect((await describeCall({}))?.facts[2]).toEqual({ label: "Media", value: { text: "Voice message" } })
   })
 
   test("shows no current text for a message with neither text nor media", async () => {
@@ -73,11 +73,14 @@ describe("delete: the approval description", () => {
     expect(description).not.toHaveProperty("pins")
   })
 
-  test("gives no headline for a chat without a name, and keeps the facts", async () => {
+  test("keeps a headline without the chat's name, and keeps the facts", async () => {
     t.follow({ name: null })
     t.store({ id: OWN_ID, fromMe: true, sender: null, body: "old text" })
     const description = await describeCall({})
-    expect(description?.headline).toBeUndefined()
+    expect(description?.headline).toEqual({
+      text: "About to delete message {id} for everyone",
+      values: { id: String(OWN_ID) },
+    })
     expect(description?.facts).toHaveLength(3)
   })
 

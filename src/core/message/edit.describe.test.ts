@@ -74,15 +74,17 @@ describe("edit: the approval description", () => {
   test("shows the caption of a message with media, else the kind of its media", async () => {
     t.own({ id: 8, body: "a caption", media: { type: "photo" } })
     t.own({ id: 9, body: null, media: { type: "video" } })
-    expect((await describeCall({ id: 8 }))?.facts[2]).toEqual({ label: "Current", value: "a caption" })
-    expect((await describeCall({ id: 9 }))?.facts[2]).toEqual({ label: "Current", value: "video" })
+    const captioned = await describeCall({ id: 8 })
+    expect(captioned?.facts[2]).toEqual({ label: "Current", value: "a caption" })
+    expect(captioned?.facts.some(({ label }) => label === "Media")).toBe(false)
+    expect((await describeCall({ id: 9 }))?.facts[2]).toEqual({ label: "Media", value: { text: "Video" } })
   })
 
-  test("gives no headline for a chat without a name, and keeps the facts", async () => {
+  test("keeps a headline without the chat's name, and keeps the facts", async () => {
     t.follow({ name: null })
     t.store({ id: OWN_ID, fromMe: true, sender: null, body: "old text" })
     const description = await describeCall({})
-    expect(description?.headline).toBeUndefined()
+    expect(description?.headline).toEqual({ text: "About to edit message {id}", values: { id: String(OWN_ID) } })
     expect(description?.facts.map(({ label }) => label)).toEqual(["Chat", "Message", "Current"])
   })
 

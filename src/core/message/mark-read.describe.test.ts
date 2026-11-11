@@ -71,11 +71,14 @@ describe("mark read: the approval description", () => {
     })
   })
 
-  test("gives no headline for a chat without a name, and keeps the facts", async () => {
+  test("keeps a headline without the chat's name, and keeps the facts", async () => {
     t.follow({ name: null })
     t.store({ id: THEIR_ID })
     const description = await describeCall({})
-    expect(description?.headline).toBeUndefined()
+    expect(description?.headline).toEqual({
+      text: "About to mark messages read up to message {id}",
+      values: { id: String(THEIR_ID) },
+    })
     expect(description?.facts.map(({ label }) => label)).toEqual(["Chat", "Up to"])
   })
 

@@ -89,11 +89,15 @@ describe("pin: the approval description", () => {
     expect(after?.pins).toEqual({ edited: String(NOW - 1000) })
   })
 
-  test("gives no headline for a chat without a name, and keeps the facts", async () => {
+  test("keeps the direction in a headline without the chat's name, and keeps the facts", async () => {
     t.follow({ name: null })
     t.store({ id: THEIR_ID, body: "from Alice" })
     const description = await describeCall({})
-    expect(description?.headline).toBeUndefined()
+    expect(description?.headline).toEqual({ text: "About to pin message {id}", values: { id: String(THEIR_ID) } })
+    expect((await describeCall({ unpin: true }))?.headline).toEqual({
+      text: "About to unpin message {id}",
+      values: { id: String(THEIR_ID) },
+    })
     expect(labels(description)).toEqual(["Chat", "Message", "Current"])
   })
 

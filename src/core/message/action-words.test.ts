@@ -3,6 +3,15 @@ import { callDescription } from "../describe"
 import { OTHER_USER, USER } from "../telegram/mirror.testing"
 import { DOWNLOAD_CONTEXT } from "../tool.testing"
 import { translator } from "../words"
+import {
+  DELETE_HEADLINES,
+  EDIT_HEADLINES,
+  MARK_READ_HEADLINES,
+  PIN_HEADLINES,
+  REACT_HEADLINES,
+  UNPIN_HEADLINES,
+  UNREACT_HEADLINES,
+} from "./action-describe"
 import { ACTION_TRANSLATIONS } from "./action-words"
 import { createActionFixture, OWN_ID, THUMBS_UP, type ActionFixture } from "./action.testing"
 import { telegramMessageDelete } from "./delete"
@@ -13,6 +22,15 @@ import { telegramMessageReact } from "./react"
 
 const ja = translator(ACTION_TRANSLATIONS, "ja")
 const HEART = "❤️"
+const HEADLINES = [
+  EDIT_HEADLINES,
+  DELETE_HEADLINES,
+  REACT_HEADLINES,
+  UNREACT_HEADLINES,
+  PIN_HEADLINES,
+  UNPIN_HEADLINES,
+  MARK_READ_HEADLINES,
+]
 
 type Description = NonNullable<Awaited<ReturnType<typeof callDescription>>>
 
@@ -63,6 +81,7 @@ describe("ACTION_TRANSLATIONS", () => {
     const words = [
       ...tools.flatMap(({ title, intent }) => [title, intent!]),
       ...Object.values(all).flatMap(([named, saved]) => [named!.headline!.text, saved!.headline!.text]),
+      ...HEADLINES.map(({ bare }) => bare),
       ...all.edit[0]!.facts.slice(1).map(({ label }) => label),
       all.edit[0]!.text!.label,
       all.react[0]!.facts[3]!.label,
@@ -86,5 +105,22 @@ describe("ACTION_TRANSLATIONS", () => {
     }
     for (const description of all.react) expect(ja.template(description.headline!.text)).toContain("{emoji}")
     for (const description of all.unreact) expect(ja.template(description.headline!.text)).not.toContain("{emoji}")
+    for (const { bare } of HEADLINES) {
+      expect(ja.template(bare)).toBe(ACTION_TRANSLATIONS.ja![bare]!)
+      expect(ja.template(bare)).toContain("{id}")
+      expect(ja.template(bare)).not.toContain("{chat}")
+    }
   })
+
+  test("says that deletion is for everyone in the intent and named headline", () => {
+    expect(ja.word(telegramMessageDelete.intent!)).toBe("メッセージを全員分削除しようとしています")
+    expect(ja.template(DELETE_HEADLINES.named)).toBe("{chat} のメッセージ {id} を全員分削除しようとしています")
+  })
+
+  test.each(HEADLINES.filter((headlines) => headlines !== MARK_READ_HEADLINES))(
+    "locates the message in Saved Messages in Japanese: %o",
+    ({ saved }) => {
+      expect(ja.template(saved)).toContain("保存済みメッセージにあるメッセージ {id}")
+    },
+  )
 })

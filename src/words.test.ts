@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { translator } from "./core"
 import { templatePlaceholders } from "./core/describe"
 import { CHAT_FACT_TRANSLATIONS } from "./core/chat/facts"
+import { MEDIA_FACT_TRANSLATIONS } from "./core/chat/media-facts"
 import { FACT_TRANSLATIONS } from "./core/facts"
 import { FILE_SEND_TRANSLATIONS } from "./core/file/send/words"
 import { FILE_TRANSLATIONS } from "./core/file/words"
@@ -14,6 +15,7 @@ import { ALL_TRANSLATIONS } from "./words"
 const TABLES = [
   FACT_TRANSLATIONS,
   CHAT_FACT_TRANSLATIONS,
+  MEDIA_FACT_TRANSLATIONS,
   MESSAGE_TRANSLATIONS,
   ACTION_TRANSLATIONS,
   FILE_TRANSLATIONS,

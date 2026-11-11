@@ -9,30 +9,39 @@ export const ACTION_TRANSLATIONS: Translations = {
     "Pin or unpin a message": "メッセージをピン留めする・解除する",
     "Mark a chat read": "チャットを既読にする",
     "About to edit a message": "メッセージを編集しようとしています",
-    "About to delete a message": "メッセージを削除しようとしています",
+    "About to delete a message for everyone": "メッセージを全員分削除しようとしています",
     "About to change a reaction": "リアクションを変更しようとしています",
     "About to pin or unpin a message": "メッセージのピン留めを変更しようとしています",
     "About to mark messages read": "メッセージを既読にしようとしています",
     "About to edit message {id} in {chat}": "{chat} のメッセージ {id} を編集しようとしています",
-    "About to edit message {id} in Saved Messages": "保存済みメッセージのメッセージ {id} を編集しようとしています",
-    "About to delete message {id} from {chat}": "{chat} のメッセージ {id} を削除しようとしています",
-    "About to delete message {id} from Saved Messages": "保存済みメッセージのメッセージ {id} を削除しようとしています",
+    "About to edit message {id} in Saved Messages": "保存済みメッセージにあるメッセージ {id} を編集しようとしています",
+    "About to edit message {id}": "メッセージ {id} を編集しようとしています",
+    "About to delete message {id} from {chat} for everyone": "{chat} のメッセージ {id} を全員分削除しようとしています",
+    "About to delete message {id} from Saved Messages":
+      "保存済みメッセージにあるメッセージ {id} を削除しようとしています",
+    "About to delete message {id} for everyone": "メッセージ {id} を全員分削除しようとしています",
     "About to react {emoji} to message {id} in {chat}":
       "{chat} のメッセージ {id} に {emoji} のリアクションを付けようとしています",
     "About to react {emoji} to message {id} in Saved Messages":
-      "保存済みメッセージのメッセージ {id} に {emoji} のリアクションを付けようとしています",
+      "保存済みメッセージにあるメッセージ {id} に {emoji} のリアクションを付けようとしています",
+    "About to react {emoji} to message {id}": "メッセージ {id} に {emoji} のリアクションを付けようとしています",
     "About to remove your reaction from message {id} in {chat}":
       "{chat} のメッセージ {id} から自分のリアクションを外そうとしています",
     "About to remove your reaction from message {id} in Saved Messages":
-      "保存済みメッセージのメッセージ {id} から自分のリアクションを外そうとしています",
+      "保存済みメッセージにあるメッセージ {id} から自分のリアクションを外そうとしています",
+    "About to remove your reaction from message {id}": "メッセージ {id} から自分のリアクションを外そうとしています",
     "About to pin message {id} in {chat}": "{chat} のメッセージ {id} をピン留めしようとしています",
-    "About to pin message {id} in Saved Messages": "保存済みメッセージのメッセージ {id} をピン留めしようとしています",
+    "About to pin message {id} in Saved Messages":
+      "保存済みメッセージにあるメッセージ {id} をピン留めしようとしています",
+    "About to pin message {id}": "メッセージ {id} をピン留めしようとしています",
     "About to unpin message {id} in {chat}": "{chat} のメッセージ {id} のピン留めを解除しようとしています",
     "About to unpin message {id} in Saved Messages":
-      "保存済みメッセージのメッセージ {id} のピン留めを解除しようとしています",
+      "保存済みメッセージにあるメッセージ {id} のピン留めを解除しようとしています",
+    "About to unpin message {id}": "メッセージ {id} のピン留めを解除しようとしています",
     "About to mark {chat} read up to message {id}": "{chat} をメッセージ {id} まで既読にしようとしています",
     "About to mark Saved Messages read up to message {id}":
       "保存済みメッセージをメッセージ {id} まで既読にしようとしています",
+    "About to mark messages read up to message {id}": "メッセージ {id} まで既読にしようとしています",
     Message: "メッセージ",
     Current: "現在の内容",
     Replaces: "置き換えるリアクション",
