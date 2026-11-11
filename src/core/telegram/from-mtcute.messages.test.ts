@@ -15,6 +15,7 @@ import {
   fakeMessage,
   fakeReactions,
   fakeReplyHeader,
+  fakeSelf,
   fakeServiceMessage,
   fakeSupergroup,
   fakeTextLink,
@@ -99,6 +100,15 @@ describe("messageInputOf the sender", () => {
   test("is the account for an outgoing message, with no sender when Telegram names none in a private chat", () => {
     const input = inputOf(fakeMessage({ out: true, fromId: undefined }), alice)
     expect(input).toMatchObject({ fromMe: true, sender: null, senderName: null })
+  })
+
+  test("is the account for a message in Saved Messages, where Telegram sets no outgoing flag", () => {
+    const raw = fakeMessage({ peerId: userPeer(FAKE_IDS.me), fromId: userPeer(FAKE_IDS.me) })
+    expect(inputOf(raw, fakeSelf())).toMatchObject({ chat: FAKE_MARKED.me, fromMe: true })
+  })
+
+  test("is not the account for an incoming message in a private chat with another person", () => {
+    expect(inputOf(fakeMessage(), alice).fromMe).toBe(false)
   })
 
   test("is the named sender in a group", () => {

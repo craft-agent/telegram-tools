@@ -50,6 +50,15 @@ export function notOwnMessage(past: string): ToolError {
   return new ToolError("forbidden", `Only your own messages can be ${past}.`)
 }
 
+/**
+ * Whether a stored message is the user's own: sent by them, or in Saved
+ * Messages (`self`). Telegram marks no message in Saved Messages as sent, so
+ * rows mirrored before that was accounted for carry `from_me` 0.
+ */
+export function isOwnMessage(fromMe: number, chatKind: ChatKind): boolean {
+  return fromMe === 1 || chatKind === "self"
+}
+
 /** The refusal for an action on a message the mirror was told is deleted. */
 export function goneMessage(past: string): ToolError {
   return new ToolError("not_found", `This message was deleted; nothing was ${past}.`)

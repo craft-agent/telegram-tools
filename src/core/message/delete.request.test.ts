@@ -102,6 +102,13 @@ describe("delete: the arguments and the mirror are checked before any request", 
     expect(calls).toHaveLength(0)
   })
 
+  test("a message in Saved Messages stored as not sent by the user is left to the service", async () => {
+    t.follow({ id: OTHER_USER, kind: "self", name: "Me", username: null })
+    t.store({ chat: OTHER_USER, id: 8, body: "a note" })
+    await t.remove({ chat: OTHER_USER, id: 8 })
+    expect(calls).toEqual([{ method: "delete", params: { chat: OTHER_USER, id: 8 } }])
+  })
+
   test("a chat the user has left is forbidden", async () => {
     t.follow({ left: true })
     expect(await t.removeFails()).toMatchObject({

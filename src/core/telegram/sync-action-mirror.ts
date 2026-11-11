@@ -1,4 +1,4 @@
-import { goneMessage, leftChat, noSuchMessage, notOwnMessage } from "./action-checks"
+import { goneMessage, isOwnMessage, leftChat, noSuchMessage, notOwnMessage } from "./action-checks"
 import type { Mirror } from "./mirror"
 import { isDeleted, type ChatRow } from "./mirror-rows"
 import type { ActionWords } from "./sync-action-outcome"
@@ -69,7 +69,7 @@ export function targetOf(
     if (isDeleted(mirror, chat, id)) return { chat, message: null }
     throw noSuchMessage(id, chat.followed, words.past)
   }
-  if (whose === "own" && row.from_me !== 1) throw notOwnMessage(words.past)
+  if (whose === "own" && !isOwnMessage(row.from_me, chat.kind)) throw notOwnMessage(words.past)
   return { chat, message: messageOf(row) }
 }
 

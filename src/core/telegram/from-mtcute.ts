@@ -41,6 +41,11 @@ function isGone(chat: Chat): boolean {
   return chat.isBanned || !chat.isMember || deactivated
 }
 
+/** Whether a peer is the account itself, whose chat is Saved Messages. */
+function isSelfChat(peer: Peer): boolean {
+  return peer.type === "user" && peer.isSelf
+}
+
 /**
  * The chat a peer is: a person, a bot, Saved Messages (`self`), or a group.
  * Null for what the mirror does not keep (monoforums and communities). The
@@ -49,7 +54,7 @@ function isGone(chat: Chat): boolean {
  */
 export function chatInputOf(peer: Peer): ChatInput | null {
   if (peer.type === "user") {
-    const kind = peer.isSelf ? "self" : peer.isBot ? "bot" : "user"
+    const kind = isSelfChat(peer) ? "self" : peer.isBot ? "bot" : "user"
     return { id: String(peer.id), kind, name: peer.displayName, username: peer.username }
   }
   const kind = chatKindOf(peer)
@@ -90,6 +95,8 @@ export function chatInputOfDialog(dialog: Dialog): ChatInput | null {
  * A message in full, or null when its chat is one the mirror does not keep.
  * Only what the mirror stores is copied: a file's facts, never its id,
  * reference or access hash; no coordinates and no phone numbers (see `mediaOf`).
+ * A message is `fromMe` when Telegram marks it outgoing or it is in Saved
+ * Messages, where Telegram marks none.
  */
 export function messageInputOf(message: Message): MessageInput | null {
   const { raw } = message
@@ -102,7 +109,7 @@ export function messageInputOf(message: Message): MessageInput | null {
     id: message.id,
     topic: topicOf(message),
     ts: message.date.getTime(),
-    fromMe: Boolean(message.isOutgoing),
+    fromMe: Boolean(message.isOutgoing) || isSelfChat(chat),
     sender,
     senderName,
     kind: message.isService ? "service" : "message",

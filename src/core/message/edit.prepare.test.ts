@@ -49,6 +49,13 @@ describe("edit: the mirror is checked before any request", () => {
     expect(calls).toHaveLength(0)
   })
 
+  test("a message in Saved Messages stored as not sent by the user is left to the service", async () => {
+    t.follow({ id: OTHER_USER, kind: "self", name: "Me", username: null })
+    t.store({ chat: OTHER_USER, id: OWN_ID, body: "old text" })
+    await t.edit({ chat: OTHER_USER })
+    expect(calls).toEqual([{ method: "edit", params: { chat: OTHER_USER, id: OWN_ID, text: "new text" } }])
+  })
+
   test("a chat the user has left is forbidden", async () => {
     t.follow({ left: true })
     const error = await t.editFails()
