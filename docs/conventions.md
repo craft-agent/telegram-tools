@@ -739,9 +739,11 @@ The facts this package's tools add beside the shared `Size`
   from sending to one person. Defined in `src/core/chat/facts.ts`.
 - **`Topic`** is the forum topic, by its title in the mirror (else its id).
 - **`Reply to`** is the message replied to, as `message {id}`.
-- **`File`** is the kind of file a save downloads, as a word of the tool's:
-  `Photo`, `Document`, `Audio`, `Voice message`, `Video` or `Sticker` (another
-  kind of media shows as the mirror names it).
+- **`File`** is the kind of file a save downloads, as a word of the tool's
+  (`Photo`, `Voice message`, `Link preview`, ...). The kind words, in
+  `src/core/chat/media-facts.ts`, are shared with the actions' `Media` fact
+  and cover every kind the mirror stores; a kind without one shows as the
+  mirror names it.
 - **`Unpack`** is `Yes` when the call asks to unpack an archive.
 - **`Files`** is how many files a send carries, when it is more than one; the
   shared `Size` then is their total.
@@ -753,7 +755,9 @@ The facts this package's tools add beside the shared `Size`
   then is the intent, since a count quoted as a headline value reads as a name.
 - **`Message`** is the message an action changes, as `message {id}`, with
   **`Current`**, its text now as the mirror has it; an edit's prompt shows the
-  new text as its text.
+  new text as its text. **`Media`**, for a message with no text, is the kind of
+  its media as one of the shared kind words, never under `Current`, so it is
+  not read as the message's text.
 - **`Replaces`** is the user's reaction a reaction call takes away.
 - **`Notify`** is `Yes` when a pin tells the members, and **`Both sides`** is
   `Yes` when a pin in a private chat also pins for the other person.
@@ -768,9 +772,11 @@ message that changed after the prompt stops the call as `stale`.
 
 Values come from the label's mirror (the chat's own title, never the model's
 account of it). A chat the mirror does not have gives no description, so the
-prompt shows the intent and the target. A call that names several chats, or one
-without a title, lists them in its text under `Chat list`, one per line, by
-their title in the mirror and their id.
+prompt shows the intent and the target. An action on a chat without a name
+keeps a headline without it, so what it does (a reaction's emoji, a pin or an
+unpin) still shows. A call that names several chats, or one without a title,
+lists them in its text under `Chat list`, one per line, by their title in the
+mirror and their id.
 
 ## Toolsets
 

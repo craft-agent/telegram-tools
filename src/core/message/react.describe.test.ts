@@ -108,14 +108,21 @@ describe("react: the approval description", () => {
 
   test("shows the kind of the media of a message with no caption", async () => {
     t.theirs({ body: null, media: { type: "voice" } })
-    expect((await describeCall({}))?.facts[2]).toEqual({ label: "Current", value: "voice" })
+    expect((await describeCall({}))?.facts[2]).toEqual({ label: "Media", value: { text: "Voice message" } })
   })
 
-  test("gives no headline for a chat without a name, and keeps the facts", async () => {
+  test("keeps the direction and emoji in a headline without the chat's name, and keeps the facts", async () => {
     t.follow({ name: null })
     t.store({ id: THEIR_ID, body: "from Alice" })
     const description = await describeCall({})
-    expect(description?.headline).toBeUndefined()
+    expect(description?.headline).toEqual({
+      text: "About to react {emoji} to message {id}",
+      values: { id: String(THEIR_ID), emoji: THUMBS_UP },
+    })
+    expect((await describeCall({ emoji: undefined, remove: true }))?.headline).toEqual({
+      text: "About to remove your reaction from message {id}",
+      values: { id: String(THEIR_ID) },
+    })
     expect(labels(description)).toEqual(["Chat", "Message", "Current"])
   })
 

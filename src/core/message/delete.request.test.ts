@@ -29,7 +29,7 @@ describe("delete: the tool", () => {
       id: "telegram_message_delete",
       toolset: "actions",
       class: "administrative",
-      intent: "About to delete a message",
+      intent: "About to delete a message for everyone",
     })
     expect(annotations(telegramMessageDelete)).toMatchObject({
       readOnlyHint: false,

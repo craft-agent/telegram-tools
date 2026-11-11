@@ -71,6 +71,11 @@ describe("save: the approval description", () => {
     expect((await describeCall(saveArgs()))?.facts[1]).toEqual({ label: "File", value: "animation" })
   })
 
+  test("uses the shared kind words for media beyond downloadable files", async () => {
+    storeMedia({ type: "poll" })
+    expect((await describeCall(saveArgs()))?.facts[1]).toEqual({ label: "File", value: { text: "Poll" } })
+  })
+
   test("shows only the chat, with no pin, for a message the mirror lacks", async () => {
     const description = await describeCall(saveArgs())
     expect(description).toEqual({

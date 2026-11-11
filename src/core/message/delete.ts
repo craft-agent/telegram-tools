@@ -22,7 +22,7 @@ export const telegramMessageDelete = defineTool({
     "A result means Telegram deleted the message for everyone. `already` means it was gone before this call.",
     "A failure `uncertain` means the delete may have gone through: check the chat in Telegram and never ask for it again without the user checking.",
   ].join(" "),
-  intent: "About to delete a message",
+  intent: "About to delete a message for everyone",
   toolset: "actions",
   class: "administrative",
   input: deleteInput,

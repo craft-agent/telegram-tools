@@ -3,6 +3,7 @@ import { DEFAULT_LIMITS, type ArchiveLimits } from "../archive/limits"
 import { ArchiveRefused } from "../archive/refused"
 import { existingChat, messageMedia, requireChatId } from "../chat/chat-rows"
 import { chatFact } from "../chat/facts"
+import { mediaKindValue } from "../chat/media-facts"
 import { PRIVATE_NOTE } from "../chat/message-schema"
 import { pickPaths, readMirror } from "../open"
 import { isAbortError, isToolError } from "../errors"
@@ -55,16 +56,6 @@ function namesOf(file: Pick<DownloadedFile, "name" | "kind" | "type">, id: numbe
   return { name, shown: file.name === null ? file.kind : name }
 }
 
-/** The words of the tool for the kinds of media a save downloads; any other kind shows as the mirror names it. */
-const FILE_KIND_WORDS: Record<string, string> = {
-  photo: "Photo",
-  document: "Document",
-  audio: "Audio",
-  voice: "Voice message",
-  video: "Video",
-  sticker: "Sticker",
-}
-
 /** The approval headline of a save, by what the mirror knows of the file's name and the chat's name. */
 function saveHeadline(file: string | undefined, chat: string | null): CallHeadline | undefined {
   if (file !== undefined && chat !== null) return { text: "About to save {file} from {chat}", values: { file, chat } }
@@ -75,9 +66,8 @@ function saveHeadline(file: string | undefined, chat: string | null): CallHeadli
 
 /** The `File` fact of a message that has media, and the `Unpack` and `Size` facts the call and the media add. */
 function fileFacts(media: MediaInfo | null, unpack: boolean | undefined): CallFact[] {
-  const kind = media && Object.hasOwn(FILE_KIND_WORDS, media.type) ? FILE_KIND_WORDS[media.type] : undefined
   return [
-    ...(media ? [{ label: "File", value: kind ? { text: kind } : media.type }] : []),
+    ...(media ? [{ label: "File", value: mediaKindValue(media.type) }] : []),
     ...(unpack ? [{ label: "Unpack", value: { text: "Yes" } }] : []),
     ...(media?.size !== undefined && Number.isSafeInteger(media.size) && media.size > 0 ? [sizeFact(media.size)] : []),
   ]
