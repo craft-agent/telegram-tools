@@ -1,19 +1,22 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test"
+import { FAKE_DATE, FAKE_IDS, fakeMessage, fakeSelf, userPeer } from "./fake-telegram.testing"
 import { CAPTION_MAX_UNITS } from "./service-requests"
 import { CHANNEL } from "./mirror.testing"
 import { failureOf } from "./service.testing"
 import { KEPT, PLAIN, UNLISTED } from "./sync-requests.testing"
 import { LEFT_GROUP } from "./sync-send.testing"
+import { IN_OTHER_CHAT, SAVED, seedPinChats } from "./sync-pin.testing"
 import {
+  EDIT_DATE,
   NEW_TEXT,
   OWN,
   OWN_TEXT,
   THEIRS,
   actionsOf,
+  affected,
   edit,
   editedInPrivate,
   remove,
-  seedActionChats,
 } from "./sync-action.testing"
 import { syncFixture, type SyncFixture } from "./sync.testing"
 
@@ -21,7 +24,7 @@ let fixture: SyncFixture
 
 beforeAll(async () => {
   fixture = syncFixture()
-  seedActionChats(fixture)
+  seedPinChats(fixture)
   await fixture.running()
 })
 
@@ -152,6 +155,38 @@ describe("a delete the mirror shows cannot succeed", () => {
   test("of a message the mirror lacks is not found", async () => {
     expect(await refusedDelete({ id: 77 })).toMatchObject({ code: "not_found" })
     nothingAsked()
+  })
+})
+
+describe("a message in Saved Messages stored as not sent by the user", () => {
+  test("is edited, since Telegram marks no message there as sent", async () => {
+    const message = fakeMessage({
+      id: IN_OTHER_CHAT,
+      peerId: userPeer(FAKE_IDS.me),
+      fromId: undefined,
+      message: NEW_TEXT,
+      date: FAKE_DATE,
+      editDate: EDIT_DATE,
+    })
+    fixture.client.setActionAnswer({
+      _: "updates",
+      updates: [{ _: "updateEditMessage", message, pts: 50, ptsCount: 1 }],
+      users: [fakeSelf()],
+      chats: [],
+      date: EDIT_DATE,
+      seq: 0,
+    })
+
+    const result = await edit(fixture, { chat: SAVED, id: IN_OTHER_CHAT, text: NEW_TEXT })
+    expect(result).toMatchObject({ id: IN_OTHER_CHAT })
+    expect(actionsOf(fixture)).toHaveLength(1)
+  })
+
+  test("is deleted", async () => {
+    fixture.client.setActionAnswer(affected())
+
+    expect(await remove(fixture, { chat: SAVED, id: IN_OTHER_CHAT })).toEqual({ id: IN_OTHER_CHAT, deleted: true })
+    expect(actionsOf(fixture)).toHaveLength(1)
   })
 })
 

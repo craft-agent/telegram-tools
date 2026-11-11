@@ -2,6 +2,7 @@ import { existingChat, messageMedia } from "../chat/chat-rows"
 import {
   ACTION_PAST,
   goneMessage,
+  isOwnMessage,
   leftChat,
   noSuchMessage,
   notOwnMessage,
@@ -68,7 +69,7 @@ function findMessage(mirror: Mirror, chatId: string, id: number, past: string, w
     if (isDeleted(mirror, chat, id)) return { chat, message: null }
     throw noSuchMessage(id, chat.followed, past)
   }
-  if (whose === "own" && row.from_me !== 1) throw notOwnMessage(past)
+  if (whose === "own" && !isOwnMessage(row.from_me, chat.kind)) throw notOwnMessage(past)
   const { media, edited } = messageMedia(mirror, chatId, id)!
   const { ts, kind, body, topic } = row
   return { chat, message: { ts, kind, body, media, edited, reactions: storedReactions(row.reactions), topic } }
