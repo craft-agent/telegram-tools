@@ -11,8 +11,15 @@ CLI_NAME = "telegram-tools-cli"
 #: The prefix skills start with: skills named ``<SKILL_PREFIX><topic>`` are registered without it.
 SKILL_PREFIX = "telegram-"
 
-#: The emoji each toolset is shown with; empty by default until a project adds its own.
-TOOLSET_EMOJI: dict[str, str] = {"account": "🪪"}
+#: The emoji each toolset is shown with.
+TOOLSET_EMOJI: dict[str, str] = {
+    "account": "🪪",
+    "chats": "💬",
+    "sync": "🔄",
+    "files": "📎",
+    "sends": "📤",
+    "actions": "🔧",
+}
 
 __all__ = [
     "CLI_NAME",
