@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { labelPaths } from "../telegram/labels"
-import { USER } from "../telegram/mirror.testing"
+import { labelPaths } from "./telegram/labels"
+import { USER } from "./telegram/mirror.testing"
 import { pickPaths, readMirror } from "./open"
-import { createChatFixture, type ChatFixture } from "./read.testing"
+import { createChatFixture, type ChatFixture } from "./chat/read.testing"
 
 let t: ChatFixture
 

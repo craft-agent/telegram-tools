@@ -1,7 +1,7 @@
 import { realpath } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { requireChatId } from "../../chat/chat-rows"
-import { pickPaths } from "../../chat/open"
+import { pickPaths } from "../../open"
 import { ToolError, isToolError } from "../../errors"
 import { checkedCaption } from "../../message/arguments"
 import { checkOutgoingFile } from "../../outgoing/check"

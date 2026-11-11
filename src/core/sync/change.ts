@@ -1,6 +1,6 @@
 import { z } from "zod"
 import { requireChatId } from "../chat/chat-rows"
-import { pickPaths } from "../chat/open"
+import { pickPaths } from "../open"
 import { ToolError } from "../errors"
 import { callService } from "../telegram/service"
 import {

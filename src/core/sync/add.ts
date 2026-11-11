@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { pickPaths } from "../chat/open"
+import { pickPaths } from "../open"
 import { SYNC_LIST_LIMIT } from "../telegram/service-requests"
 import { defineTool } from "../tool"
 import { accountTargets, changeInput, requestSyncAdd, requireChatIds } from "./change"

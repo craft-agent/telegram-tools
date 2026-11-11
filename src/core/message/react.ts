@@ -1,5 +1,5 @@
 import { requireChatId } from "../chat/chat-rows"
-import { pickPaths, readMirror } from "../chat/open"
+import { pickPaths, readMirror } from "../open"
 import { cut, MAX_VALUE_LENGTH } from "../describe"
 import { ownReaction } from "../telegram/action-checks"
 import { callService } from "../telegram/service"

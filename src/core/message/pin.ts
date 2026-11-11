@@ -1,5 +1,5 @@
 import { requireChatId } from "../chat/chat-rows"
-import { pickPaths, readMirror } from "../chat/open"
+import { pickPaths, readMirror } from "../open"
 import { isPrivateChat } from "../telegram/action-checks"
 import { callService } from "../telegram/service"
 import { type PinParams, type PinResult, SERVICE_REQUESTS } from "../telegram/service-requests"

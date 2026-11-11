@@ -7,7 +7,7 @@ import { aroundChat, liveAround } from "./around"
 import { fetchResult, planFetch } from "./fetch"
 import { listChats, readListArguments } from "./list"
 import { requestAround, requestFetch, requestHistory, requestRefresh, requestTopics } from "./live"
-import { pickPaths, readMirror } from "./open"
+import { pickPaths, readMirror } from "../open"
 import {
   AROUND_COUNT,
   FETCH_PAGES,

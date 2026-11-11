@@ -3,7 +3,7 @@ import { RESULT_BUDGET } from "../pages"
 import { labelPaths } from "../telegram/labels"
 import { GROUP, NOW, OTHER_USER, USER } from "../telegram/mirror.testing"
 import { formatLocalTime } from "../time"
-import { readMirror } from "./open"
+import { readMirror } from "../open"
 import { at, createChatFixture, type ChatFixture } from "./read.testing"
 import { SCAN_LIMITS, searchMessages, type ScanLimits } from "./search"
 
