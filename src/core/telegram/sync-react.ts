@@ -6,12 +6,10 @@ import type { ReactionInfo } from "./mirror-input"
 import { toJson } from "./mirror-rows"
 import type { ReactParams, ReactResult } from "./service-requests"
 import type { ServiceCall } from "./service-server"
-import { performAction, recordAction, updatesOf, type ActionContext } from "./sync-action"
+import { performAction, recordAction, resolveChatPeer, runAction, updatesOf, type ActionContext } from "./sync-action"
 import { anyMessageOf, storedMessageOf } from "./sync-action-mirror"
 import { MESSAGE_GONE, type ActionRefusals, type ActionWords } from "./sync-action-outcome"
 import { writing } from "./sync-ending"
-import { viaTelegram } from "./sync-request-calls"
-import { cancelled } from "./sync-request-errors"
 import { parseReactParams } from "./sync-request-params"
 import type { RequestQueue } from "./sync-request-queue"
 import { handOver } from "./sync-send"
@@ -116,8 +114,7 @@ async function reactTo(
   if (params.emoji !== undefined && ownReaction(storedReactions(message.reactions)) === params.emoji) {
     return { ...doneOf(params), already: true }
   }
-  const peer = await viaTelegram(ctx, call, "react", () => ctx.client.resolvePeer(Number(params.chat)))
-  if (signal.aborted) throw cancelled()
+  const peer = await resolveChatPeer(ctx, call, signal, "react", params.chat)
 
   // This replaces all the user's reactions on the message; none removes them.
   const request: tl.messages.RawSendReactionRequest = {
@@ -126,7 +123,7 @@ async function reactTo(
     msgId: params.id,
     reaction: params.emoji === undefined ? [] : [{ _: "reactionEmoji", emoticon: params.emoji }],
   }
-  const response = await performAction(ctx, signal, REACT_REFUSALS, (options) => ctx.client.call(request, options))
+  const response = await performAction(ctx, signal, REACT_REFUSALS, request)
   if (response === undefined) return { ...doneOf(params), already: true }
   handOver(ctx, response, "react")
   recordReaction(ctx, params, response)
@@ -149,7 +146,5 @@ export function reactRequest(
   raw: unknown,
   call: ServiceCall,
 ): Promise<ReactResult> {
-  const params = parseReactParams(raw)
-  const signal = AbortSignal.any([call.signal, ctx.signal])
-  return queue.run(signal, () => reactTo(ctx, call, signal, params))
+  return runAction(ctx, queue, raw, call, parseReactParams, (params, signal) => reactTo(ctx, call, signal, params))
 }

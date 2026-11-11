@@ -4,13 +4,19 @@ import { inTransaction } from "./mirror"
 import { isNumberedPerChat, type ChatRow } from "./mirror-rows"
 import type { DeleteParams, DeleteResult } from "./service-requests"
 import type { ServiceCall } from "./service-server"
-import { handOverAffected, performAction, recordAction, type ActionContext } from "./sync-action"
+import {
+  handOverAffected,
+  inputChannelOf,
+  performAction,
+  recordAction,
+  resolveChatPeer,
+  runAction,
+  type ActionContext,
+} from "./sync-action"
 import { targetOf } from "./sync-action-mirror"
 import { MESSAGE_GONE, type ActionRefusals, type ActionWords } from "./sync-action-outcome"
 import { deleteMessages } from "./ingest-delete"
 import { writing } from "./sync-ending"
-import { viaTelegram } from "./sync-request-calls"
-import { cancelled } from "./sync-request-errors"
 import { parseDeleteParams } from "./sync-request-params"
 import type { RequestQueue } from "./sync-request-queue"
 
@@ -37,12 +43,11 @@ const DELETE_REFUSALS: ActionRefusals = {
 
 /** The call that deletes message `id` for everyone: a channel's own method for a supergroup or channel, else the account's. */
 function requestOf(
-  peer: tl.TypeInputPeer,
+  channel: tl.RawInputChannel | undefined,
   id: number,
 ): tl.messages.RawDeleteMessagesRequest | tl.channels.RawDeleteMessagesRequest {
-  if (peer._ !== "inputPeerChannel") return { _: "messages.deleteMessages", revoke: true, id: [id] }
-  const { channelId, accessHash } = peer
-  return { _: "channels.deleteMessages", channel: { _: "inputChannel", channelId, accessHash }, id: [id] }
+  if (!channel) return { _: "messages.deleteMessages", revoke: true, id: [id] }
+  return { _: "channels.deleteMessages", channel, id: [id] }
 }
 
 /**
@@ -71,12 +76,10 @@ async function deleteOwn(
 ): Promise<DeleteResult> {
   const { chat, message } = targetOf(ctx.mirror, params.chat, params.id, DELETE_WORDS)
   if (!message) return { id: params.id, deleted: true, already: true }
-  const peer = await viaTelegram(ctx, call, "delete", () => ctx.client.resolvePeer(Number(params.chat)))
-  if (signal.aborted) throw cancelled()
+  const channel = inputChannelOf(await resolveChatPeer(ctx, call, signal, "delete", params.chat))
 
-  const request = requestOf(peer, params.id)
-  const affected = await performAction(ctx, signal, DELETE_REFUSALS, (options) => ctx.client.call(request, options))
-  if (affected) handOverAffected(ctx, "delete", affected, peer._ === "inputPeerChannel" ? peer.channelId : undefined)
+  const affected = await performAction(ctx, signal, DELETE_REFUSALS, requestOf(channel, params.id))
+  if (affected) handOverAffected(ctx, "delete", affected, channel?.channelId)
   recordDelete(ctx, chat, params.id)
   // No event counted: the message was not there to delete, so it is gone, though not by this call.
   return { id: params.id, deleted: true, ...(!affected || affected.ptsCount === 0 ? { already: true } : {}) }
@@ -97,7 +100,5 @@ export function deleteRequest(
   raw: unknown,
   call: ServiceCall,
 ): Promise<DeleteResult> {
-  const params = parseDeleteParams(raw)
-  const signal = AbortSignal.any([call.signal, ctx.signal])
-  return queue.run(signal, () => deleteOwn(ctx, call, signal, params))
+  return runAction(ctx, queue, raw, call, parseDeleteParams, (params, signal) => deleteOwn(ctx, call, signal, params))
 }
