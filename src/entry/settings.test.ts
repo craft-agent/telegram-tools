@@ -5,6 +5,7 @@ import {
   forwardedVariables,
   parseServiceSettings,
   parseSettings,
+  parseStateDir,
   parseToolSettings,
   settingVariables,
 } from "./settings"
@@ -298,6 +299,18 @@ describe("parseServiceSettings", () => {
   test("rejects any other settings flag, naming it", () => {
     expect(failure(() => parseService(["--read-only"])).message).toContain("--read-only")
     expect(failure(() => parseService(["--nope"])).message).toContain("--nope")
+  })
+
+  test("rejects a tool option flag too, as does parseStateDir, and ignores its variable", () => {
+    expect(failure(() => parseService(["--note-text", "x"])).message).toBe("Option --note-text is not available here.")
+    expect(failure(() => parseStateDir(["--note-text=x"], {}, profile)).message).toBe(
+      "Option --note-text is not available here.",
+    )
+    expect(parseService([], { DEMO_NOTE_TEXT: "x" })).toEqual({
+      state_dir: expect.any(String),
+      keep_disappearing: false,
+      channels: false,
+    })
   })
 })
 
