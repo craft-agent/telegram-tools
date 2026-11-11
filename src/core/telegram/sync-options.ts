@@ -1,4 +1,3 @@
-import { DOWNLOAD_STALL_MS } from "./sync-download"
 import type { OpenClient } from "./sync-telegram"
 import { realPause, type Pause } from "./sync-wait"
 
@@ -6,6 +5,13 @@ const SECOND_MS = 1000
 const MINUTE_MS = 60 * SECOND_MS
 const HOUR_MS = 60 * MINUTE_MS
 const DAY_MS = 24 * HOUR_MS
+
+/**
+ * Bounds a download's or an upload's wait for the next part, in milliseconds.
+ * mtcute waits out flood waits and retries failed parts inside either without
+ * end; this is what bounds those sleeps and retries.
+ */
+export const TRANSFER_STALL_MS = 60_000
 
 /** How often the heartbeat writes `alive_at` and lets expired messages go. */
 const DEFAULT_HEARTBEAT_EVERY_MS = 5 * SECOND_MS
@@ -83,7 +89,7 @@ export type SyncOptions = {
   /** The shortest and the longest random pause before a background fetch; 0.5 and 1.5 seconds by default. */
   paceMs?: readonly [number, number]
   /** How long a download may receive nothing, or an upload move no byte, before it stops; 60 seconds by default. */
-  downloadStallMs?: number
+  transferStallMs?: number
 }
 
 /** `SyncOptions` with every default filled in. */
@@ -108,6 +114,6 @@ export function resolveOptions(options: SyncOptions): ResolvedSyncOptions {
     seedAttempts: options.seedAttempts ?? DEFAULT_SEED_ATTEMPTS,
     fillLimit: options.fillLimit ?? DEFAULT_FILL_LIMIT,
     paceMs: options.paceMs ?? DEFAULT_PACE_MS,
-    downloadStallMs: options.downloadStallMs ?? DOWNLOAD_STALL_MS,
+    transferStallMs: options.transferStallMs ?? TRANSFER_STALL_MS,
   }
 }

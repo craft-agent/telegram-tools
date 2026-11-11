@@ -1,6 +1,7 @@
 import { open, type FileHandle } from "node:fs/promises"
 import { MtTimeoutError } from "@mtcute/core"
 import { ToolError } from "../errors"
+import { MS_PER_S } from "../time"
 import type { ResolvedSyncOptions } from "./sync-options"
 import type { FileMedia } from "./sync-download-file"
 import { abortable, cancelled, requestFailure } from "./sync-request-errors"
@@ -10,13 +11,11 @@ import type { SyncTelegram } from "./sync-telegram"
 /** What streaming a download to disk works with; the download request's and the keeper's contexts hold all of it. */
 export type DownloadStreamContext = TelegramCallContext & {
   client: Pick<SyncTelegram, "downloadAsIterable">
-  settings: Pick<ResolvedSyncOptions, "log" | "downloadStallMs">
+  settings: Pick<ResolvedSyncOptions, "log" | "transferStallMs">
 }
 
 /** The permissions of a downloaded file: the owner reads and writes it, and nobody runs it. */
 export const FILE_MODE = 0o600
-
-const MS_PER_S = 1000
 
 /** The error of a download that received nothing for `stallMs`: mtcute's stall limit, which is not the caller leaving. */
 function stalled(stallMs: number): ToolError {
@@ -37,7 +36,7 @@ export async function writeAll(handle: FileHandle, chunk: Uint8Array): Promise<v
  * with the bytes written, or `undefined` when the next chunk would pass `max`:
  * it stops there, and the caller removes the file. Telegram's failures become
  * the request's errors, a flood wait among them is told and not retried; a
- * download that receives nothing for `downloadStallMs` ends as `upstream_error`;
+ * download that receives nothing for `transferStallMs` ends as `upstream_error`;
  * a failure to write the file is the service's own and passes through. The file
  * is closed, and nothing writes to it any more, when this settles.
  */
@@ -49,7 +48,7 @@ export async function writeDownload(
   max: number,
 ): Promise<number | undefined> {
   const env = { endSession: ctx.endSession, log: ctx.settings.log }
-  const stallMs = ctx.settings.downloadStallMs
+  const stallMs = ctx.settings.transferStallMs
   const failure = (error: unknown): Error => {
     if (signal.aborted) return cancelled()
     if (error instanceof MtTimeoutError && error.timeout === stallMs) return stalled(stallMs)

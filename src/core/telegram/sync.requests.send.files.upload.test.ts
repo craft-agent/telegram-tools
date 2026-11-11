@@ -23,7 +23,7 @@ const STALL_MS = 50
 beforeEach(async () => {
   fixture = syncFixture()
   seedSendChats(fixture)
-  service = await fixture.running({ downloadStallMs: STALL_MS })
+  service = await fixture.running({ transferStallMs: STALL_MS })
   answerFiles(fixture, { firstId: 50 })
 })
 

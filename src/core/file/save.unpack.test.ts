@@ -4,6 +4,7 @@ import { join } from "node:path"
 import { gzipSync } from "node:zlib"
 import { buildTar } from "../archive/tar.testing"
 import { buildZip } from "../archive/zip.testing"
+import { modeOf as mode } from "../telegram/sync-keep.testing"
 import { CANCELLED_MESSAGE } from "./constants"
 import { abortWhen } from "./abort.testing"
 import { createSaveFixture, saveArgs, type SaveFixture } from "./save.testing"
@@ -29,7 +30,6 @@ async function saveWith(bytes: Buffer, name = "pack.zip", extra: Record<string, 
   return t.save(saveArgs(extra))
 }
 
-const mode = (path: string) => statSync(path).mode & 0o777
 const leftovers = (folder: string) => readdirSync(folder).filter((name) => name.startsWith("."))
 
 /** Every path below a folder, folders with a trailing slash. */

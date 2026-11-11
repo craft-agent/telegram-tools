@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import type { Message, tl } from "@mtcute/core"
 import { fakeVideoMedia } from "./fake-telegram-media.testing"
@@ -9,6 +9,9 @@ import { eventually, type SyncFixture } from "./sync.testing"
 
 /** The bytes a test's download serves. */
 export const CHUNK = Uint8Array.of(1, 2, 3)
+
+/** The permission bits of a file or folder, without its file type. */
+export const modeOf = (path: string) => statSync(path).mode & 0o777
 
 /** A new message from Alice with `media`, as Telegram pushes it. */
 export function arriving(id: number, media: tl.TypeMessageMedia, overrides: Overrides<tl.RawMessage> = {}): Message {

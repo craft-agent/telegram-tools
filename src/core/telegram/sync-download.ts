@@ -21,16 +21,8 @@ import type { SyncTelegram } from "./sync-telegram"
 export type DownloadContext = DownloadStreamContext & {
   client: Pick<SyncTelegram, "getMessages" | "downloadAsIterable">
   mirror: Mirror
-  settings: Pick<ResolvedSyncOptions, "stateDir" | "label" | "log" | "downloadStallMs">
+  settings: Pick<ResolvedSyncOptions, "stateDir" | "label" | "log" | "transferStallMs">
 }
-
-/**
- * How long a download may receive nothing, or an upload move no byte, before
- * it stops, in milliseconds. mtcute waits out flood waits and retries failed
- * parts inside either without end; this is what bounds those sleeps and
- * retries.
- */
-export const DOWNLOAD_STALL_MS = 60_000
 
 /**
  * The file a message carries. `not_found` when it carries none, naming what it

@@ -18,8 +18,8 @@ export type OwnAction = Extract<keyof typeof ACTION_PAST, "edit" | "delete">
 /** What the user does to a message of anyone's, for the words of a refusal. */
 export type AnyAction = Exclude<keyof typeof ACTION_PAST, OwnAction>
 
-/** What an action needs to know of the message it is aimed at in the mirror. */
-export type OwnMessage = {
+/** The message an action aims at in the mirror: anyone's for a reaction, a pin or a read mark. */
+export type ActionMessage = {
   /** When it was sent, in milliseconds. */
   ts: number
   kind: "message" | "service"
@@ -35,15 +35,15 @@ export type OwnMessage = {
 }
 
 /** The chat an action is aimed at, and its message: null when the mirror was told the message is deleted. */
-export type OwnTarget = { chat: ChatRow; message: OwnMessage | null }
+export type ActionTarget = { chat: ChatRow; message: ActionMessage | null }
 
 /** The chat an action is aimed at, and its message, which the mirror holds and has not been told is deleted. */
-export type LiveTarget = { chat: ChatRow; message: OwnMessage }
+export type LiveTarget = { chat: ChatRow; message: ActionMessage }
 
 type StoredOwn = {
   ts: number
   from_me: number
-  kind: OwnMessage["kind"]
+  kind: ActionMessage["kind"]
   body: string | null
   reactions: string | null
   topic: number | null
@@ -59,7 +59,7 @@ type StoredOwn = {
  * null `message`, and any other missing one is `not_found`, since a chat the
  * mirror does not keep holds no messages to check.
  */
-function findMessage(mirror: Mirror, chatId: string, id: number, past: string, whose: "own" | "anyone"): OwnTarget {
+function findMessage(mirror: Mirror, chatId: string, id: number, past: string, whose: "own" | "anyone"): ActionTarget {
   const chat = existingChat(mirror, chatId)
   if (chat.left) throw leftChat(past)
   const row = mirror
@@ -76,7 +76,7 @@ function findMessage(mirror: Mirror, chatId: string, id: number, past: string, w
 }
 
 /** The chat and the user's own message an edit or a delete is aimed at; see `findMessage` for what is refused. */
-export function findOwnMessage(mirror: Mirror, chatId: string, id: number, action: OwnAction): OwnTarget {
+export function findOwnMessage(mirror: Mirror, chatId: string, id: number, action: OwnAction): ActionTarget {
   return findMessage(mirror, chatId, id, ACTION_PAST[action], "own")
 }
 

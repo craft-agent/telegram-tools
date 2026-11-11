@@ -119,7 +119,7 @@ describe("a download stalled after some bytes", () => {
 })
 
 describe("a download that receives nothing for the stall limit", () => {
-  beforeEach(async () => void (await fixture.running({ downloadStallMs: 50 })))
+  beforeEach(async () => void (await fixture.running({ transferStallMs: 50 })))
 
   test("stops with the folder removed, and says it stalled", async () => {
     fixture.client.setDownload([CHUNK], "stall")

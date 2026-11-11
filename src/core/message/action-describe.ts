@@ -3,7 +3,7 @@ import { cut, MAX_VALUE_LENGTH } from "../describe"
 import type { ChatRow } from "../telegram/mirror-rows"
 import type { CallDescription, CallFact, CallHeadline } from "../tool"
 import { topicFacts } from "./facts"
-import type { OwnMessage } from "./own"
+import type { ActionMessage } from "./own"
 
 /** The headline templates of an action: for a chat the mirror names, and for Saved Messages. */
 export type ActionHeadlines = { named: string; saved: string }
@@ -69,7 +69,7 @@ function actionHeadline(
 }
 
 /** The `Current` fact: the message's text now, or its caption, or the kind of its media when it has no caption, cut to the budget of a fact's value; none for a message with neither. */
-function currentFacts({ body, media }: OwnMessage): CallFact[] {
+function currentFacts({ body, media }: ActionMessage): CallFact[] {
   const shown = body || media?.type
   return shown ? [{ label: "Current", value: cut(shown, MAX_VALUE_LENGTH) }] : []
 }
@@ -86,7 +86,7 @@ export function describeAction(
   headlines: ActionHeadlines,
   chat: Pick<ChatRow, "kind" | "name">,
   id: number,
-  message: OwnMessage | null,
+  message: ActionMessage | null,
   extras: ActionExtras = {},
 ): CallDescription {
   const headline = actionHeadline(headlines, chat, id, extras.values ?? {})

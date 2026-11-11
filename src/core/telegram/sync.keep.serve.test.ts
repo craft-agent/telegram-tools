@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test"
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { basename, dirname, join } from "node:path"
 import { fakeViewOncePhotoMedia } from "./fake-telegram-media.testing"
@@ -7,7 +7,7 @@ import { FAKE_DATE } from "./fake-telegram.testing"
 import type { DownloadResult, SavedFile } from "./service-requests"
 import { failureOf } from "./service.testing"
 import { CHAT, download, fileMedia, incomingFolders, mediaMessage } from "./sync-download.testing"
-import { CHUNK, keptFolder, writeKept } from "./sync-keep.testing"
+import { CHUNK, keptFolder, modeOf, writeKept } from "./sync-keep.testing"
 import { KEPT, seedListedChats } from "./sync-requests.testing"
 import { syncFixture, type SyncFixture } from "./sync.testing"
 
@@ -30,7 +30,6 @@ afterEach(() => {
 })
 
 const MAX = 1000
-const modeOf = (path: string) => statSync(path).mode & 0o777
 const calls = (method: "getMessages" | "downloadAsIterable") => fixture.client.argsOf(method).length
 
 function savedOf(result: DownloadResult): SavedFile {

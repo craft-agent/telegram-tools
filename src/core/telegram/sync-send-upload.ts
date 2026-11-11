@@ -12,7 +12,7 @@ import type { SyncTelegram } from "./sync-telegram"
 /** What uploading the files of a send works with; the send's context holds all of it. */
 export type UploadContext = TelegramCallContext & {
   client: Pick<SyncTelegram, "uploadFile" | "call">
-  settings: Pick<ResolvedSyncOptions, "log" | "downloadStallMs">
+  settings: Pick<ResolvedSyncOptions, "log" | "transferStallMs">
 }
 
 /** A file on Telegram's servers that no message holds yet. */
@@ -44,10 +44,10 @@ function uploadFailure(ctx: UploadContext, signal: AbortSignal, error: unknown, 
 /**
  * Uploads one file and answers with it. mtcute retries the parts and waits out
  * flood waits inside an upload without end, so an upload whose progress does
- * not grow for `downloadStallMs` is aborted and fails as `upstream_error`.
+ * not grow for `transferStallMs` is aborted and fails as `upstream_error`.
  */
 async function uploadOne(ctx: UploadContext, signal: AbortSignal, file: OutboxFile): Promise<UploadedFile> {
-  const stallMs = ctx.settings.downloadStallMs
+  const stallMs = ctx.settings.transferStallMs
   const stall = new AbortController()
   const uploadSignal = AbortSignal.any([signal, stall.signal])
   let stalled = false

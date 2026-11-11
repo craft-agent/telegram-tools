@@ -151,7 +151,7 @@ describe("a download that fails", () => {
 
   test("leaves nothing when it receives nothing for the stall limit", async () => {
     fixture.client.setDownload([CHUNK], "stall")
-    await start({ downloadStallMs: 50 })
+    await start({ transferStallMs: 50 })
 
     push(fixture, arriving(1, viewOnceFile("a.txt", "text/plain", 3)))
 
