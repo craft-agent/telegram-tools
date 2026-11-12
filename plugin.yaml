@@ -32,15 +32,15 @@ config_schema:
     type: list
     description: Single tools to remove by id. Wins over tools and toolsets.
   state_dir:
-    description: "Where every label's state lives; an absolute path, or one starting with ~. Defaults to $XDG_STATE_HOME/telegram-tools, or ~/.local/state/telegram-tools."
+    description: "Where every label's state lives; an absolute path, or one starting with ~. Blank means unset. Defaults to $XDG_STATE_HOME/telegram-tools when XDG_STATE_HOME is absolute, else ~/.local/state/telegram-tools."
   download_dir:
-    description: "Where received files are saved; an absolute path, or one starting with ~. Defaults to ~/Downloads/telegram-tools. Read by tools; no service restart needed."
+    description: "Where received files are saved; an absolute path, or one starting with ~. Blank means unset. Defaults to ~/Downloads/telegram-tools. Read by tools; no service restart needed."
   download_max_mb:
     type: int
     description: "The largest file a download takes, in MB; an integer from 1 to 2000, default 100. Read by tools; no service restart needed."
   send_dirs:
     type: list
-    description: "The directories files may be sent from, besides the working directory; absolute paths, or ones starting with ~, without commas. Defaults to none. Read by tools; no service restart needed."
+    description: "The directories files may be sent from, besides the working directory; absolute paths, or ones starting with ~, without commas. Blank items are dropped. Defaults to none. Read by tools; no service restart needed."
   keep_disappearing:
     type: bool
     description: Keeps disappearing and view-once messages for the user; off by default. Read by the sync service.
