@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { homedir } from "node:os"
 import { resolve } from "node:path"
-import { parseServiceSettings, parseSettings, parseStateDir, parseToolSettings, settingsFromOptions } from "./settings"
+import { parseSettings, parseToolSettings, settingsFromOptions } from "./settings"
 import { failure, profile } from "./settings.testing"
 
 const env = { HOME: "/people/example", DEMO_DOWNLOAD_DIR: "/env/downloads", DEMO_DOWNLOAD_MAX_MB: "50" }
@@ -96,19 +96,5 @@ describe("download settings", () => {
     expect(failure(() => settingsFromOptions({ download_max_mb: value }, {}, profile)).message).toBe(
       'Option "download_max_mb" must be a finite number.',
     )
-  })
-
-  test("service and state-only commands refuse flags and ignore invalid download environment", () => {
-    const badEnv = { DEMO_DOWNLOAD_DIR: "relative", DEMO_DOWNLOAD_MAX_MB: "bad" }
-    expect(parseServiceSettings([], badEnv, profile)).toEqual({
-      state_dir: expect.any(String),
-      keep_disappearing: false,
-      channels: false,
-    })
-    expect(parseStateDir([], badEnv, profile)).toEqual(expect.any(String))
-    for (const args of [["--download-dir=/received"], ["--download-max-mb=1"]]) {
-      expect(failure(() => parseServiceSettings(args, {}, profile)).message).toContain("is not available here")
-      expect(failure(() => parseStateDir(args, {}, profile)).message).toContain("is not available here")
-    }
   })
 })

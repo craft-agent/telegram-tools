@@ -10,33 +10,17 @@ import {
   type Toolsets,
 } from "../core"
 import { PROJECT } from "../project"
-import type { GivenDirectory } from "./directory"
-import { resolveDirectorySettings } from "./directory"
-import { resolveDownloadDir } from "./download-dir"
+import { resolveDirectorySettings, type DirectorySettings } from "./directory"
 import { PROJECT_PROFILE, type EntryProfile } from "./profile"
-import { resolveSendDirs } from "./send-dirs"
-import { resolveStateDir } from "./state-dir"
 
 /** Who asks the person before an administrative tool acts: the harness, or the tool through the client's form. */
 export type ConfirmMode = "harness" | "elicitation"
 
 /**
- * The settings needed to run tools: tool selection, read-only mode, the resolved state and download settings, the
- * two the sync service takes (off when absent) and the values of the package's own settings (`options`, possibly
- * empty).
+ * The settings needed to run tools: tool selection, read-only mode, the resolved state and download settings and
+ * the values of the package's own settings (`options`, possibly empty).
  */
-export type RunSettings = ToolSettings & {
-  options: ToolOptions
-  state_dir: string
-  download_dir: string
-  download_max_mb: number
-  /** The directories files may be sent from, besides the working directory: absolute paths. */
-  send_dirs: string[]
-  /** Whether messages that disappear are kept. */
-  keep_disappearing?: boolean
-  /** Whether channels are listed and their messages received. */
-  channels?: boolean
-}
+export type RunSettings = ToolSettings & DirectorySettings & { options: ToolOptions }
 
 export type EntrySettings = RunSettings & { confirm: ConfirmMode }
 
@@ -44,21 +28,8 @@ const CONFIRM_MODES: readonly ConfirmMode[] = ["harness", "elicitation"]
 const ALL_TOOLSETS = "all"
 const TRUE_VALUES: readonly string[] = ["1", "true"]
 const FALSE_VALUES: readonly string[] = ["0", "false"]
-const DEFAULT_DOWNLOAD_MAX_MB = 100
-const MAX_DOWNLOAD_MB = 2000
 
-type OptionName =
-  | "toolsets"
-  | "read_only"
-  | "tools"
-  | "exclude_tools"
-  | "confirm"
-  | "state_dir"
-  | "download_dir"
-  | "download_max_mb"
-  | "send_dirs"
-  | "keep_disappearing"
-  | "channels"
+type OptionName = "toolsets" | "read_only" | "tools" | "exclude_tools" | "confirm"
 
 /** A setting's command-line flag and the end of its environment variable, which follows the profile's prefix; a boolean flag takes no value. */
 type Option = { flag: string; envSuffix: string; boolean?: true }
@@ -69,16 +40,7 @@ const OPTIONS: Record<OptionName, Option> = {
   tools: { flag: "--tools", envSuffix: "TOOLS" },
   exclude_tools: { flag: "--exclude-tools", envSuffix: "EXCLUDE_TOOLS" },
   confirm: { flag: "--confirm", envSuffix: "CONFIRM" },
-  state_dir: { flag: "--state-dir", envSuffix: "STATE_DIR" },
-  download_dir: { flag: "--download-dir", envSuffix: "DOWNLOAD_DIR" },
-  download_max_mb: { flag: "--download-max-mb", envSuffix: "DOWNLOAD_MAX_MB" },
-  send_dirs: { flag: "--send-dirs", envSuffix: "SEND_DIRS" },
-  keep_disappearing: { flag: "--keep-disappearing", envSuffix: "KEEP_DISAPPEARING", boolean: true },
-  channels: { flag: "--channels", envSuffix: "CHANNELS", boolean: true },
 }
-
-/** The two boolean settings the sync service takes. */
-const SERVICE_OPTION_NAMES = ["keep_disappearing", "channels"] as const satisfies readonly OptionName[]
 
 function profileOptions(profile: EntryProfile): NonNullable<EntryProfile["options"]> {
   return profile.options ?? {}
@@ -189,39 +151,7 @@ function parseNumber(value: string, source: string): number {
 }
 
 /** A setting given as text, and where it came from, for error messages. */
-type SettingText = GivenDirectory
-
-/** A comma-separated directory setting as one entry per directory, each keeping where it came from. */
-function listedDirectories(given: SettingText | undefined): GivenDirectory[] {
-  return given === undefined ? [] : splitList(given.text).map((text) => ({ text, source: given.source }))
-}
-
-function downloadMaxMb(value: unknown, source: string): number {
-  if (typeof value !== "number" || !Number.isInteger(value) || value < 1 || value > MAX_DOWNLOAD_MB) {
-    throw new ToolError("invalid_argument", `${source} must be an integer from 1 to ${MAX_DOWNLOAD_MB}.`)
-  }
-  return value
-}
-
-/** `download_max_mb` given as text: digits only, so `1e2` or `0x10` is not read as a number. */
-function downloadMaxMbText({ text, source }: SettingText): number {
-  const trimmed = text.trim()
-  return downloadMaxMb(/^\d+$/.test(trimmed) ? Number(trimmed) : Number.NaN, source)
-}
-
-/** The resolved download settings, read by tools rather than the sync service. */
-export function downloadSettings(
-  given: ((name: "download_dir" | "download_max_mb") => SettingText | undefined) | undefined,
-  env: Record<string, string | undefined>,
-  profile: EntryProfile,
-): Pick<RunSettings, "download_dir" | "download_max_mb"> {
-  const value = given ?? ((name) => envText(name, env, profile))
-  const max = value("download_max_mb")
-  return {
-    download_dir: resolveDownloadDir(value("download_dir"), env, profile),
-    download_max_mb: max === undefined ? DEFAULT_DOWNLOAD_MAX_MB : downloadMaxMbText(max),
-  }
-}
+type SettingText = { text: string; source: string }
 
 type Environment = Record<string, string | undefined>
 
@@ -433,56 +363,6 @@ export function parseToolSettings(
   return settings
 }
 
-/**
- * Reads only the `state_dir` setting from a command line that takes no other
- * setting, for commands that select no tools: any other settings flag is
- * `invalid_argument`. The flag wins over its environment variable.
- */
-export function parseStateDir(
-  argv: string[],
-  env: Record<string, string | undefined>,
-  profile: EntryProfile = PROJECT_PROFILE,
-): string {
-  const flags = readFlags(argv, profile)
-  const other = Object.keys(flags).find((name) => name !== "state_dir")
-  if (other !== undefined) {
-    throw new ToolError("invalid_argument", `Option ${settingOptions(profile)[other]!.flag} is not available here.`)
-  }
-  return resolveStateDir(flagOrEnvText(flags, "state_dir", env, profile), env, profile)
-}
-
-/** What the sync service and its service unit take from the command line: the state directory and two booleans. */
-export type ServiceSettings = { state_dir: string; keep_disappearing: boolean; channels: boolean }
-
-/**
- * Reads the settings of the commands that run or install the sync service
- * from their remaining flags: the state directory, `--keep-disappearing` and
- * `--channels` (flag over `<envPrefix>_*`, both off by default). Any other
- * settings flag is `invalid_argument`.
- */
-export function parseServiceSettings(
-  argv: string[],
-  env: Record<string, string | undefined>,
-  profile: EntryProfile = PROJECT_PROFILE,
-): ServiceSettings {
-  const flags = readFlags(argv, profile)
-  const allowed: readonly string[] = ["state_dir", ...SERVICE_OPTION_NAMES]
-  const other = Object.keys(flags).find((name) => !allowed.includes(name))
-  if (other !== undefined) {
-    throw new ToolError("invalid_argument", `Option ${settingOptions(profile)[other]!.flag} is not available here.`)
-  }
-  const value = (name: OptionName): SettingText | undefined => flagOrEnvText(flags, name, env, profile)
-  const on = (name: (typeof SERVICE_OPTION_NAMES)[number]): boolean => {
-    const given = value(name)
-    return given !== undefined && parseBoolean(given.text, given.source)
-  }
-  return {
-    state_dir: resolveStateDir(value("state_dir"), env, profile),
-    keep_disappearing: on("keep_disappearing"),
-    channels: on("channels"),
-  }
-}
-
 const TOOL_OPTION_NAMES = ["toolsets", "read_only", "tools", "exclude_tools"] as const satisfies readonly OptionName[]
 type ToolOptionName = (typeof TOOL_OPTION_NAMES)[number]
 
@@ -494,17 +374,6 @@ const optionSource = (name: string): string => `Option "${name}"`
 
 function optionError(name: string, expected: string): ToolError {
   return new ToolError("invalid_argument", `${optionSource(name)} must be ${expected}.`)
-}
-
-function directoryOption(name: "state_dir" | "download_dir", value: unknown): string {
-  if (typeof value !== "string") throw optionError(name, "an absolute path")
-  return value
-}
-
-function sendDirsOption(value: unknown): GivenDirectory[] {
-  const list = stringList(value)
-  if (!list) throw optionError("send_dirs", "a list of absolute paths")
-  return list.map((text) => ({ text, source: optionSource("send_dirs") }))
 }
 
 function toolsetsOption(value: unknown, toolsets: Toolsets): string[] | "all" | undefined {

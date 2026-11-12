@@ -57,18 +57,12 @@ class SettingsFlagsTest(unittest.TestCase):
         )
 
     def test_state_dir_flag(self) -> None:
-        self.assertEqual(
-            settings.state_dir_flags(StubContext({"state_dir": "/custom/path"})), ["--state-dir", "/custom/path"]
-        )
-        self.assertEqual(settings.state_dir_flags(StubContext({})), [])
-
-    def test_state_dir_included_in_settings_flags(self) -> None:
         self.assertEqual(self.flags(state_dir="/custom/path"), ["--state-dir", "/custom/path"])
 
     def test_invalid_state_dir_refused(self) -> None:
-        for value in (123, True, "", "   ", []):
-            with self.subTest(value=value), self.assertRaises(settings.SettingsError):
-                settings.state_dir_flags(StubContext({"state_dir": value}))
+        for value in (123, True, []):
+            with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "state_dir"):
+                self.flags(state_dir=value)
 
     def test_a_wrong_type_is_refused(self) -> None:
         for config in (
@@ -104,7 +98,6 @@ class SettingsFlagsTest(unittest.TestCase):
 
     def test_send_dirs_flag_joins_the_list(self) -> None:
         self.assertEqual(self.flags(send_dirs=["/a", "~/b"]), ["--send-dirs", "/a,~/b"])
-        self.assertEqual(settings.send_dirs_flags(StubContext({})), [])
         self.assertEqual(self.flags(send_dirs=[]), [])
 
     def test_invalid_send_dirs_refused(self) -> None:

@@ -1,14 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { PROJECT } from "../project"
 import type { EntryProfile } from "./profile"
-import {
-  forwardedVariables,
-  parseServiceSettings,
-  parseSettings,
-  parseStateDir,
-  parseToolSettings,
-  settingVariables,
-} from "./settings"
+import { forwardedVariables, parseSettings, parseToolSettings, settingVariables } from "./settings"
 import { FILE_SETTINGS, failure, profile } from "./settings.testing"
 
 const parse = (argv: string[], env: Record<string, string | undefined> = {}) => parseSettings(argv, env, profile)
@@ -278,37 +271,6 @@ describe("keep_disappearing and channels", () => {
     expect(parseTool(["--channels"], { DEMO_KEEP_DISAPPEARING: "true" }).options).toEqual({
       keep_disappearing: true,
       channels: true,
-    })
-  })
-})
-
-describe("parseServiceSettings", () => {
-  const parseService = (argv: string[], env: Record<string, string | undefined> = {}) =>
-    parseServiceSettings(argv, env, profile)
-
-  test("gives the state directory and both booleans, off by default", () => {
-    expect(parseService([])).toEqual({ state_dir: expect.any(String), keep_disappearing: false, channels: false })
-    expect(parseService(["--state-dir=/s", "--channels"], { DEMO_KEEP_DISAPPEARING: "1" })).toEqual({
-      state_dir: "/s",
-      keep_disappearing: true,
-      channels: true,
-    })
-  })
-
-  test("rejects any other settings flag, naming it", () => {
-    expect(failure(() => parseService(["--read-only"])).message).toContain("--read-only")
-    expect(failure(() => parseService(["--nope"])).message).toContain("--nope")
-  })
-
-  test("rejects a tool option flag too, as does parseStateDir, and ignores its variable", () => {
-    expect(failure(() => parseService(["--note-text", "x"])).message).toBe("Option --note-text is not available here.")
-    expect(failure(() => parseStateDir(["--note-text=x"], {}, profile)).message).toBe(
-      "Option --note-text is not available here.",
-    )
-    expect(parseService([], { DEMO_NOTE_TEXT: "x" })).toEqual({
-      state_dir: expect.any(String),
-      keep_disappearing: false,
-      channels: false,
     })
   })
 })

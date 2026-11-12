@@ -1,14 +1,11 @@
 import { homedir } from "node:os"
-import { isAbsolute, join, resolve, sep } from "node:path"
-import { ToolError, type ToolOptions } from "../core"
+import { isAbsolute, resolve } from "node:path"
+import type { ToolOptions } from "../core"
 import type { EntryProfile } from "./profile"
 
 /** The folder of a person's downloads under their home directory. */
 const DOWNLOADS_DIR = "Downloads"
 const DEFAULT_DOWNLOAD_MAX_MB = 100
-
-/** A directory setting given as text, and where it came from, for error messages. */
-export type GivenDirectory = { text: string; source: string }
 
 /** The package's own settings the tools read, resolved: absolute paths and the largest download. */
 export type DirectorySettings = {
@@ -23,21 +20,10 @@ export type DirectorySettings = {
 }
 
 /** The user's home directory from `$HOME` (when absolute) or `os.homedir()`. */
-export function homeDir(env: Record<string, string | undefined>): string {
+function homeDir(env: Record<string, string | undefined>): string {
   const envHome = env.HOME
   if (envHome && isAbsolute(envHome)) return envHome
   return homedir()
-}
-
-/** Resolves a directory setting after expanding a leading `~`; anything else is `invalid_argument` naming the source. */
-export function resolveGivenDirectory(given: GivenDirectory, home: string): string {
-  const text = given.text.trim()
-  const expanded =
-    text === "~" ? home : text.startsWith("~/") || text.startsWith(`~${sep}`) ? join(home, text.slice(2)) : text
-  if (!text || !isAbsolute(expanded)) {
-    throw new ToolError("invalid_argument", `${given.source} must be an absolute path.`)
-  }
-  return resolve(expanded)
 }
 
 /** The state directory when none is given: `$XDG_STATE_HOME/<name>` (when absolute), else `<home>/.local/state/<name>`. */
