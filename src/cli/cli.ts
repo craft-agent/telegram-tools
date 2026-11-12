@@ -11,6 +11,7 @@ import {
   type ErrorCode,
   type ErrorDetails,
   type ToolContext,
+  type ToolOptions,
   type ToolSpec,
   type Translations,
 } from "../core"
@@ -60,7 +61,7 @@ export type CliIo = {
   translations?: Translations
 }
 
-/** What `run` and `target` name: the tool, the working directory and the resolved directory and download settings. */
+/** What `run` and `target` name: the tool, the working directory, the resolved directory and download settings and the package's own settings. */
 type ToolCall = {
   toolId: string
   cwd: string
@@ -68,6 +69,7 @@ type ToolCall = {
   downloadDir: string
   downloadMaxMb: number
   sendDirs: string[]
+  options: ToolOptions
 }
 
 type Command =
@@ -84,6 +86,7 @@ function toolContext(command: ToolCall, io: CliIo): ToolContext {
     downloadMaxMb: command.downloadMaxMb,
     sendDirs: command.sendDirs,
     programName: PROJECT.name,
+    options: command.options,
     signal: io.signal,
   }
 }
@@ -141,6 +144,7 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile
       downloadDir: settings.download_dir,
       downloadMaxMb: settings.download_max_mb,
       sendDirs: settings.send_dirs,
+      options: settings.options,
       language: promptLanguage(language, io.env, harnessLanguage, profile),
     }
   }
@@ -160,6 +164,7 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile
     downloadDir: settings.download_dir,
     downloadMaxMb: settings.download_max_mb,
     sendDirs: settings.send_dirs,
+    options: settings.options,
   }
 }
 
@@ -273,9 +278,10 @@ const PERSON_COMMANDS: Partial<Record<string, (argv: string[], io: CommandIo) =>
  * `target` takes `--language <tag>`, else `<envPrefix>_LANGUAGE`, else `--harness-language <tag>` (the harness's own
  * display language) as the prompt language; none, or one without a table,
  * keeps English. `target` also takes the settings flags of `run` (and their
- * `<envPrefix>_*` variables), so it resolves a call as `run` will. Standard
- * output carries only the JSON document; a mistake in the command line is one
- * line on standard error and `EXIT_USAGE`.
+ * `<envPrefix>_*` variables, the package's own tool options among them), so it
+ * resolves a call as `run` will; `run` and `target` hand the tool options to
+ * the tool as `options`. Standard output carries only the JSON document; a
+ * mistake in the command line is one line on standard error and `EXIT_USAGE`.
  * `login`, `sync`, `service`, `logout` and `remove` are for a person setting
  * up an account (see `PERSON_COMMANDS`). Resolves to the exit code.
  */

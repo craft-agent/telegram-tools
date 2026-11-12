@@ -5,6 +5,7 @@ import {
   forwardedVariables,
   parseServiceSettings,
   parseSettings,
+  parseStateDir,
   parseToolSettings,
   settingVariables,
 } from "./settings"
@@ -28,11 +29,14 @@ describe("settingVariables", () => {
       "DEMO_SEND_DIRS",
       "DEMO_KEEP_DISAPPEARING",
       "DEMO_CHANNELS",
+      "DEMO_NOTE_TEXT",
     ])
   })
 
   test("uses the package's own prefix by default", () => {
-    expect(settingVariables()).toEqual(settingVariables({ ...profile, envPrefix: PROJECT.envPrefix }))
+    expect(settingVariables()).toEqual(
+      settingVariables({ ...profile, envPrefix: PROJECT.envPrefix, options: PROJECT.options }),
+    )
   })
 })
 
@@ -48,7 +52,7 @@ describe("forwardedVariables", () => {
 
 describe("parseSettings", () => {
   test("defaults to the harness confirming and no other setting", () => {
-    expect(parse([])).toEqual({ confirm: "harness", state_dir: expect.any(String), ...FILE_SETTINGS })
+    expect(parse([])).toEqual({ confirm: "harness", options: {}, state_dir: expect.any(String), ...FILE_SETTINGS })
   })
 
   test("reads each flag", () => {
@@ -72,6 +76,7 @@ describe("parseSettings", () => {
       tools: ["demo_thing_read"],
       exclude_tools: ["demo_thing_merge"],
       confirm: "elicitation",
+      options: {},
       state_dir: "/custom/state",
       ...FILE_SETTINGS,
     })
@@ -93,6 +98,7 @@ describe("parseSettings", () => {
       exclude_tools: ["c"],
       read_only: true,
       confirm: "elicitation",
+      options: {},
       state_dir: "/custom/state",
       ...FILE_SETTINGS,
     })
@@ -114,6 +120,7 @@ describe("parseSettings", () => {
       tools: ["x"],
       exclude_tools: ["y", "z"],
       confirm: "elicitation",
+      options: {},
       state_dir: "/env/state",
       ...FILE_SETTINGS,
     })
@@ -179,6 +186,7 @@ describe("parseSettings", () => {
       exclude_tools: ["b"],
       confirm: "harness",
       read_only: true,
+      options: {},
       state_dir: "/flag/state",
       ...FILE_SETTINGS,
     })
@@ -187,6 +195,7 @@ describe("parseSettings", () => {
   test("an empty environment variable counts as unset", () => {
     expect(parse([], { DEMO_TOOLSETS: "", DEMO_CONFIRM: " " })).toEqual({
       confirm: "harness",
+      options: {},
       state_dir: expect.any(String),
       ...FILE_SETTINGS,
     })
@@ -291,11 +300,23 @@ describe("parseServiceSettings", () => {
     expect(failure(() => parseService(["--read-only"])).message).toContain("--read-only")
     expect(failure(() => parseService(["--nope"])).message).toContain("--nope")
   })
+
+  test("rejects a tool option flag too, as does parseStateDir, and ignores its variable", () => {
+    expect(failure(() => parseService(["--note-text", "x"])).message).toBe("Option --note-text is not available here.")
+    expect(failure(() => parseStateDir(["--note-text=x"], {}, profile)).message).toBe(
+      "Option --note-text is not available here.",
+    )
+    expect(parseService([], { DEMO_NOTE_TEXT: "x" })).toEqual({
+      state_dir: expect.any(String),
+      keep_disappearing: false,
+      channels: false,
+    })
+  })
 })
 
 describe("parseToolSettings", () => {
   test("reads the tool settings and gives no confirm setting", () => {
-    expect(parseTool([])).toEqual({ state_dir: expect.any(String), ...FILE_SETTINGS })
+    expect(parseTool([])).toEqual({ options: {}, state_dir: expect.any(String), ...FILE_SETTINGS })
     expect(
       parseTool(["--toolsets=gamma", "--read-only", "--tools", "a", "--state-dir=/tool/state"], {
         DEMO_EXCLUDE_TOOLS: "b",
@@ -305,6 +326,7 @@ describe("parseToolSettings", () => {
       read_only: true,
       tools: ["a"],
       exclude_tools: ["b"],
+      options: {},
       state_dir: "/tool/state",
       ...FILE_SETTINGS,
     })
@@ -316,6 +338,10 @@ describe("parseToolSettings", () => {
   })
 
   test("ignores DEMO_CONFIRM, even a bad one", () => {
-    expect(parseTool([], { DEMO_CONFIRM: "ask" })).toEqual({ state_dir: expect.any(String), ...FILE_SETTINGS })
+    expect(parseTool([], { DEMO_CONFIRM: "ask" })).toEqual({
+      options: {},
+      state_dir: expect.any(String),
+      ...FILE_SETTINGS,
+    })
   })
 })
