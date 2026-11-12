@@ -1,11 +1,15 @@
 import { z } from "zod"
-import { defineTool, type ToolSpec } from "../core"
+import { defineTool, type OptionSpec, type ToolSpec } from "../core"
+import { PROJECT } from "../project"
 
 /** A tool that shows the tool options its call got, for the tests of every entry point. */
 
 /** The tool option the test profiles carry. */
 export const NOTE_OPTION = "note_text"
 export const NOTE_ID = "demo_note_stamp"
+
+/** The options the test profiles declare: the package's own settings, then the note option. */
+export const PROFILE_OPTIONS: Readonly<Record<string, OptionSpec>> = { ...PROJECT.options, [NOTE_OPTION]: "text" }
 
 const optionValueSchema = z.union([z.string(), z.boolean(), z.number(), z.array(z.string()).readonly()])
 

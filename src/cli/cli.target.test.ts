@@ -3,7 +3,7 @@ import { mkdtempSync, realpathSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { PIN_PATTERN } from "../core"
-import { EXIT_FAILED, EXIT_OK } from "./cli"
+import { EXIT_FAILED, EXIT_OK, EXIT_USAGE } from "./cli"
 import { ADD_ID, DESCRIBED_ID, ENGLISH_WORDS, HANGING_DESCRIBE_ID, READ_ID, cli, json, specs } from "./testing"
 import type { ToolSpec } from "../core"
 
@@ -140,7 +140,7 @@ describe("target", () => {
     expect(seenStateDir).toBe("/env/target/state")
   })
 
-  test("accepts the settings flags of run and passes the download settings into context for targets", async () => {
+  test("accepts the download options of run, passes them into context for targets and refuses tool selection", async () => {
     let seen: { downloadDir?: string; downloadMaxMb?: number } = {}
     const checkTool: ToolSpec = {
       ...specs[1]!,
@@ -167,8 +167,9 @@ describe("target", () => {
     expect(runEnv.code).toBe(EXIT_OK)
     expect(seen).toEqual({ downloadDir: envDir, downloadMaxMb: 7 })
 
-    const runSelection = await cli([...argv, "--read-only", "--toolsets", "all"], "", { specs: [checkTool] })
-    expect(runSelection.code).toBe(EXIT_OK)
+    const runSelection = await cli([...argv, "--read-only"], "", { specs: [checkTool] })
+    expect(runSelection.code).toBe(EXIT_USAGE)
+    expect(runSelection.stderr).toContain('Unknown option "--read-only"')
   })
 
   test("accepts --send-dirs and passes sendDirs into context for targets", async () => {

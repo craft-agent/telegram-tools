@@ -52,21 +52,25 @@ class ApprovalHookTest(FakeCliCase):
         self.assertEqual(call["argv"], ["target", "demo_thing_create", "--cwd", CWD])
         self.assertEqual(json.loads(call["stdin"]), {"target": "target/one", "body": "hi"})
 
-    def test_target_call_gets_the_same_settings_flags_as_run(self) -> None:
+    def test_target_call_gets_the_option_flags_run_gets_but_no_tool_selection(self) -> None:
         self.reply("target demo_thing_create", stdout='{"resources":["target/one"]}\n')
         config = {
             "state_dir": "/custom/state",
             "download_dir": "/custom/downloads",
             "download_max_mb": 5,
+            "send_dirs": ["/a", "/b"],
             "read_only": True,
+            "toolsets": ["things"],
         }
         ctx = self.register(config)
         hook = ctx.hooks[0][1]
         hook(tool_name="demo_thing_create", args={"target": "target/one"})
         [call] = self.target_calls()
-        flags = settings.settings_flags(StubContext(config))
+        flags = settings.option_flags(StubContext(config))
         self.assertIn("--download-dir", flags)
         self.assertEqual(call["argv"], ["target", "demo_thing_create", "--cwd", CWD, *flags])
+        self.assertNotIn("--read-only", call["argv"])
+        self.assertNotIn("--toolsets", call["argv"])
 
     def test_every_non_read_class_is_sent_to_approval(self) -> None:
         for tool_id in ("demo_widget_update", "demo_item_add", "demo_gadget_edit", "demo_task_run"):

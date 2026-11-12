@@ -25,7 +25,7 @@ describe("settingsFromOptions", () => {
       read_only: true,
       tools: ["demo_thing_read"],
       exclude_tools: ["a"],
-      options: {},
+      options: { state_dir: "/custom/state" },
       state_dir: "/custom/state",
       ...FILE_SETTINGS,
     })
@@ -45,7 +45,7 @@ describe("settingsFromOptions", () => {
       toolsets: ["gamma"],
       read_only: true,
       tools: ["a", "b"],
-      options: {},
+      options: { state_dir: "/env/state" },
       state_dir: "/env/state",
       ...FILE_SETTINGS,
     })
@@ -55,7 +55,7 @@ describe("settingsFromOptions", () => {
       toolsets: ["beta"],
       read_only: false,
       tools: ["a", "b"],
-      options: {},
+      options: { state_dir: "/opt/state" },
       state_dir: "/opt/state",
       ...FILE_SETTINGS,
     })
@@ -69,7 +69,15 @@ describe("settingsFromOptions", () => {
     expect(failure(() => fromOptions({ exclude_tools: [null] })).message).toContain('"exclude_tools"')
     expect(failure(() => fromOptions({ state_dir: 123 })).message).toContain('"state_dir"')
     expect(failure(() => fromOptions({ state_dir: false })).message).toContain('"state_dir"')
-    expect(failure(() => fromOptions({ state_dir: "relative" })).message).toContain('"state_dir"')
+    expect(failure(() => fromOptions({ state_dir: "relative" })).message).toBe(
+      'Option "state_dir" must be an absolute path.',
+    )
+  })
+
+  test("a blank state_dir counts as unset, whatever the variable says", () => {
+    const unset = fromOptions({}).state_dir
+    expect(fromOptions({ state_dir: " " }, { DEMO_STATE_DIR: "/env/state" }).state_dir).toBe(unset)
+    expect(fromOptions({}, { DEMO_STATE_DIR: " " }).state_dir).toBe(unset)
   })
 
   test("an unknown toolset or option is rejected, naming it", () => {
@@ -81,17 +89,15 @@ describe("settingsFromOptions", () => {
 
   test("reads keep_disappearing and channels from options and the environment", () => {
     expect(fromOptions({ keep_disappearing: true, channels: false })).toEqual({
-      options: {},
+      options: { keep_disappearing: true, channels: false },
       state_dir: expect.any(String),
       ...FILE_SETTINGS,
-      keep_disappearing: true,
-      channels: false,
     })
-    expect(fromOptions({}, { DEMO_CHANNELS: "1", DEMO_KEEP_DISAPPEARING: "0" })).toMatchObject({
+    expect(fromOptions({}, { DEMO_CHANNELS: "1", DEMO_KEEP_DISAPPEARING: "0" }).options).toEqual({
       channels: true,
       keep_disappearing: false,
     })
-    expect(fromOptions({ channels: false }, { DEMO_CHANNELS: "1" }).channels).toBe(false)
+    expect(fromOptions({ channels: false }, { DEMO_CHANNELS: "1" }).options.channels).toBe(false)
     expect(failure(() => fromOptions({ channels: "true" })).message).toContain('"channels"')
     expect(failure(() => fromOptions({ keep_disappearing: 1 })).message).toContain('"keep_disappearing"')
   })

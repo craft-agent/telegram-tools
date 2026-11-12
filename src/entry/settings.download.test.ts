@@ -56,33 +56,45 @@ describe("download settings", () => {
     expect(failure(() => parseSettings([], { DEMO_DOWNLOAD_DIR: "relative" }, profile)).message).toContain(
       "DEMO_DOWNLOAD_DIR",
     )
-    for (const value of ["relative", "", false, 1, null]) {
+    for (const value of ["relative", false, 1, null]) {
       expect(failure(() => settingsFromOptions({ download_dir: value }, {}, profile)).message).toContain(
-        '"download_dir"',
+        'Option "download_dir" must be an absolute path.',
       )
     }
   })
 
-  test.each(["1", "2000"])("accepts the limit boundary %s", (value) => {
+  test.each(["1", "2000", "1e2", " 50 "])("accepts the limit %s", (value) => {
     expect(parseSettings(["--download-max-mb", value], {}, profile).download_max_mb).toBe(Number(value))
+    expect(parseSettings([], { DEMO_DOWNLOAD_MAX_MB: value }, profile).download_max_mb).toBe(Number(value))
   })
 
-  test.each(["0", "2001", "1.5", "1e2", "0x10", "-5", "text", "true", "false", "Infinity", "NaN", ""])(
-    "refuses invalid limit %s",
-    (value) => {
-      expect(failure(() => parseSettings(["--download-max-mb", value], {}, profile)).message).toContain(
-        "--download-max-mb must be an integer from 1 to 2000",
-      )
-      if (value)
-        expect(failure(() => parseSettings([], { DEMO_DOWNLOAD_MAX_MB: value }, profile)).message).toContain(
-          "DEMO_DOWNLOAD_MAX_MB",
-        )
-    },
-  )
+  test.each(["0", "2001", "1.5", "-5"])("refuses the limit %s outside 1 to 2000 or not whole", (value) => {
+    expect(failure(() => parseSettings(["--download-max-mb", value], {}, profile)).message).toBe(
+      "--download-max-mb must be a whole number from 1 to 2000.",
+    )
+    expect(failure(() => parseSettings([], { DEMO_DOWNLOAD_MAX_MB: value }, profile)).message).toBe(
+      "DEMO_DOWNLOAD_MAX_MB must be a whole number from 1 to 2000.",
+    )
+  })
 
-  test.each([0, 2001, 1.5, "100", "text", true, false, null])("refuses invalid plugin limit %j", (value) => {
-    expect(failure(() => settingsFromOptions({ download_max_mb: value }, {}, profile)).message).toContain(
-      'Option "download_max_mb" must be an integer from 1 to 2000',
+  test.each(["text", "true", "false", "Infinity", "NaN"])("refuses the limit %s that is not a number", (value) => {
+    expect(failure(() => parseSettings(["--download-max-mb", value], {}, profile)).message).toContain(
+      "--download-max-mb",
+    )
+    expect(failure(() => parseSettings([], { DEMO_DOWNLOAD_MAX_MB: value }, profile)).message).toContain(
+      "DEMO_DOWNLOAD_MAX_MB",
+    )
+  })
+
+  test.each([0, 2001, 1.5])("refuses plugin limit %j outside 1 to 2000 or not whole", (value) => {
+    expect(failure(() => settingsFromOptions({ download_max_mb: value }, {}, profile)).message).toBe(
+      'Option "download_max_mb" must be a whole number from 1 to 2000.',
+    )
+  })
+
+  test.each(["100", "text", true, false, null])("refuses plugin limit %j that is not a number", (value) => {
+    expect(failure(() => settingsFromOptions({ download_max_mb: value }, {}, profile)).message).toBe(
+      'Option "download_max_mb" must be a finite number.',
     )
   })
 

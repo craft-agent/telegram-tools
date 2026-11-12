@@ -139,36 +139,15 @@ def settings_flags(ctx: PluginContext) -> list[str]:
     elif toolsets is not None and (names := _names("toolsets", toolsets)):
         flags += ["--toolsets", names]
 
-    for key, flag in (
-        ("read_only", "--read-only"),
-        ("keep_disappearing", "--keep-disappearing"),
-        ("channels", "--channels"),
-    ):
-        value = ctx.get_config(key)
-        if value is not None and not isinstance(value, bool):
-            raise SettingsError(f'setting "{key}" must be true or false')
-        if value:
-            flags.append(flag)
+    read_only = ctx.get_config("read_only")
+    if read_only is not None and not isinstance(read_only, bool):
+        raise SettingsError('setting "read_only" must be true or false')
+    if read_only:
+        flags.append("--read-only")
 
     for key, flag in (("tools", "--tools"), ("exclude_tools", "--exclude-tools")):
         value = ctx.get_config(key)
         if value is not None and (names := _names(key, value)):
             flags += [flag, names]
-
-    flags += state_dir_flags(ctx)
-
-    download_dir = ctx.get_config("download_dir")
-    if download_dir is not None:
-        if not isinstance(download_dir, str) or not download_dir.strip():
-            raise SettingsError('setting "download_dir" must be a path')
-        flags += ["--download-dir", download_dir]
-
-    download_max_mb = ctx.get_config("download_max_mb")
-    if download_max_mb is not None:
-        if type(download_max_mb) is not int or not 1 <= download_max_mb <= MAX_DOWNLOAD_MB:
-            raise SettingsError(f'setting "download_max_mb" must be an integer from 1 to {MAX_DOWNLOAD_MB}')
-        flags += ["--download-max-mb", str(download_max_mb)]
-
-    flags += send_dirs_flags(ctx)
 
     return [*flags, *option_flags(ctx)]

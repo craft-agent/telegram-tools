@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { NOTE_ID, NOTE_OPTION, noteSpec } from "../entry/options.testing"
+import { NOTE_ID, NOTE_OPTION, PROFILE_OPTIONS, noteSpec } from "../entry/options.testing"
 import { parseSettings } from "../entry/settings"
 import { call, connect, runCleanups, settings } from "./testing"
 
@@ -21,7 +21,7 @@ describe("tool options", () => {
       name: "demo-tools",
       envPrefix: "DEMO",
       toolsets: { names: ["alpha"], defaults: ["alpha"] },
-      options: { [NOTE_OPTION]: "text" } as const,
+      options: PROFILE_OPTIONS,
     }
     const entry = parseSettings(["--note-text", "from flag"], {}, profile)
     const { client } = await connect([noteSpec], entry)

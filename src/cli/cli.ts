@@ -15,10 +15,11 @@ import {
   type ToolSpec,
   type Translations,
 } from "../core"
+import { resolveDirectorySettings } from "../entry/directory"
 import { errorBody } from "../entry/errors"
 import { approvalOf, checkPin } from "../entry/pin"
 import { PROJECT_PROFILE, type EntryProfile } from "../entry/profile"
-import { parseToolSettings, promptLanguage } from "../entry/settings"
+import { parseToolOptions, parseToolSettings, promptLanguage } from "../entry/settings"
 import { visible } from "../entry/visible"
 import { promptTranslator, promptWords } from "../entry/words"
 import { PROJECT } from "../project"
@@ -134,17 +135,18 @@ function parseCommand(argv: string[], io: Pick<CliIo, "specs" | "env" | "profile
   if (cwd === undefined) throw usageError(`Command ${name} needs ${CWD_FLAG} <dir>.`)
   if (name === "target") {
     const { value: language, rest: afterLanguage } = takeFlag(rest, LANGUAGE_FLAG)
-    const { value: harnessLanguage, rest: settingFlags } = takeFlag(afterLanguage, HARNESS_LANGUAGE_FLAG)
-    const settings = parseToolSettings(settingFlags, io.env, profile)
+    const { value: harnessLanguage, rest: optionFlags } = takeFlag(afterLanguage, HARNESS_LANGUAGE_FLAG)
+    const parsedOptions = parseToolOptions(optionFlags, io.env, profile)
+    const directories = resolveDirectorySettings(parsedOptions, io.env, profile)
     return {
       name,
       toolId,
       cwd,
-      stateDir: settings.state_dir,
-      downloadDir: settings.download_dir,
-      downloadMaxMb: settings.download_max_mb,
-      sendDirs: settings.send_dirs,
-      options: settings.options,
+      stateDir: directories.state_dir,
+      downloadDir: directories.download_dir,
+      downloadMaxMb: directories.download_max_mb,
+      sendDirs: directories.send_dirs,
+      options: parsedOptions,
       language: promptLanguage(language, io.env, harnessLanguage, profile),
     }
   }
@@ -277,10 +279,10 @@ const PERSON_COMMANDS: Partial<Record<string, (argv: string[], io: CommandIo) =>
  * language) of that description and the resources when there is a description.
  * `target` takes `--language <tag>`, else `<envPrefix>_LANGUAGE`, else `--harness-language <tag>` (the harness's own
  * display language) as the prompt language; none, or one without a table,
- * keeps English. `target` also takes the settings flags of `run` (and their
- * `<envPrefix>_*` variables, the package's own tool options among them), so it
- * resolves a call as `run` will; `run` and `target` hand the tool options to
- * the tool as `options`. Standard output carries only the JSON document; a
+ * keeps English. `target` also takes the package's own tool options of `run`
+ * (as flags or `<envPrefix>_<OPTION>` variables, the directory and download
+ * settings among them), so it resolves a call as `run` will; `run` and
+ * `target` hand the tool options to the tool as `options`. Standard output carries only the JSON document; a
  * mistake in the command line is one line on standard error and `EXIT_USAGE`.
  * `login`, `sync`, `service`, `logout` and `remove` are for a person setting
  * up an account (see `PERSON_COMMANDS`). Resolves to the exit code.

@@ -11,6 +11,7 @@ import {
 } from "../core"
 import { PROJECT } from "../project"
 import type { GivenDirectory } from "./directory"
+import { resolveDirectorySettings } from "./directory"
 import { resolveDownloadDir } from "./download-dir"
 import { PROJECT_PROFILE, type EntryProfile } from "./profile"
 import { resolveSendDirs } from "./send-dirs"
@@ -390,12 +391,11 @@ export function parseSettings(
   const flags = readFlags(argv, profile)
   const value = (name: OptionName): SettingText | undefined => flagOrEnvText(flags, name, env, profile)
 
+  const options = optionsFrom(flags, env, profile)
   const settings: EntrySettings = {
     confirm: "harness",
-    options: optionsFrom(flags, env, profile),
-    state_dir: resolveStateDir(value("state_dir"), env, profile),
-    ...downloadSettings(value, env, profile),
-    send_dirs: resolveSendDirs(listedDirectories(value("send_dirs")), env),
+    options,
+    ...resolveDirectorySettings(options, env, profile),
   }
   const toolsets = value("toolsets")
   if (toolsets) settings.toolsets = checkToolsets(splitList(toolsets.text), toolsets.source, profile.toolsets)
@@ -407,10 +407,6 @@ export function parseSettings(
   if (excluded) settings.exclude_tools = splitList(excluded.text)
   const confirm = value("confirm")
   if (confirm) settings.confirm = parseConfirm(confirm.text.trim(), confirm.source)
-  for (const name of SERVICE_OPTION_NAMES) {
-    const given = value(name)
-    if (given) settings[name] = parseBoolean(given.text, given.source)
-  }
   return settings
 }
 
@@ -487,17 +483,7 @@ export function parseServiceSettings(
   }
 }
 
-const TOOL_OPTION_NAMES = [
-  "toolsets",
-  "read_only",
-  "tools",
-  "exclude_tools",
-  "state_dir",
-  "download_dir",
-  "download_max_mb",
-  "send_dirs",
-  ...SERVICE_OPTION_NAMES,
-] as const satisfies readonly OptionName[]
+const TOOL_OPTION_NAMES = ["toolsets", "read_only", "tools", "exclude_tools"] as const satisfies readonly OptionName[]
 type ToolOptionName = (typeof TOOL_OPTION_NAMES)[number]
 
 function stringList(value: unknown): string[] | undefined {
@@ -661,18 +647,9 @@ export function settingsFromOptions(
     }
     if (parsed !== undefined) parsedOptions[name] = parsed
   }
-  const directoryText = (name: "state_dir" | "download_dir"): SettingText | undefined =>
-    given[name] !== undefined
-      ? { text: directoryOption(name, given[name]), source: optionSource(name) }
-      : envText(name, env, profile)
   const settings: PluginSettings = {
     options: parsedOptions,
-    state_dir: resolveStateDir(directoryText("state_dir"), env, profile),
-    send_dirs: resolveSendDirs(resolve("send_dirs", sendDirsOption, listedDirectories) ?? [], env),
-    download_dir: resolveDownloadDir(directoryText("download_dir"), env, profile),
-    download_max_mb:
-      resolve("download_max_mb", (value) => downloadMaxMb(value, optionSource("download_max_mb")), downloadMaxMbText) ??
-      DEFAULT_DOWNLOAD_MAX_MB,
+    ...resolveDirectorySettings(parsedOptions, env, profile),
   }
   const toolsets = resolve(
     "toolsets",
@@ -682,10 +659,6 @@ export function settingsFromOptions(
   if (toolsets !== undefined) settings.toolsets = toolsets
   const readOnly = resolve("read_only", booleanOption("read_only"), ({ text, source }) => parseBoolean(text, source))
   if (readOnly !== undefined) settings.read_only = readOnly
-  for (const name of SERVICE_OPTION_NAMES) {
-    const given = resolve(name, booleanOption(name), ({ text, source }) => parseBoolean(text, source))
-    if (given !== undefined) settings[name] = given
-  }
   const tools = resolve("tools", listOption("tools"), ({ text }) => splitList(text))
   if (tools !== undefined) settings.tools = tools
   const excluded = resolve("exclude_tools", listOption("exclude_tools"), ({ text }) => splitList(text))

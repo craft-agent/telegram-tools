@@ -30,12 +30,12 @@ class SettingsFlagsTest(unittest.TestCase):
                 "--toolsets",
                 "things,widgets",
                 "--read-only",
-                "--keep-disappearing",
-                "--channels",
                 "--tools",
                 "demo_thing_read",
                 "--exclude-tools",
                 "demo_widget_update,demo_gadget_edit",
+                "--keep-disappearing",
+                "--channels",
             ],
         )
 
@@ -82,7 +82,6 @@ class SettingsFlagsTest(unittest.TestCase):
             {"tools": "demo_thing_read"},
             {"exclude_tools": [1]},
             {"state_dir": 123},
-            {"state_dir": ""},
         ):
             with self.subTest(config=config), self.assertRaises(settings.SettingsError):
                 self.flags(**config)
@@ -96,10 +95,10 @@ class SettingsFlagsTest(unittest.TestCase):
             self.assertEqual(self.flags(download_max_mb=value), ["--download-max-mb", str(value)])
 
     def test_invalid_download_settings_refused(self) -> None:
-        for value in (123, True, "", "   ", []):
+        for value in (123, True, []):
             with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "download_dir"):
                 self.flags(download_dir=value)
-        for value in (0, 2001, 1.5, 1.0, "100", "text", True, False, []):
+        for value in ("100", "text", True, False, []):
             with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "download_max_mb"):
                 self.flags(download_max_mb=value)
 
@@ -109,14 +108,24 @@ class SettingsFlagsTest(unittest.TestCase):
         self.assertEqual(self.flags(send_dirs=[]), [])
 
     def test_invalid_send_dirs_refused(self) -> None:
-        for value in ("/a", 123, True, [1], [""], ["  "], ["/a,/b"]):
+        for value in ("/a", 123, True, [1], ["/a,/b"]):
             with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "send_dirs"):
                 self.flags(send_dirs=value)
 
 
 class OptionFlagsTest(unittest.TestCase):
-    def test_the_starter_has_no_tool_options(self) -> None:
-        self.assertEqual(project.OPTIONS, {})
+    def test_the_package_declares_its_own_settings(self) -> None:
+        self.assertEqual(
+            project.OPTIONS,
+            {
+                "state_dir": "path",
+                "download_dir": "path",
+                "download_max_mb": {"type": "number", "integer": True, "min": 1, "max": 2000},
+                "send_dirs": "paths",
+                "keep_disappearing": "boolean",
+                "channels": "boolean",
+            },
+        )
 
     def test_each_kind_becomes_a_flag(self) -> None:
         options = {"note_text": "text", "note_pinned": "boolean", "note_count": "number", "note_tags": "list"}
