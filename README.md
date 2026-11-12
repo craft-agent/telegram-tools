@@ -284,6 +284,26 @@ in Hermes.
 
 [`docs/conventions.md`](docs/conventions.md) has the rules each step follows.
 
+A package declares each option as `text`, `boolean`, `number`, `list`, `path`
+or `paths`, or as an object with `type` and optional bounds. For example, in
+`src/project.ts`:
+
+```ts
+options: {
+  notes_dir: "path",
+  note_limit: { type: "number", integer: true, min: 1, max: 50 },
+}
+```
+
+`integer: true` requires a whole number; `min` and `max` bound a number or
+count a `list` or `paths` value's items. An object with only `type` means the
+same as the type alone. Hermes's `OPTIONS` mirrors the declarations on one
+line, with double quotes and Python's `True` for `integer`:
+
+```python
+OPTIONS: dict[str, str | dict[str, object]] = {"notes_dir": "path", "note_limit": {"type": "number", "integer": True, "min": 1, "max": 50}}
+```
+
 ## Reads and writes
 
 Every read tool is named `<prefix>_<domain>_read`. Reads can run unasked;
@@ -320,25 +340,36 @@ Where a write is asked about, and where it is not:
 Every entry point takes the same settings. A flag wins over its environment
 variable, and an option or setting wins over the variable too.
 
-| Setting             | Flag                    | Variable                           | Meaning                                                                                                                                                    |
-| ------------------- | ----------------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `toolsets`          | `--toolsets`            | `TELEGRAM_TOOLS_TOOLSETS`          | the toolsets that are on, or `all`; default those `src/project.ts` names                                                                                   |
-| `read_only`         | `--read-only`           | `TELEGRAM_TOOLS_READ_ONLY`         | registers no tool that writes; wins over every other setting                                                                                               |
-| `tools`             | `--tools`               | `TELEGRAM_TOOLS_TOOLS`             | single tools to add by ID, whatever their toolset                                                                                                          |
-| `exclude_tools`     | `--exclude-tools`       | `TELEGRAM_TOOLS_EXCLUDE_TOOLS`     | single tools to remove by ID; wins over `tools` and `toolsets`                                                                                             |
-| `confirm`           | `--confirm`             | `TELEGRAM_TOOLS_CONFIRM`           | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                                              |
-| `language`          | `--language`            | `TELEGRAM_TOOLS_LANGUAGE`          | native plugins only: the approval prompt's language, such as `ja`                                                                                          |
-| `emoji`             | —                       | —                                  | Hermes only: the emoji shown beside each toolset, by toolset name (`""` for none)                                                                          |
-| `state_dir`         | `--state-dir`           | `TELEGRAM_TOOLS_STATE_DIR`         | where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`                                                                                  |
-| `download_dir`      | `--download-dir`        | `TELEGRAM_TOOLS_DOWNLOAD_DIR`      | where `telegram_file_save` saves received files, a folder per message; default `~/Downloads/telegram-tools`; read by the tools, no service restart needed  |
-| `download_max_mb`   | `--download-max-mb <n>` | `TELEGRAM_TOOLS_DOWNLOAD_MAX_MB`   | the largest file a download takes, in MB; integer 1..2000, default 100; read by the tools, no service restart needed                                       |
-| `send_dirs`         | `--send-dirs`           | `TELEGRAM_TOOLS_SEND_DIRS`         | the directories files may be sent from, besides the working directory; absolute paths, default none; read by the tools, no service restart needed          |
-| `keep_disappearing` | `--keep-disappearing`   | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | keep disappearing and view-once messages for the user; off by default; read by `sync` and `service install`, run `service install` again after changing it |
-| `channels`          | `--channels`            | `TELEGRAM_TOOLS_CHANNELS`          | list, read, mirror and send to channels; off by default, see below; read by `sync` and `service install`, run `service install` again after changing it    |
+| Setting             | Flag                    | Variable                           | Meaning                                                                                                                                                               |
+| ------------------- | ----------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `toolsets`          | `--toolsets`            | `TELEGRAM_TOOLS_TOOLSETS`          | the toolsets that are on, or `all`; default those `src/project.ts` names                                                                                              |
+| `read_only`         | `--read-only`           | `TELEGRAM_TOOLS_READ_ONLY`         | registers no tool that writes; wins over every other setting                                                                                                          |
+| `tools`             | `--tools`               | `TELEGRAM_TOOLS_TOOLS`             | single tools to add by ID, whatever their toolset                                                                                                                     |
+| `exclude_tools`     | `--exclude-tools`       | `TELEGRAM_TOOLS_EXCLUDE_TOOLS`     | single tools to remove by ID; wins over `tools` and `toolsets`                                                                                                        |
+| `confirm`           | `--confirm`             | `TELEGRAM_TOOLS_CONFIRM`           | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                                                         |
+| `language`          | `--language`            | `TELEGRAM_TOOLS_LANGUAGE`          | native plugins only: the approval prompt's language, such as `ja`                                                                                                     |
+| `emoji`             | —                       | —                                  | Hermes only: the emoji shown beside each toolset, by toolset name (`""` for none)                                                                                     |
+| `state_dir`         | `--state-dir`           | `TELEGRAM_TOOLS_STATE_DIR`         | `path`: where every label's state lives; default `$XDG_STATE_HOME/telegram-tools`                                                                                     |
+| `download_dir`      | `--download-dir`        | `TELEGRAM_TOOLS_DOWNLOAD_DIR`      | `path`: where `telegram_file_save` saves received files, a folder per message; default `~/Downloads/telegram-tools`; read by the tools, no service restart needed     |
+| `download_max_mb`   | `--download-max-mb <n>` | `TELEGRAM_TOOLS_DOWNLOAD_MAX_MB`   | `number`: the largest file a download takes, in MB; whole number 1..2000, default 100; read by the tools, no service restart needed                                   |
+| `send_dirs`         | `--send-dirs`           | `TELEGRAM_TOOLS_SEND_DIRS`         | `paths`: the directories files may be sent from, besides the working directory; default none; read by the tools, no service restart needed                            |
+| `keep_disappearing` | `--keep-disappearing`   | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | `boolean`: keep disappearing and view-once messages for the user; off by default; read by `sync` and `service install`, run `service install` again after changing it |
+| `channels`          | `--channels`            | `TELEGRAM_TOOLS_CHANNELS`          | `boolean`: list, read, mirror and send to channels; off by default, see below; read by `sync` and `service install`, run `service install` again after changing it    |
 
-Lists are comma-separated in a flag or a variable. A package's own settings,
-listed in `options` in `src/project.ts`, take a row each here and are read the
-same way. Where each harness reads them:
+Lists are comma-separated in a flag or a variable. These are this package's own
+settings listed in `options` in `src/project.ts`: `state_dir`, `download_dir`,
+`download_max_mb`, `send_dirs`, `keep_disappearing` and `channels`. They are
+read the same way. A `path` is trimmed; `~` and `~/…` (also with the platform
+separator) stand for the home directory (`HOME` when it is absolute, else the
+account's). It must then be absolute and reaches the tool normalized, without
+a filesystem check. `paths` is a list of such paths, comma-separated in a flag or variable
+and an array of strings in a plugin option. A blank path counts as unset, so
+the default applies. Blank list items are dropped; a list with none left also
+counts as unset.
+Bounds check only a given value, not an unset option. Refused values are
+`invalid_argument`, naming the flag, variable or option and what it must be.
+Hermes passes paths and lists to the command line, which checks the paths and
+bounds. Where each harness reads them:
 
 - **OpenCode** takes the plugin `options` shown above, with lists as arrays,
   `read_only` as a boolean, `state_dir` and `download_dir` as paths, and

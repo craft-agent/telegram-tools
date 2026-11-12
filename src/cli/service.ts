@@ -18,7 +18,7 @@ import {
   writeServiceRecord,
 } from "../core/telegram/service-record"
 import { lockHolder } from "../core/telegram/sync-lock"
-import type { ServiceSettings } from "../entry/settings"
+import type { ServiceSettings } from "../entry/command-settings"
 import { PROJECT } from "../project"
 import { handleCommandError, parseCommandServiceSettings, parseFlagArgs, usageError } from "./command-args"
 import { EXIT_OK, type CommandIo } from "./command-io"

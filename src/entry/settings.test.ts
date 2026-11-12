@@ -1,14 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { PROJECT } from "../project"
 import type { EntryProfile } from "./profile"
-import {
-  forwardedVariables,
-  parseServiceSettings,
-  parseSettings,
-  parseStateDir,
-  parseToolSettings,
-  settingVariables,
-} from "./settings"
+import { forwardedVariables, parseSettings, parseToolSettings, settingVariables } from "./settings"
 import { FILE_SETTINGS, failure, profile } from "./settings.testing"
 
 const parse = (argv: string[], env: Record<string, string | undefined> = {}) => parseSettings(argv, env, profile)
@@ -76,7 +69,7 @@ describe("parseSettings", () => {
       tools: ["demo_thing_read"],
       exclude_tools: ["demo_thing_merge"],
       confirm: "elicitation",
-      options: {},
+      options: { state_dir: "/custom/state" },
       state_dir: "/custom/state",
       ...FILE_SETTINGS,
     })
@@ -98,7 +91,7 @@ describe("parseSettings", () => {
       exclude_tools: ["c"],
       read_only: true,
       confirm: "elicitation",
-      options: {},
+      options: { state_dir: "/custom/state" },
       state_dir: "/custom/state",
       ...FILE_SETTINGS,
     })
@@ -120,7 +113,7 @@ describe("parseSettings", () => {
       tools: ["x"],
       exclude_tools: ["y", "z"],
       confirm: "elicitation",
-      options: {},
+      options: { state_dir: "/env/state" },
       state_dir: "/env/state",
       ...FILE_SETTINGS,
     })
@@ -186,7 +179,7 @@ describe("parseSettings", () => {
       exclude_tools: ["b"],
       confirm: "harness",
       read_only: true,
-      options: {},
+      options: { state_dir: "/flag/state" },
       state_dir: "/flag/state",
       ...FILE_SETTINGS,
     })
@@ -255,19 +248,18 @@ describe("parseSettings", () => {
 })
 
 describe("keep_disappearing and channels", () => {
-  test("are absent unless set", () => {
-    expect(parse([])).not.toHaveProperty("keep_disappearing")
-    expect(parse([])).not.toHaveProperty("channels")
+  test("are absent from the options unless set", () => {
+    expect(parse([]).options).toEqual({})
   })
 
   test("read from the flags, the environment, and the flag wins", () => {
-    expect(parse(["--keep-disappearing", "--channels"])).toMatchObject({ keep_disappearing: true, channels: true })
-    expect(parse([], { DEMO_KEEP_DISAPPEARING: "1", DEMO_CHANNELS: "true" })).toMatchObject({
+    expect(parse(["--keep-disappearing", "--channels"]).options).toEqual({ keep_disappearing: true, channels: true })
+    expect(parse([], { DEMO_KEEP_DISAPPEARING: "1", DEMO_CHANNELS: "true" }).options).toEqual({
       keep_disappearing: true,
       channels: true,
     })
-    expect(parse([], { DEMO_CHANNELS: "0" }).channels).toBe(false)
-    expect(parse(["--channels"], { DEMO_CHANNELS: "0" }).channels).toBe(true)
+    expect(parse([], { DEMO_CHANNELS: "0" }).options.channels).toBe(false)
+    expect(parse(["--channels"], { DEMO_CHANNELS: "0" }).options.channels).toBe(true)
   })
 
   test("a bad environment value is rejected, naming the variable; a value after the flag is too", () => {
@@ -276,40 +268,9 @@ describe("keep_disappearing and channels", () => {
   })
 
   test("parseToolSettings reads them too", () => {
-    expect(parseTool(["--channels"], { DEMO_KEEP_DISAPPEARING: "true" })).toMatchObject({
+    expect(parseTool(["--channels"], { DEMO_KEEP_DISAPPEARING: "true" }).options).toEqual({
       keep_disappearing: true,
       channels: true,
-    })
-  })
-})
-
-describe("parseServiceSettings", () => {
-  const parseService = (argv: string[], env: Record<string, string | undefined> = {}) =>
-    parseServiceSettings(argv, env, profile)
-
-  test("gives the state directory and both booleans, off by default", () => {
-    expect(parseService([])).toEqual({ state_dir: expect.any(String), keep_disappearing: false, channels: false })
-    expect(parseService(["--state-dir=/s", "--channels"], { DEMO_KEEP_DISAPPEARING: "1" })).toEqual({
-      state_dir: "/s",
-      keep_disappearing: true,
-      channels: true,
-    })
-  })
-
-  test("rejects any other settings flag, naming it", () => {
-    expect(failure(() => parseService(["--read-only"])).message).toContain("--read-only")
-    expect(failure(() => parseService(["--nope"])).message).toContain("--nope")
-  })
-
-  test("rejects a tool option flag too, as does parseStateDir, and ignores its variable", () => {
-    expect(failure(() => parseService(["--note-text", "x"])).message).toBe("Option --note-text is not available here.")
-    expect(failure(() => parseStateDir(["--note-text=x"], {}, profile)).message).toBe(
-      "Option --note-text is not available here.",
-    )
-    expect(parseService([], { DEMO_NOTE_TEXT: "x" })).toEqual({
-      state_dir: expect.any(String),
-      keep_disappearing: false,
-      channels: false,
     })
   })
 })
@@ -326,7 +287,7 @@ describe("parseToolSettings", () => {
       read_only: true,
       tools: ["a"],
       exclude_tools: ["b"],
-      options: {},
+      options: { state_dir: "/tool/state" },
       state_dir: "/tool/state",
       ...FILE_SETTINGS,
     })

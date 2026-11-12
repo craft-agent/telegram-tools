@@ -319,7 +319,15 @@ Every entry point takes the same settings:
 - **`confirm`** is `harness` (the default) or `elicitation`; it says who asks
   before an administrative tool acts (see "Write classes"). The default leaves
   the question to the harness, whose approval every user already knows.
-- **`state_dir`**: where every account's state lives (see "Accounts and state").
+- **`state_dir`** is this package's `path` option for every account's state
+  (see "Accounts and state"), read as "Options" below describes.
+- **`download_dir`**, **`download_max_mb`** and **`send_dirs`** are this
+  package's options for files (see "Files"), read as "Options" below describes:
+  a `path`, a whole `number` from 1 to 2000 (MB), and `paths`, respectively.
+- **`keep_disappearing`** and **`channels`** are this package's `boolean`
+  options, both off by default (see "The mirror"), read as "Options" below
+  describes, but only by `sync` and `service`. Run `service install` again
+  after changing them.
 - **`language`** is the language of a native plugin's approval prompt (see
   "Write classes"); unset, the prompt follows the harness's display language
   or stays in English.
@@ -332,14 +340,27 @@ Every entry point takes the same settings:
 - **Options** are the package's own settings, the ones the tools themselves
   read, listed in `options` in `src/project.ts` (and `OPTIONS` in the Hermes
   plugin's `project.py`), each mapping a snake_case name to its type (`text`,
-  `boolean`, `number` or `list`). Its flag is the name with `_` as `-` (a
+  `boolean`, `number`, `list`, `path` or `paths`) or a declaration with
+  `{ type, integer, min, max }`. `integer: true` requires a whole `number`;
+  `min` and `max` bound a `number` or count the items of a `list` or `paths`.
+  Only `type` is required. Its flag is the name with `_` as `-` (a
   `boolean` flag takes no value), its variable is `<envPrefix>_<NAME>`
   uppercased, and its plugin option or setting is the name itself. A flag wins
-  over its variable, an option over its variable, and a blank text or empty
-  list counts as unset. They reach a tool as `context.options`, keyed by name,
-  and one that is not given is absent: a neutral default means unset, and the
-  tool then does nothing extra. A tool reads an option when it runs, so a
-  change applies on the next call.
+  over its variable, an option over its variable, and a blank text or path or
+  empty list counts as unset. A `path` is trimmed; `~` alone or followed by
+  `/` (or the platform separator) stands for the home directory: `HOME` when
+  it is absolute, else the account's.
+  The expanded path must be absolute and reaches the tool normalized, without
+  a filesystem check. A `paths` value is a list of such paths, comma-separated
+  in a flag or variable and an array of strings in a plugin option; items are
+  trimmed and blank items dropped, and none left counts as unset. Bounds
+  check only a value that is given, after blanks are dropped; unset stays
+  unset. Refused values are `invalid_argument`, naming the flag, variable or
+  option and what it must be. A package should not have to check a directory
+  or a limit again inside its tool. They reach a tool as `context.options`,
+  keyed by name, and one that is not given is absent: a neutral default means
+  unset, and the tool then does nothing extra. A tool reads an option when it
+  runs, so a change applies on the next call.
 
 ## Skills
 
@@ -439,10 +460,10 @@ Every entry point takes the same settings:
   `api_id` and `api_hash`, mtcute's storage, the mirror, the service's socket,
   the service record, short-lived copies of files in transit (`incoming/`,
   `outbox/`), and the files `keep_disappearing` kept (`kept/`). The state root
-  is the `state_dir` setting, by default `$XDG_STATE_HOME/telegram-tools`, or
-  `~/.local/state/telegram-tools` without it. One directory per label means a
-  label is moved, backed up or removed as a whole, and nothing of one account
-  sits in another's.
+  is the `state_dir` path option, by default `$XDG_STATE_HOME/telegram-tools`
+  when `XDG_STATE_HOME` is absolute, else `~/.local/state/telegram-tools`.
+  One directory per label means a label is moved, backed up or removed as a
+  whole, and nothing of one account sits in another's.
 - **`account` picks the label.** Left out, it picks the only logged-in label;
   with several, the call fails as `invalid_argument` and lists them. One
   account is the common case and needs no argument, while several never
@@ -511,8 +532,8 @@ Every entry point takes the same settings:
 
 - **What the mirror keeps depends on the kind of chat.** Private chats, bots,
   basic groups and Saved Messages are mirrored always; supergroups while on
-  the sync list; channels while on it with the `channels` setting on; forum
-  topics as topics.
+  the sync list; channels while on it with the `channels` boolean option on;
+  forum topics as topics.
 - **The sync list names the supergroups and channels the mirror keeps**, at
   most 30. They are the chats a user chooses: a busy supergroup or channel
   would fill the mirror and the model's reads with text nobody asked for, so
@@ -557,9 +578,9 @@ Every entry point takes the same settings:
   it back.
 - **Disappearing and view-once messages leave when they expire.** They leave
   the mirror with their files by default, as their sender meant and the API
-  terms §1.4 require. With `keep_disappearing` on they are kept and marked with
-  a note in a field of its own that they are for the user only, with their
-  files kept as they arrive.
+  terms §1.4 require. With the `keep_disappearing` boolean option on they are
+  kept and marked with a note in a field of its own that they are for the user
+  only, with their files kept as they arrive.
 - **Channels never bring sponsored messages.** None is fetched or shown:
   advertisements are text nobody in the chat chose, and keeping them out
   avoids untrusted prompts reaching the model. They come only from a request
@@ -583,7 +604,7 @@ Every entry point takes the same settings:
   judged by real path, so a link that leads elsewhere counts as elsewhere.
   The state directory and the tools' own install directory are never among
   them, nor inside them.
-- **Received files are saved under `download_dir`**, by default
+- **Received files are saved under the `download_dir` path option**, by default
   `~/Downloads/telegram-tools`, where a person looks for what they downloaded.
   A message's file goes in `<download_dir>/<label>/<chat id>/<message id>/`,
   directories mode 700 and files mode 600, never executable: a received file
@@ -597,7 +618,8 @@ Every entry point takes the same settings:
   there; the tool takes only a file inside that folder and removes the folder
   after the call. No name a message carries reaches the file system before it
   is cleaned: the sender chose it.
-- **A download stops at `download_max_mb`**, 100 by default and at most 2000.
+- **A download stops at the `download_max_mb` number option**, in MB: a whole
+  number from 1 to 2000, default 100.
   A file declaring more is refused before anything is downloaded, and a
   download that passes the limit stops and leaves nothing. Telegram takes
   files of several gigabytes, and the one connection serves every request.
@@ -646,8 +668,8 @@ Every entry point takes the same settings:
 - **A file is sent only from the working directory or `send_dirs`.** The
   working directory is where the user pointed the agent, so "send this log"
   needs no setting; it does not count when it is the home directory or a file
-  system root, which would open everything the user owns. `send_dirs` names
-  the others, none by default.
+  system root, which would open everything the user owns. The `send_dirs`
+  paths option names the others, none by default; blank items are dropped.
 - **Keys, secrets and programs never leave.** A file is refused for a key or
   settings folder anywhere in its real path (`.ssh`, `.gnupg`, `.aws`,
   `.config`, `.git`, …), a name that looks like a key or a secret (`.env`,

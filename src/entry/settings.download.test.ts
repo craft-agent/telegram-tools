@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { homedir } from "node:os"
 import { resolve } from "node:path"
-import { parseServiceSettings, parseSettings, parseStateDir, parseToolSettings, settingsFromOptions } from "./settings"
+import { parseSettings, parseToolSettings, settingsFromOptions } from "./settings"
 import { failure, profile } from "./settings.testing"
 
 const env = { HOME: "/people/example", DEMO_DOWNLOAD_DIR: "/env/downloads", DEMO_DOWNLOAD_MAX_MB: "50" }
@@ -52,51 +52,66 @@ describe("download settings", () => {
   })
 
   test("relative paths and invalid option types name their source", () => {
-    expect(failure(() => parseSettings(["--download-dir=relative"], {}, profile)).message).toContain("--download-dir")
-    expect(failure(() => parseSettings([], { DEMO_DOWNLOAD_DIR: "relative" }, profile)).message).toContain(
-      "DEMO_DOWNLOAD_DIR",
+    expect(failure(() => parseSettings(["--download-dir=relative"], {}, profile)).message).toBe(
+      "--download-dir must be an absolute path.",
     )
-    for (const value of ["relative", "", false, 1, null]) {
+    expect(failure(() => parseSettings([], { DEMO_DOWNLOAD_DIR: "relative" }, profile)).message).toBe(
+      "DEMO_DOWNLOAD_DIR must be an absolute path.",
+    )
+    for (const value of ["relative", false, 1, null]) {
       expect(failure(() => settingsFromOptions({ download_dir: value }, {}, profile)).message).toContain(
-        '"download_dir"',
+        'Option "download_dir" must be an absolute path.',
       )
     }
   })
 
-  test.each(["1", "2000"])("accepts the limit boundary %s", (value) => {
-    expect(parseSettings(["--download-max-mb", value], {}, profile).download_max_mb).toBe(Number(value))
+  test("a blank directory counts as unset, in a flag, a variable and a plugin option", () => {
+    const unset = resolve("/people/example", "Downloads", profile.name)
+    expect(parseSettings(["--download-dir", " "], { HOME: env.HOME }, profile).download_dir).toBe(unset)
+    expect(parseSettings(["--download-dir= "], env, profile).download_dir).toBe(unset)
+    expect(parseSettings([], { HOME: env.HOME, DEMO_DOWNLOAD_DIR: " " }, profile).download_dir).toBe(unset)
+    expect(settingsFromOptions({ download_dir: "" }, env, profile).download_dir).toBe(unset)
   })
 
-  test.each(["0", "2001", "1.5", "1e2", "0x10", "-5", "text", "true", "false", "Infinity", "NaN", ""])(
-    "refuses invalid limit %s",
-    (value) => {
-      expect(failure(() => parseSettings(["--download-max-mb", value], {}, profile)).message).toContain(
-        "--download-max-mb must be an integer from 1 to 2000",
-      )
-      if (value)
-        expect(failure(() => parseSettings([], { DEMO_DOWNLOAD_MAX_MB: value }, profile)).message).toContain(
-          "DEMO_DOWNLOAD_MAX_MB",
-        )
-    },
-  )
+  test.each(["1", "2000", "1e2", " 50 "])("accepts the limit %s", (value) => {
+    expect(parseSettings(["--download-max-mb", value], {}, profile).download_max_mb).toBe(Number(value))
+    expect(parseSettings([], { DEMO_DOWNLOAD_MAX_MB: value }, profile).download_max_mb).toBe(Number(value))
+  })
 
-  test.each([0, 2001, 1.5, "100", "text", true, false, null])("refuses invalid plugin limit %j", (value) => {
-    expect(failure(() => settingsFromOptions({ download_max_mb: value }, {}, profile)).message).toContain(
-      'Option "download_max_mb" must be an integer from 1 to 2000',
+  test.each(["0", "2001", "1.5", "-5"])("refuses the limit %s outside 1 to 2000 or not whole", (value) => {
+    expect(failure(() => parseSettings(["--download-max-mb", value], {}, profile)).message).toBe(
+      "--download-max-mb must be a whole number from 1 to 2000.",
+    )
+    expect(failure(() => parseSettings([], { DEMO_DOWNLOAD_MAX_MB: value }, profile)).message).toBe(
+      "DEMO_DOWNLOAD_MAX_MB must be a whole number from 1 to 2000.",
     )
   })
 
-  test("service and state-only commands refuse flags and ignore invalid download environment", () => {
-    const badEnv = { DEMO_DOWNLOAD_DIR: "relative", DEMO_DOWNLOAD_MAX_MB: "bad" }
-    expect(parseServiceSettings([], badEnv, profile)).toEqual({
-      state_dir: expect.any(String),
-      keep_disappearing: false,
-      channels: false,
+  test.each(["text", "true", "false", "Infinity", "NaN"])("refuses the limit %s that is not a number", (value) => {
+    expect(failure(() => parseSettings(["--download-max-mb", value], {}, profile)).message).toContain(
+      "--download-max-mb",
+    )
+    expect(failure(() => parseSettings([], { DEMO_DOWNLOAD_MAX_MB: value }, profile)).message).toContain(
+      "DEMO_DOWNLOAD_MAX_MB",
+    )
+  })
+
+  test.each([0, 2001, 1.5])("refuses plugin limit %j outside 1 to 2000 or not whole", (value) => {
+    expect(failure(() => settingsFromOptions({ download_max_mb: value }, {}, profile)).message).toBe(
+      'Option "download_max_mb" must be a whole number from 1 to 2000.',
+    )
+  })
+
+  test.each(["100", "text", true, false, null])("refuses plugin limit %j that is not a number", (value) => {
+    expect(failure(() => settingsFromOptions({ download_max_mb: value }, {}, profile)).message).toBe(
+      'Option "download_max_mb" must be a finite number.',
+    )
+  })
+
+  test("the tool settings read them too", () => {
+    expect(parseToolSettings(["--download-dir=/flag", "--download-max-mb=7"], {}, profile)).toMatchObject({
+      download_dir: "/flag",
+      download_max_mb: 7,
     })
-    expect(parseStateDir([], badEnv, profile)).toEqual(expect.any(String))
-    for (const args of [["--download-dir=/received"], ["--download-max-mb=1"]]) {
-      expect(failure(() => parseServiceSettings(args, {}, profile)).message).toContain("is not available here")
-      expect(failure(() => parseStateDir(args, {}, profile)).message).toContain("is not available here")
-    }
   })
 })

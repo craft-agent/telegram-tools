@@ -155,15 +155,15 @@ def resolve_target(
     runtime: Runtime,
     tool_id: str,
     args: Any,
-    flags: list[str] | None = None,
     language: str | None = None,
     harness_language: Callable[[], str | None] = lambda: display_language(),
+    option_flags: list[str] | None = None,
 ) -> Target:
     """What ``target`` prints: ``["*"]`` for resources that cannot be told, no description for one absent or bad.
 
-    ``flags`` are the same settings flags ``run`` gets, so ``target`` resolves the call as ``run`` will.
     ``language`` is the plugin's ``language`` setting and ``harness_language`` reads Hermes' display language
-    per call; neither may fail the run, and ``target`` picks among them.
+    per call; neither may fail the run, and ``target`` picks among them. ``option_flags`` are the package's
+    own tool options as ``run`` gets them, so ``target`` resolves the call as ``run`` will.
     """
     try:
         result = runtime.run(
@@ -172,8 +172,8 @@ def resolve_target(
                 tool_id,
                 "--cwd",
                 agent_cwd(),
-                *(flags or []),
                 *language_flags(language, _known(harness_language)),
+                *(option_flags or []),
             ],
             stdin=json.dumps(run_arguments(args)),
             timeout=TARGET_TIMEOUT_SECONDS,
@@ -222,20 +222,21 @@ def _message(tool: ToolInfo, target: Target, surface: Callable[[], str | None]) 
 def make_hook(
     runtime: Runtime,
     tools: list[ToolInfo],
-    flags: list[str] | None = None,
     surface: Callable[[], str | None] = lambda: None,
     language: str | None = None,
     harness_language: Callable[[], str | None] = lambda: display_language(),
     pins: PinStash | None = None,
+    option_flags: list[str] | None = None,
 ) -> Callable[..., dict[str, str] | None]:
     """The ``pre_tool_call`` hook: it sends every call of these tools but a read to the person's approval.
 
     Whether a person is there to ask, and what happens when none is, is
-    Hermes' own gate to decide. ``flags`` are the same settings flags ``run``
-    gets, so ``target`` resolves the call as ``run`` will. ``language`` is the
-    plugin's ``language`` setting; ``harness_language`` is read on every call.
-    When ``pins`` is given, the pin ``target`` answered is kept in it under the
-    call's ``pin_key`` for the pin hook; the decision is the same either way.
+    Hermes' own gate to decide. ``language`` is the plugin's ``language``
+    setting; ``harness_language`` is read on every call. ``option_flags`` are
+    the package's own tool options as ``run`` gets them, so ``target`` resolves
+    the call as ``run`` will. When ``pins`` is given, the pin ``target``
+    answered is kept in it under the call's ``pin_key`` for the pin hook; the
+    decision is the same either way.
     """
     by_id = {tool.id: tool for tool in tools}
 
@@ -243,7 +244,7 @@ def make_hook(
         tool = by_id.get(tool_name)
         if tool is None or tool.write_class == READ_CLASS:
             return None
-        target = resolve_target(runtime, tool.id, args, flags, language, harness_language)
+        target = resolve_target(runtime, tool.id, args, language, harness_language, option_flags)
         call = pin_key(kwargs)
         if pins is not None and call is not None:
             # An entry left by a call that never reached the pin hook must not stand for this one.
@@ -304,12 +305,13 @@ def register_approval(
     ctx: PluginContext,
     runtime: Runtime,
     tools: list[ToolInfo],
-    flags: list[str] | None = None,
     language: str | None = None,
+    option_flags: list[str] | None = None,
 ) -> None:
     """Hold every non-read call of ``tools`` for approval, with the card in ``language`` (the plugin's setting).
 
-    ``flags`` are the same settings flags ``run`` gets, so ``target`` resolves the call as ``run`` will.
+    ``option_flags`` are the package's own tool options as ``run`` gets them, so ``target`` resolves the call as
+    ``run`` will.
 
     Two hooks, in this order, since Hermes runs them in registration order: the approval hook
     stashes the pin of what the card shows, then the pin hook gives it to the call.
@@ -317,6 +319,8 @@ def register_approval(
     pins = PinStash()
     ctx.register_hook(
         HOOK_NAME,
-        make_hook(runtime, tools, flags, surface=lambda: session_surface(ctx), language=language, pins=pins),
+        make_hook(
+            runtime, tools, surface=lambda: session_surface(ctx), language=language, pins=pins, option_flags=option_flags
+        ),
     )
     ctx.register_hook(HOOK_NAME, make_pin_hook(tools, pins))

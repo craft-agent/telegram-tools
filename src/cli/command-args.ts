@@ -1,6 +1,6 @@
 import { isAbortError, isToolError, ToolError } from "../core"
+import { parseServiceSettings, parseStateDir, type ServiceSettings } from "../entry/command-settings"
 import { PROJECT_PROFILE } from "../entry/profile"
-import { parseServiceSettings, parseStateDir, type ServiceSettings } from "../entry/settings"
 import { PROJECT } from "../project"
 import { EXIT_FAILED, EXIT_USAGE, type CommandIo } from "./command-io"
 

@@ -1,6 +1,6 @@
 import { expect } from "bun:test"
 import { isToolError } from "../core"
-import { NOTE_OPTION } from "./options.testing"
+import { PROFILE_OPTIONS } from "./options.testing"
 import type { EntryProfile } from "./profile"
 
 /** Fixtures the settings tests share. */
@@ -9,7 +9,7 @@ export const profile: EntryProfile = {
   name: "demo-tools",
   envPrefix: "DEMO",
   toolsets: { names: ["alpha", "beta", "gamma"], defaults: ["alpha"] },
-  options: { [NOTE_OPTION]: "text" },
+  options: PROFILE_OPTIONS,
 }
 
 /** The file settings' defaults: download_dir, download_max_mb and send_dirs. */
