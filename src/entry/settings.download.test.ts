@@ -52,15 +52,25 @@ describe("download settings", () => {
   })
 
   test("relative paths and invalid option types name their source", () => {
-    expect(failure(() => parseSettings(["--download-dir=relative"], {}, profile)).message).toContain("--download-dir")
-    expect(failure(() => parseSettings([], { DEMO_DOWNLOAD_DIR: "relative" }, profile)).message).toContain(
-      "DEMO_DOWNLOAD_DIR",
+    expect(failure(() => parseSettings(["--download-dir=relative"], {}, profile)).message).toBe(
+      "--download-dir must be an absolute path.",
+    )
+    expect(failure(() => parseSettings([], { DEMO_DOWNLOAD_DIR: "relative" }, profile)).message).toBe(
+      "DEMO_DOWNLOAD_DIR must be an absolute path.",
     )
     for (const value of ["relative", false, 1, null]) {
       expect(failure(() => settingsFromOptions({ download_dir: value }, {}, profile)).message).toContain(
         'Option "download_dir" must be an absolute path.',
       )
     }
+  })
+
+  test("a blank directory counts as unset, in a flag, a variable and a plugin option", () => {
+    const unset = resolve("/people/example", "Downloads", profile.name)
+    expect(parseSettings(["--download-dir", " "], { HOME: env.HOME }, profile).download_dir).toBe(unset)
+    expect(parseSettings(["--download-dir= "], env, profile).download_dir).toBe(unset)
+    expect(parseSettings([], { HOME: env.HOME, DEMO_DOWNLOAD_DIR: " " }, profile).download_dir).toBe(unset)
+    expect(settingsFromOptions({ download_dir: "" }, env, profile).download_dir).toBe(unset)
   })
 
   test.each(["1", "2000", "1e2", " 50 "])("accepts the limit %s", (value) => {
@@ -96,5 +106,12 @@ describe("download settings", () => {
     expect(failure(() => settingsFromOptions({ download_max_mb: value }, {}, profile)).message).toBe(
       'Option "download_max_mb" must be a finite number.',
     )
+  })
+
+  test("the tool settings read them too", () => {
+    expect(parseToolSettings(["--download-dir=/flag", "--download-max-mb=7"], {}, profile)).toMatchObject({
+      download_dir: "/flag",
+      download_max_mb: 7,
+    })
   })
 })

@@ -58,11 +58,15 @@ class SettingsFlagsTest(unittest.TestCase):
 
     def test_state_dir_flag(self) -> None:
         self.assertEqual(self.flags(state_dir="/custom/path"), ["--state-dir", "/custom/path"])
+        self.assertEqual(self.flags(state_dir=" ~/state \n"), ["--state-dir", "~/state"])
 
     def test_invalid_state_dir_refused(self) -> None:
         for value in (123, True, []):
             with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "state_dir"):
                 self.flags(state_dir=value)
+
+    def test_a_blank_path_gives_no_flag(self) -> None:
+        self.assertEqual(self.flags(state_dir="", download_dir="   ", send_dirs=["", "  "]), [])
 
     def test_a_wrong_type_is_refused(self) -> None:
         for config in (
@@ -76,6 +80,9 @@ class SettingsFlagsTest(unittest.TestCase):
             {"tools": "demo_thing_read"},
             {"exclude_tools": [1]},
             {"state_dir": 123},
+            {"download_dir": []},
+            {"download_max_mb": "100"},
+            {"send_dirs": "/a"},
         ):
             with self.subTest(config=config), self.assertRaises(settings.SettingsError):
                 self.flags(**config)
@@ -92,18 +99,47 @@ class SettingsFlagsTest(unittest.TestCase):
         for value in (123, True, []):
             with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "download_dir"):
                 self.flags(download_dir=value)
-        for value in ("100", "text", True, False, []):
+        for value in ("100", "text", True, False, [], float("nan")):
             with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "download_max_mb"):
                 self.flags(download_max_mb=value)
 
+    def test_the_limits_of_the_download_size_are_left_to_the_command_line(self) -> None:
+        for value in (0, 2001):
+            self.assertEqual(self.flags(download_max_mb=value), ["--download-max-mb", str(value)])
+
     def test_send_dirs_flag_joins_the_list(self) -> None:
         self.assertEqual(self.flags(send_dirs=["/a", "~/b"]), ["--send-dirs", "/a,~/b"])
+        self.assertEqual(self.flags(send_dirs=[" /a ", "", "  ", "~/b"]), ["--send-dirs", "/a,~/b"])
         self.assertEqual(self.flags(send_dirs=[]), [])
 
     def test_invalid_send_dirs_refused(self) -> None:
         for value in ("/a", 123, True, [1], ["/a,/b"]):
             with self.subTest(value=value), self.assertRaisesRegex(settings.SettingsError, "send_dirs"):
                 self.flags(send_dirs=value)
+
+    def test_each_of_the_packages_own_settings_becomes_its_flag_in_declaration_order(self) -> None:
+        self.assertEqual(
+            self.flags(
+                channels=True,
+                send_dirs=["/a", "/b"],
+                download_max_mb=7,
+                state_dir="/state",
+                download_dir="/received",
+                keep_disappearing=True,
+            ),
+            [
+                "--state-dir",
+                "/state",
+                "--download-dir",
+                "/received",
+                "--download-max-mb",
+                "7",
+                "--send-dirs",
+                "/a,/b",
+                "--keep-disappearing",
+                "--channels",
+            ],
+        )
 
 
 class OptionFlagsTest(unittest.TestCase):

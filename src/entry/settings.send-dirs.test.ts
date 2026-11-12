@@ -49,4 +49,19 @@ describe("the send_dirs setting", () => {
       expect(failure(() => fromOptions({ send_dirs: value })).message).toContain('"send_dirs"')
     }
   })
+
+  test("a plugin option drops blank items", () => {
+    expect(fromOptions({ send_dirs: ["/a", "", " ", "~/b"] }, { HOME: "/home/user" }).send_dirs).toEqual([
+      "/a",
+      "/home/user/b",
+    ])
+    expect(fromOptions({ send_dirs: ["", " "] }, { DEMO_SEND_DIRS: "/env" }).send_dirs).toEqual([])
+  })
+
+  test("normalizes each entry and names the option that was not absolute", () => {
+    expect(parse(["--send-dirs", "/var/a/../a,/var/b"]).send_dirs).toEqual(["/var/a", "/var/b"])
+    expect(failure(() => fromOptions({ send_dirs: ["/a", "~otheruser/files"] })).message).toBe(
+      'Option "send_dirs" must be an absolute path.',
+    )
+  })
 })
