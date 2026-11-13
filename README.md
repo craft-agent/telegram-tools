@@ -269,6 +269,21 @@ skill is [`telegram-actions`](skills/telegram-actions/SKILL.md), shown as
 `telegram-tools:telegram-actions` in Claude Code and `telegram-tools:actions`
 in Hermes.
 
+### Grants (`grants`)
+
+Off by default. Delegates bounded writes for jobs where no person can answer.
+
+| Tool                    | What it does                                             | Class          |
+| ----------------------- | -------------------------------------------------------- | -------------- |
+| `telegram_grant_create` | ask a person to delegate one tool's writes within limits | administrative |
+| `telegram_grant_read`   | list grants and their use, or read the usage log         | read           |
+| `telegram_grant_revoke` | remove a grant so no more calls run under it             | overwrite      |
+
+A write tool becomes grantable by declaring `bounds` and giving
+`measure(args, context)` in its spec; see the
+[conventions](docs/conventions.md#writes-no-one-is-there-to-approve).
+No tool of this package declares `bounds` yet.
+
 ## Adding a tool
 
 1. Write the spec in `src/core/<domain>/<verb>.ts` with `defineTool`: an ID
@@ -335,7 +350,8 @@ Where a write is asked about, and where it is not:
   a rule asks for it: add the `telegram_*` rule shown under [OpenCode](#opencode).
 - **Codex** asks before every write because of the plugin's approval mode.
   Under `codex exec` it refuses with "MCP tool call requires approval, but
-  approval policy is never".
+  approval policy is never". For bounded jobs, see
+  [Writes no one is there to approve](#writes-no-one-is-there-to-approve).
 - **Grok Build** under `grok -p` refuses a write it cannot ask about, unless it
   is allowed beforehand.
 - **Grok Build** calls the plugin's tools through its `use_tool` tool, and the
@@ -347,13 +363,72 @@ Where a write is asked about, and where it is not:
   names the plugin's server `telegram-tools_telegram-tools` (plugin,
   then server). `agy -p` refuses a tool it cannot ask about.
 - **Hermes** `hermes chat -q` refuses a write it cannot ask about; `hermes -z`
-  and `--yolo` skip approval, so writes then run unasked.
+  and `--yolo` skip approval, so writes then run unasked. For bounded jobs, see
+  [Writes no one is there to approve](#writes-no-one-is-there-to-approve).
 
 A call a tool's `gate` refuses never runs, whatever the answer. OpenCode and
 Hermes refuse it before they ask, so no prompt shows it; Hermes blocks it with
 the tool's error. Claude Code, Codex, Grok Build and Antigravity draw their
 own prompt before the MCP server sees the call, so they may still ask about
 it; the server then refuses it.
+
+## Writes no one is there to approve
+
+A grant limits a job's writes by tool, named targets, bounds, calls per hour
+and expiry. It never overrides the host's permissions. The
+[conventions](docs/conventions.md#writes-no-one-is-there-to-approve) give the
+contract.
+
+1. In a session where a person answers, supply the key described under
+   [Settings](#settings), turn on the `grants` toolset alongside the job's
+   toolset, and ask the agent to delegate. It calls `telegram_grant_create`;
+   the prompt shows the tool, targets, rate, days, every bound and the reason.
+   Approve once.
+2. Set the same key and `unattended` for the job only, for example
+   `TELEGRAM_TOOLS_UNATTENDED=true`. Otherwise grants are not checked.
+3. Let the host allow the write tool in that run, as below. The grant still
+   bounds each call.
+4. Revoke with `telegram_grant_revoke`, or list grants and their use with
+   `telegram_grant_read`.
+
+What lets a write reach the package when no one can answer, for example
+`telegram_message_send`:
+
+- **OpenCode** `opencode run` rejects every question unless an allow rule
+  names the tool (`"permission": { "telegram_message_send": "allow" }`) or the
+  run starts with `--auto`.
+- **Claude Code** `claude -p` needs the tool in `--allowedTools`, as
+  `mcp__plugin_telegram-tools_telegram-tools__telegram_message_send`.
+- **Codex** `codex exec` needs `approval_mode = "approve"` for that tool under
+  the plugin's MCP server in `config.toml`
+  (`[mcp_servers.<server>.tools.<tool>]`), since the plugin's default asks
+  before every write.
+- **Grok Build** `grok -p` needs both allow rules:
+  `--allow 'MCPTool(telegram-tools__telegram_message_send)'` and
+  `--allow 'MCPTool(telegram_message_send)'`, for the qualified and short names
+  described under [Reads and writes](#reads-and-writes).
+- **Antigravity** `agy -p` needs
+  `mcp(telegram-tools_telegram-tools/telegram_message_send)` in
+  `permissions.allow`.
+- **Hermes** `hermes chat -q` denies by `approvals.single_query_mode` unless
+  allowed. `-z` and `--yolo` skip approvals and run the write; the grant is
+  then the only bound.
+
+### Limits
+
+- A run with every approval skipped (Hermes `-z` or `--yolo`, an
+  always-approve mode, an explicit `allow` for `telegram_grant_create`, or a
+  global OpenCode V1 `allow`) shows no prompt. A grant created there is not a
+  person's answer: create grants only where the harness asks.
+- An earlier copy of the grants directory put back whole is not detected.
+  Expiry, at most 90 days, bounds what it can restore.
+- Anyone who can read the key can sign grants. Keep it where the agent's
+  tools cannot read it.
+- The OpenCode V2 plugin forces a question for `telegram_grant_create`
+  through a hook; only hosts that offer that hook run it.
+
+The OpenCode V2 service and Hermes gateway keep the environment they started
+with; see [Settings](#settings) before changing the job's variables.
 
 ## Settings
 
@@ -364,6 +439,8 @@ variable, and an option or setting wins over the variable too.
 | ------------------- | ----------------------- | ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `toolsets`          | `--toolsets`            | `TELEGRAM_TOOLS_TOOLSETS`          | the toolsets that are on, or `all`; default those `src/project.ts` names                                                                                              |
 | `read_only`         | `--read-only`           | `TELEGRAM_TOOLS_READ_ONLY`         | registers no tool that writes; wins over every other setting                                                                                                          |
+| `unattended`        | `--unattended`          | `TELEGRAM_TOOLS_UNATTENDED`        | no person can answer: a write runs only under a grant that covers it; off by default                                                                                  |
+| `grants_dir`        | `--grants-dir`          | `TELEGRAM_TOOLS_GRANTS_DIR`        | where grants and their use are kept; default `$XDG_STATE_HOME/telegram-tools/grants`, else `~/.local/state/telegram-tools/grants`                                     |
 | `tools`             | `--tools`               | `TELEGRAM_TOOLS_TOOLS`             | single tools to add by ID, whatever their toolset                                                                                                                     |
 | `exclude_tools`     | `--exclude-tools`       | `TELEGRAM_TOOLS_EXCLUDE_TOOLS`     | single tools to remove by ID; wins over `tools` and `toolsets`                                                                                                        |
 | `confirm`           | `--confirm`             | `TELEGRAM_TOOLS_CONFIRM`           | MCP server only: `harness` (default) or `elicitation`, as the conventions say                                                                                         |
@@ -376,6 +453,12 @@ variable, and an option or setting wins over the variable too.
 | `exclude_chats`     | `--exclude-chats`       | `TELEGRAM_TOOLS_EXCLUDE_CHATS`     | `list`: chat ids every tool leaves out; default none; read by the tools, no service restart needed                                                                    |
 | `keep_disappearing` | `--keep-disappearing`   | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | `boolean`: keep disappearing and view-once messages for the user; off by default; read by `sync` and `service install`, run `service install` again after changing it |
 | `channels`          | `--channels`            | `TELEGRAM_TOOLS_CHANNELS`          | `boolean`: list, read, mirror and send to channels; off by default, see below; read by `sync` and `service install`, run `service install` again after changing it    |
+
+`TELEGRAM_TOOLS_GRANT_KEY` is a variable only, never a flag or a plugin
+option. Use at least 32 characters, for example from `openssl rand -hex 32`,
+stored where the host keeps secrets. Without it no write runs while
+unattended and no grant can be created. Codex forwards it alongside the
+settings' variables, as described below.
 
 Lists are comma-separated in a flag or a variable. These are this package's own
 settings listed in `options` in `src/project.ts`: `state_dir`, `download_dir`,
