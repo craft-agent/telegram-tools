@@ -1,10 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import { z } from "zod"
 import { ToolError, abortError, isToolError, type ToolContext, type ToolSpec } from "../core"
+import { DOWNLOAD_CONTEXT } from "../core/tool.testing"
 import { gateRefusal } from "./gate"
 import { approvalOf, checkPin } from "./pin"
 
-const CTX: ToolContext = { cwd: "/work" }
+const CTX: ToolContext = { cwd: "/work", ...DOWNLOAD_CONTEXT }
 const input = z.object({ name: z.string().default("todo") })
 
 type Gate = NonNullable<ToolSpec["gate"]>
