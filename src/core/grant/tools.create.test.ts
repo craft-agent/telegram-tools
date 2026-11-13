@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { z } from "zod"
 import { defineTool, invoke, type CallDescription, type ToolContext } from "../tool"
+import { DOWNLOAD_CONTEXT } from "../tool.testing"
 import { MAX_GRANT_DAYS, MAX_GRANT_RATE } from "./model"
 import { readGrants } from "./store"
 import { grantTools } from "./tools"
@@ -42,7 +43,7 @@ let ctx: ToolContext
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "grant-tools-create-"))
-  ctx = { cwd: dir, grants: { unattended: false, dir, key: KEY, now: () => NOW } }
+  ctx = { cwd: dir, ...DOWNLOAD_CONTEXT, grants: { unattended: false, dir, key: KEY, now: () => NOW } }
 })
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true })
@@ -179,7 +180,7 @@ test("creation needs a key and a grant context", async () => {
     code: "forbidden",
     details: { reason: "no_key" },
   })
-  await expect(invoke(create!, ARGS, { cwd: dir })).rejects.toMatchObject({
+  await expect(invoke(create!, ARGS, { cwd: dir, ...DOWNLOAD_CONTEXT })).rejects.toMatchObject({
     code: "forbidden",
     message: "Grants are not set up where this tool runs.",
     details: { reason: "not_set_up" },
