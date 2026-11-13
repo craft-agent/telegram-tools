@@ -373,13 +373,14 @@ variable, and an option or setting wins over the variable too.
 | `download_dir`      | `--download-dir`        | `TELEGRAM_TOOLS_DOWNLOAD_DIR`      | `path`: where `telegram_file_save` saves received files, a folder per message; default `~/Downloads/telegram-tools`; read by the tools, no service restart needed     |
 | `download_max_mb`   | `--download-max-mb <n>` | `TELEGRAM_TOOLS_DOWNLOAD_MAX_MB`   | `number`: the largest file a download takes, in MB; whole number 1..2000, default 100; read by the tools, no service restart needed                                   |
 | `send_dirs`         | `--send-dirs`           | `TELEGRAM_TOOLS_SEND_DIRS`         | `paths`: the directories files may be sent from, besides the working directory; default none; read by the tools, no service restart needed                            |
+| `exclude_chats`     | `--exclude-chats`       | `TELEGRAM_TOOLS_EXCLUDE_CHATS`     | `list`: chat ids every tool leaves out; default none; read by the tools, no service restart needed                                                                    |
 | `keep_disappearing` | `--keep-disappearing`   | `TELEGRAM_TOOLS_KEEP_DISAPPEARING` | `boolean`: keep disappearing and view-once messages for the user; off by default; read by `sync` and `service install`, run `service install` again after changing it |
 | `channels`          | `--channels`            | `TELEGRAM_TOOLS_CHANNELS`          | `boolean`: list, read, mirror and send to channels; off by default, see below; read by `sync` and `service install`, run `service install` again after changing it    |
 
 Lists are comma-separated in a flag or a variable. These are this package's own
 settings listed in `options` in `src/project.ts`: `state_dir`, `download_dir`,
-`download_max_mb`, `send_dirs`, `keep_disappearing` and `channels`. They are
-read the same way. A `path` is trimmed; `~` and `~/…` (also with the platform
+`download_max_mb`, `send_dirs`, `exclude_chats`, `keep_disappearing` and
+`channels`. They are read the same way. A `path` is trimmed; `~` and `~/…` (also with the platform
 separator) stand for the home directory (`HOME` when it is absolute, else the
 account's). It must then be absolute and reaches the tool normalized, without
 a filesystem check. `paths` is a list of such paths, comma-separated in a flag or variable
@@ -437,6 +438,45 @@ bounds. Where each harness reads them:
   args = ["-y", "@craftsamo/telegram-tools@<version>", "--read-only"]
   env_vars = ["TELEGRAM_TOOLS_TOOLSETS"]
   ```
+
+`exclude_chats` keeps the named chats out of every tool: lists, searches and
+account counts leave them out, and a call naming one fails as `not_found`,
+just like an unknown chat. The sync list leaves them out too, but its `size`
+still counts them toward the 30-chat limit. The service keeps mirroring them.
+Messages in other chats keep their ids and stored quotes or forward names,
+but never look up an excluded chat's name or replied text. A malformed id
+fails chat tools with `invalid_argument`.
+
+Set it per harness, in that harness's plugin option or setting, not the shared
+`TELEGRAM_TOOLS_EXCLUDE_CHATS` variable when only one harness should leave a
+chat out. For OpenCode V2, in `opencode.json`:
+
+```json
+{
+  "plugins": [
+    {
+      "package": "@craftsamo/telegram-tools@<version>",
+      "options": { "exclude_chats": ["-1001234567890"] }
+    }
+  ]
+}
+```
+
+For Hermes, in `config.yaml` (quote each id):
+
+```yaml
+plugins:
+  entries:
+    telegram-tools:
+      settings:
+        exclude_chats:
+          - "-1001234567890"
+```
+
+OpenCode and Hermes refuse a call naming an excluded chat before asking for
+approval. MCP clients (Claude Code, Codex, Grok Build and Antigravity) draw
+their own prompt before the server sees the call, so they may still ask about
+it by its id; the server then refuses it.
 
 ### Accounts and the sync service
 

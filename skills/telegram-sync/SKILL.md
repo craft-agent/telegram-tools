@@ -40,6 +40,9 @@ messages accumulate locally. Add only the chats the user wants followed.
 list, by `method: "list"`. It reads the account's local mirror only, needing no
 network or sync service, and never writes anything.
 
+Chats the person keeps out of reach are omitted, but `size` still counts them
+toward the limit; do not try to discover or change them another way.
+
 - `chats`: the list of chats, oldest added first:
   - `id`: Telegram's signed chat ID as text (such as `"-1001234567890"`).
   - `name`: chat title, or `null` when unknown.

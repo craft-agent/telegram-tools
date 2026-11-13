@@ -13,6 +13,10 @@ metadata:
 
 ## Where reads come from
 
+The person may keep some chats out of reach: they appear in no chat list or
+search, and a call naming one fails as an unknown chat would. Do not try to
+work around this by searching another way or asking for its id.
+
 What the mirror keeps depends on the kind of chat:
 
 - Private chats, bots, basic groups and Saved Messages are mirrored always.
@@ -50,7 +54,7 @@ never loop live reads over many chats.
   first. It is always read live from Telegram via the sync service.
 - `search` finds messages in the mirror whose text, caption or file name holds
   every word of `query` (case-insensitive), newest first. It searches across
-  every mirrored chat, or stays in one with `chat`, between `after` and
+  every accessible mirrored chat, or stays in one with `chat`, between `after` and
   `before`. Earlier versions of edited messages are not searched. `scope`
   states what the search covers and what it leaves out. It checks a bounded
   number of messages per call: when it stops early, `scanned_to` gives the

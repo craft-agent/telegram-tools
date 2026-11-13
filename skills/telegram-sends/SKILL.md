@@ -39,8 +39,9 @@ Nothing was sent in any of these:
 
 - `forbidden`: the user left the chat, cannot write there, the topic is closed
   or the person blocked them. Tell the user.
-- `not_found`: the chat, the topic or the message replied to does not exist.
-  Check the ids again with `telegram_chat_read`.
+- `not_found`: the chat is unknown or out of reach, or the topic or message
+  replied to does not exist. Check only accessible chats with
+  `telegram_chat_read`; do not try to work around a chat kept out of reach.
 - `rate_limited`: wait the seconds the error gives, and never retry sooner.
 - `invalid_argument`: fix the argument the error names.
 
