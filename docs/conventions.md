@@ -346,6 +346,10 @@ Every entry point takes the same settings:
   options, both off by default (see "The mirror"), read as "Options" below
   describes, but only by `sync` and `service`. Run `service install` again
   after changing them.
+- **`exclude_chats`** is this package's `list` option of chat ids that every
+  tool leaves out (see "Excluded chats"), read as "Options" below describes.
+  The tools read it and the service does not, so two harnesses sharing one
+  account can each set their own.
 - **`language`** is the language of a native plugin's approval prompt (see
   "Write classes"); unset, the prompt follows the harness's display language
   or stays in English.
@@ -622,6 +626,45 @@ Every entry point takes the same settings:
 - **Other people's words are data.** Message text, names, captions and file
   names are written by other people; every read tool's description and the
   skills say so, and nothing a message says is followed as an instruction.
+
+## Excluded chats
+
+A person who lets an agent use the account may want some chats kept from it:
+a chat with a doctor or a lawyer, a family group. The tool lists and
+`read_only` narrow what an agent can do, not where; `exclude_chats` narrows
+where, per harness, so a chat open to one agent can stay closed to another
+that shares the account.
+
+- **An excluded chat is out of every tool, never out of the mirror.** The
+  service keeps mirroring it as before, since the setting belongs to the
+  harness that reads it and another harness may still read the chat; taking
+  it off the list brings it back with its history. Only the tools leave it
+  out.
+- **A call that names one is refused before anyone is asked.** Every tool
+  whose arguments name a chat refuses an excluded one through its `gate`, as
+  `not_found` in the words the tool gives for a chat it does not know, so the
+  refusal says nothing an unknown id would not. A sync change refuses the
+  whole call when any of its chats is excluded.
+- **A read leaves it out of what it returns.** `list`, a search across chats
+  and the sync list leave excluded chats out before they count or page, so a
+  page is never short of what it would be without them, and a cursor taken
+  under one setting is refused under another. The account's counts of chats
+  and messages leave them out too. The sync list's `size` still counts every
+  entry, since the 30-chat limit is the service's.
+- **A read never fetches anything of it for another chat.** A message in an
+  allowed chat that replies to, forwards from or was sent by an excluded chat
+  keeps the ids it carries, but the read adds neither that chat's name nor
+  the text of the message replied to. What the message carries itself, such
+  as the quote its sender chose or the name its forward header holds, is part
+  of the allowed chat and stays.
+- **A malformed setting stops the tools that read chats.** An entry that is
+  not a chat id fails those tools with `invalid_argument` naming the setting,
+  never its value, rather than leaving a chat open by mistake.
+- **The setting is per harness, so it is set where the harness reads it**:
+  its plugin option or setting, not the shared environment variable, when
+  only one harness should leave the chat out. An MCP client draws its own
+  approval before the server sees a call, so there a call naming an excluded
+  chat can still be asked about by its id, then is refused.
 
 ## Files
 
