@@ -5,6 +5,7 @@ import type { Mirror } from "../telegram/mirror"
 import type { ChatRow } from "../telegram/mirror-rows"
 import { formatLocalTime } from "../time"
 import { existingChat, findChats, MAX_NAME_LENGTH, requireChatId } from "./chat-rows"
+import { excludedCondition } from "./excluded"
 import { fingerprint } from "./filter"
 import { messageEntries } from "./message"
 import { cuttableMessage } from "./message-cut"
@@ -86,8 +87,13 @@ function searchedChat(mirror: Mirror, chat: string | undefined): ChatRow | undef
 }
 
 /** The entries for `hits` with the id and the name of the chat each is in. */
-function hitEntries(mirror: Mirror, hits: readonly StoredMessage[], now: number): MessageEntry[] {
-  const entries = messageEntries(mirror, hits, now)
+function hitEntries(
+  mirror: Mirror,
+  hits: readonly StoredMessage[],
+  now: number,
+  excluded: ReadonlySet<string>,
+): MessageEntry[] {
+  const entries = messageEntries(mirror, hits, now, excluded)
   const chats = findChats(mirror, [...new Set(hits.map((hit) => hit.chat))])
   entries.forEach((entry, index) => {
     const id = hits[index]!.chat
@@ -108,27 +114,43 @@ function hitEntries(mirror: Mirror, hits: readonly StoredMessage[], now: number)
  * A full page returns a `next` from its last hit, which may lead to an empty
  * page when nothing older matches. Stopping at the scan limit returns the hits
  * found so far with `scanned_to`, the time reached, and a `next` that
- * continues from there.
+ * continues from there. Messages of the `excluded` chats are left out of the
+ * scan itself, so they take no part of its limit and no place in a page or a
+ * cursor.
  */
 export function searchMessages(
   mirror: Mirror,
   args: Pick<ChatReadInput, "query" | "chat" | "after" | "before" | "limit" | "cursor">,
   now: number,
+  excluded: ReadonlySet<string>,
   scan: ScanLimits = SCAN_LIMITS,
 ): ChatReadOutput {
   const words = searchWords(args.query)
   const chat = searchedChat(mirror, args.chat)
   const limit = clampLimit(args.limit, LIMITS.search, "limit")
   const range = readRange(args)
-  const filter = fingerprint([...words].sort(), chat?.id ?? null, range.after ?? null, range.before ?? null)
+  const filter = fingerprint(
+    [...words].sort(),
+    chat?.id ?? null,
+    range.after ?? null,
+    range.before ?? null,
+    [...excluded].sort(),
+  )
   const resume = args.cursor === undefined ? undefined : readCursor(args.cursor, "cursor", searchCursor)
   if (resume && resume.filter !== filter) throw notACursor("cursor")
 
   const shown = liveMessages(now)
+  const hidden = excludedCondition("chat", excluded)
   const bounds = rangeConditions(range)
   const base: ScanScope = {
-    conditions: ["kind = 'message'", shown.condition, ...(chat ? ["chat = ?"] : []), ...bounds.conditions],
-    params: [...shown.params, ...(chat ? [chat.id] : []), ...bounds.params],
+    conditions: [
+      "kind = 'message'",
+      shown.condition,
+      ...(chat ? ["chat = ?"] : []),
+      ...(hidden ? [hidden.sql] : []),
+      ...bounds.conditions,
+    ],
+    params: [...shown.params, ...(chat ? [chat.id] : []), ...(hidden?.params ?? []), ...bounds.params],
   }
   const hits: StoredMessage[] = []
   let position: Position | undefined = resume && { ts: resume.ts, chat: resume.chat, id: resume.id }
@@ -156,7 +178,7 @@ export function searchMessages(
     position = lastScanned && positionOf(lastScanned)
   }
 
-  const entries = hitEntries(mirror, hits, now)
+  const entries = hitEntries(mirror, hits, now, excluded)
   const { items, stopped } = fitItems(
     (fitting) => ({ messages: fitting, scope: SEARCH_SCOPE, note: DATA_NOTE }),
     entries,

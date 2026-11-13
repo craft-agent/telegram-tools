@@ -153,12 +153,24 @@ function entryOf(parsed: Parsed, related: Related, now: number): MessageEntry {
  * first, then from the mirror, so rows the mirror does not hold (a live read)
  * still find it. `now` decides which timed messages have expired (only kept
  * ones can still be shown) and which replied-to texts may be shown.
+ *
+ * Nothing is read of an `excluded` chat for a message that points at it: no
+ * name for a sender or a forward, no text for a reply. What the message itself
+ * carries (ids, the quote, the names it was stored with) stays.
  */
-export function messageEntries(mirror: Mirror, rows: readonly StoredMessage[], now: number): MessageEntry[] {
+export function messageEntries(
+  mirror: Mirror,
+  rows: readonly StoredMessage[],
+  now: number,
+  excluded: ReadonlySet<string>,
+): MessageEntry[] {
   const parsed = rows.map(parse)
-  const named = parsed.flatMap(({ row, forward }) => [row.sender, forward?.from].filter((id) => id != null))
-  const replies = parsed.flatMap((item) => repliedRef(item) ?? [])
+  const named = parsed
+    .flatMap(({ row, forward }) => [row.sender, forward?.from].filter((id) => id != null))
+    .filter((id) => !excluded.has(id))
+  const replies = parsed.flatMap((item) => repliedRef(item) ?? []).filter(({ chat }) => !excluded.has(chat))
   const loaded = loadRelated(mirror, rows, named, replies, now)
-  const related: Related = { ...loaded, replied: new Map([...loaded.replied, ...pageTexts(rows, now)]) }
+  const pageRows = rows.filter((row) => !excluded.has(row.chat))
+  const related: Related = { ...loaded, replied: new Map([...loaded.replied, ...pageTexts(pageRows, now)]) }
   return parsed.map((item) => entryOf(item, related, now))
 }

@@ -78,8 +78,9 @@ function aroundResult(
   { anchor, older, newer }: Neighbours,
   live: boolean,
   now: number,
+  excluded: ReadonlySet<string>,
 ): ChatReadOutput {
-  const entries = messageEntries(mirror, [anchor, ...older, ...newer], now)
+  const entries = messageEntries(mirror, [anchor, ...older, ...newer], now, excluded)
   const anchorEntry = entries[0]!
   const olderEntries = entries.slice(1, 1 + older.length)
   const newerEntries = entries.slice(1 + older.length)
@@ -128,6 +129,7 @@ export function aroundChat(
   mirror: Mirror,
   args: Pick<ChatReadInput, "chat" | "id" | "before_count" | "after_count" | "topic">,
   now: number,
+  excluded: ReadonlySet<string>,
 ): AroundPlan {
   const chatId = requireChatId(args.chat, "around")
   if (args.id === undefined) {
@@ -150,7 +152,7 @@ export function aroundChat(
   }
 
   const neighbours = mirrorNeighbours(mirror, chat, { id: args.id, topic: args.topic, beforeCount, afterCount }, now)
-  return { output: aroundResult(mirror, chat, neighbours, false, now) }
+  return { output: aroundResult(mirror, chat, neighbours, false, now, excluded) }
 }
 
 /**
@@ -158,7 +160,13 @@ export function aroundChat(
  * read only for the names and texts the messages refer to. The messages are
  * ordered by id around the anchor, and a side is held to the count asked for.
  */
-export function liveAround(mirror: Mirror, read: LiveAround, found: AroundResult, now: number): ChatReadOutput {
+export function liveAround(
+  mirror: Mirror,
+  read: LiveAround,
+  found: AroundResult,
+  now: number,
+  excluded: ReadonlySet<string>,
+): ChatReadOutput {
   const rows = found.messages.map(storedMessage)
   const anchor = rows.find((row) => row.id === read.request.id)
   if (!anchor) throw new ToolError("not_found", NO_MESSAGE)
@@ -169,5 +177,5 @@ export function liveAround(mirror: Mirror, read: LiveAround, found: AroundResult
     older: older.slice(0, read.request.before_count),
     newer: newer.slice(0, read.request.after_count),
   }
-  return aroundResult(mirror, read.chat, neighbours, true, now)
+  return aroundResult(mirror, read.chat, neighbours, true, now, excluded)
 }

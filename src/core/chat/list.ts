@@ -4,6 +4,7 @@ import { clampLimit, encodeCursor, fitItems, notACursor, readCursor, type Cuttab
 import type { Mirror } from "../telegram/mirror"
 import type { ChatRow } from "../telegram/mirror-rows"
 import { chatEntry } from "./chat-rows"
+import { excludedCondition } from "./excluded"
 import { fingerprint } from "./filter"
 import { messageEntries } from "./message"
 import { cutMessage, dropMetadata, messageTextLength } from "./message-cut"
@@ -66,23 +67,32 @@ function lastMessages(mirror: Mirror, chats: readonly ChatRow[], now: number): S
 }
 
 /** Adds `last_message` to each entry: its chat's newest mirrored message, or null. */
-function addLastMessages(mirror: Mirror, chats: readonly ChatRow[], entries: ChatEntry[], now: number): void {
+function addLastMessages(
+  mirror: Mirror,
+  chats: readonly ChatRow[],
+  entries: ChatEntry[],
+  now: number,
+  excluded: ReadonlySet<string>,
+): void {
   const rows = lastMessages(mirror, chats, now)
-  const built = new Map(messageEntries(mirror, rows, now).map((entry, index) => [rows[index]!.chat, entry]))
+  const built = new Map(messageEntries(mirror, rows, now, excluded).map((entry, index) => [rows[index]!.chat, entry]))
   for (const entry of entries) entry.last_message = built.get(entry.id) ?? null
 }
 
 /**
  * The `list` method's arguments, checked: refuses a bad `limit` or a cursor
- * made under other filters, so a caller can check them before asking the
- * service anything.
+ * made under other filters or another `excluded` set of chats, so a caller can
+ * check them before asking the service anything.
  */
-export function readListArguments(args: Pick<ChatReadInput, "query" | "unread" | "limit" | "cursor">) {
+export function readListArguments(
+  args: Pick<ChatReadInput, "query" | "unread" | "limit" | "cursor">,
+  excluded: ReadonlySet<string>,
+) {
   const limit = clampLimit(args.limit, LIMITS.list, "limit")
   const query = foldQuery(args.query)
   const unreadOnly = args.unread === true
   const after = args.cursor === undefined ? undefined : readCursor(args.cursor, "cursor", listCursor)
-  const filter = fingerprint(query, unreadOnly)
+  const filter = fingerprint(query, unreadOnly, [...excluded].sort())
   if (after && after.filter !== filter) throw notACursor("cursor")
   return { limit, query, unreadOnly, after, filter }
 }
@@ -90,25 +100,29 @@ export function readListArguments(args: Pick<ChatReadInput, "query" | "unread" |
 /**
  * The `list` method: chats newest activity first, a chat with none last,
  * optionally those whose name or username holds `query`, or that have unread
- * messages, each with its last message on request. Pages by a keyset cursor
- * over (activity, id), so a chat that gains a message between pages is not
- * shown twice.
+ * messages, each with its last message on request, without the `excluded`
+ * chats. Pages by a keyset cursor over (activity, id), so a chat that gains a
+ * message between pages is not shown twice.
  */
 export function listChats(
   mirror: Mirror,
   args: Pick<ChatReadInput, "query" | "unread" | "last" | "limit" | "cursor">,
   now: number,
+  excluded: ReadonlySet<string>,
 ): ChatReadOutput {
-  const { limit, query, unreadOnly, after, filter } = readListArguments(args)
-  let chats = (mirror.prepare("SELECT * FROM chats").all() as ChatRow[]).sort((a, b) =>
-    byActivity(positionOf(a), positionOf(b)),
-  )
+  const { limit, query, unreadOnly, after, filter } = readListArguments(args, excluded)
+  const hidden = excludedCondition("id", excluded)
+  let chats = (
+    mirror
+      .prepare(`SELECT * FROM chats${hidden ? ` WHERE ${hidden.sql}` : ""}`)
+      .all(...(hidden?.params ?? [])) as ChatRow[]
+  ).sort((a, b) => byActivity(positionOf(a), positionOf(b)))
   if (after) chats = chats.filter((chat) => byActivity(positionOf(chat), after) > 0)
   if (unreadOnly) chats = chats.filter((chat) => chat.unread > 0)
   if (query !== "") chats = chats.filter((chat) => matches(chat, query))
   const page = chats.slice(0, limit)
   const entries = page.map(chatEntry)
-  if (args.last) addLastMessages(mirror, page, entries, now)
+  if (args.last) addLastMessages(mirror, page, entries, now, excluded)
   const { items, stopped } = fitItems((fitting) => ({ chats: fitting, note: DATA_NOTE }), entries, {
     cuttable: cuttableChat,
   })
