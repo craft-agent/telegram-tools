@@ -6,6 +6,7 @@ import { z } from "zod"
 import { isToolError } from "../errors"
 import { askPersonOnly, exemptFromGrants } from "./guard"
 import { defineTool, invoke, type ToolContext, type ToolSpec } from "../tool"
+import { DOWNLOAD_CONTEXT } from "../tool.testing"
 import type { Grant } from "./model"
 import { addGrant, type GrantStoreOptions } from "./store"
 import { readUsage } from "./usage"
@@ -54,7 +55,7 @@ function grant(overrides: Partial<Grant> = {}): Grant {
 }
 
 function context(now: Date = NOW): ToolContext {
-  return { cwd: base, grants: { unattended: true, dir: store.dir, key: KEY, now: () => now } }
+  return { cwd: base, ...DOWNLOAD_CONTEXT, grants: { unattended: true, dir: store.dir, key: KEY, now: () => now } }
 }
 
 const ARGS = { path: "/work/a.md" }
