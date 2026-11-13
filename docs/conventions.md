@@ -599,7 +599,10 @@ and every entry point checks them the same way.
 - **A label is 1 to 24 lowercase letters, digits and `_`**, starting and
   ending with a letter or a digit; logging in names it `default` when no label
   is given. A label is also a directory name, so the set is kept to what every
-  file system takes as it is.
+  file system takes as it is. `grants` is reserved: the grants directory
+  defaults to `grants` under `$XDG_STATE_HOME/telegram-tools`, where the
+  labels' directories sit by default, so no label may take that name, and
+  listing the labels skips it.
 - **Each label keeps all of its state in one directory**,
   `<state root>/<label>/`, created with mode 700: the session and the app's
   `api_id` and `api_hash`, mtcute's storage, the mirror, the service's socket,
@@ -937,7 +940,8 @@ that shares the account.
   Telegram's edit time limit decides how old a message may be. A delete is
   always for everyone (`revoke`; supergroups and channels have no other kind),
   since deleting only from the user's own devices would leave the message with
-  everyone else; it is `administrative`, so it is asked every time.
+  everyone else; it is `administrative`, so it is asked every time, except in an unattended
+  run under a grant that covers it.
 - **A reaction is one standard emoji**, replacing the user's earlier one on
   that message, or removed. Custom-emoji reactions need Premium and paid ones
   spend Stars, so both are refused; which emoji a chat allows is Telegram's

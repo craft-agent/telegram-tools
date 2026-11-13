@@ -258,10 +258,10 @@ Hermes.
 The `actions` toolset is off by default: it changes what other people have
 already read. Turn it on with `toolsets` or `tools`. Edit and delete take only
 the user's own messages; a delete is always for everyone, cannot be undone and
-is asked about every time. A reaction is one standard emoji that replaces the
-user's earlier one (custom and paid reactions are refused). A pin is silent
-unless `notify`, and in a private chat it pins for the user only unless
-`both_sides`. Mark read runs only when the user asks, goes up to the message
+is asked about every time, except in an unattended run under a grant that
+covers it. A reaction is one standard emoji that replaces the user's earlier one
+(custom and paid reactions are refused). A pin is silent unless `notify`, and
+in a private chat it pins for the user only unless `both_sides`. Mark read runs only when the user asks, goes up to the message
 named and never back, and makes the senders see it read. Every action needs the
 sync service running. `already` means it was already so; `uncertain` means it
 may have happened, so the person checks the chat before it is asked again. The
@@ -575,8 +575,9 @@ The tools log in as a device of the user's own account through
 data.
 
 - **Each logged-in session has a label**, 1 to 24 lowercase letters, digits and
-  `_` (`default` when logging in names none). A tool's `account` argument picks
-  the label; leave it out when only one session is logged in.
+  `_` (`default` when logging in names none); `grants` is reserved for the
+  grants directory. A tool's `account` argument picks the label; leave it out
+  when only one session is logged in.
 - **Each label keeps its state in one directory**, `<state_dir>/<label>/` (mode
   700): the session and the app credentials, mtcute's storage, the mirror, the
   service's socket, and `incoming/`, the short-lived copies of files in
