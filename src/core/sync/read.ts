@@ -1,5 +1,6 @@
 import { z } from "zod"
 import { shownName } from "../chat/chat-rows"
+import { excludedChats } from "../chat/excluded"
 import { DATA_NOTE } from "../chat/message-schema"
 import { pickPaths, readMirror } from "../open"
 import { nameCut } from "../chat/schema"
@@ -52,8 +53,12 @@ type ListedRow = {
   kind: ChatKind | null
 }
 
-/** The sync list, oldest added first and by id among equals, each chat as a result carries it. */
-function listedChats(mirror: Mirror): z.input<typeof output> {
+/**
+ * The sync list, oldest added first and by id among equals, each chat as a
+ * result carries it, without the `excluded` chats. `size` still counts every
+ * entry, since the service's limit does.
+ */
+function listedChats(mirror: Mirror, excluded: ReadonlySet<string>): z.input<typeof output> {
   const rows = mirror
     .prepare(
       `SELECT sync_list.chat AS id, sync_list.added AS added, sync_list.seeded AS seeded, chats.name AS name, chats.kind AS kind
@@ -61,14 +66,16 @@ function listedChats(mirror: Mirror): z.input<typeof output> {
        ORDER BY sync_list.added, sync_list.chat`,
     )
     .all() as ListedRow[]
-  const chats = rows.map((row) => ({
-    id: row.id,
-    ...shownName(row.name),
-    kind: row.kind,
-    added_at: formatLocalTime(row.added),
-    seeded_at: row.seeded === null ? null : formatLocalTime(row.seeded),
-  }))
-  return { chats, size: chats.length, limit: SYNC_LIST_LIMIT, note: NOTE }
+  const chats = rows
+    .filter((row) => !excluded.has(row.id))
+    .map((row) => ({
+      id: row.id,
+      ...shownName(row.name),
+      kind: row.kind,
+      added_at: formatLocalTime(row.added),
+      seeded_at: row.seeded === null ? null : formatLocalTime(row.seeded),
+    }))
+  return { chats, size: rows.length, limit: SYNC_LIST_LIMIT, note: NOTE }
 }
 
 /** The `telegram_sync_read` tool definition. */
@@ -86,7 +93,8 @@ export const telegramSyncRead = defineTool({
   input,
   output,
   async execute(args, ctx) {
+    const excluded = excludedChats(ctx)
     const paths = await pickPaths(ctx, args.account)
-    return readMirror(paths, listedChats)
+    return readMirror(paths, (mirror) => listedChats(mirror, excluded))
   },
 })
