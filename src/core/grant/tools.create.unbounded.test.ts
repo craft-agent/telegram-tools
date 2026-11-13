@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { z } from "zod"
 import { defineTool, invoke, type CallDescription, type ToolContext } from "../tool"
+import { DOWNLOAD_CONTEXT } from "../tool.testing"
 import { askPersonOnly, exemptFromGrants } from "./guard"
 import { readGrants } from "./store"
 import { grantTools } from "./tools"
@@ -37,7 +38,7 @@ let ctx: ToolContext
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "grant-tools-unbounded-"))
-  ctx = { cwd: dir, grants: { unattended: false, dir, key: KEY, now: () => NOW } }
+  ctx = { cwd: dir, ...DOWNLOAD_CONTEXT, grants: { unattended: false, dir, key: KEY, now: () => NOW } }
 })
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true })
