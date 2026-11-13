@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { invoke, type ToolContext } from "../tool"
+import { DOWNLOAD_CONTEXT } from "../tool.testing"
 import type { Grant } from "./model"
 import { addGrant } from "./store"
 import { grantTools } from "./tools"
@@ -32,7 +33,7 @@ let ctx: ToolContext
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), "grant-tools-read-"))
-  ctx = { cwd: dir, grants: { unattended: true, dir, key: KEY, now: () => NOW } }
+  ctx = { cwd: dir, ...DOWNLOAD_CONTEXT, grants: { unattended: true, dir, key: KEY, now: () => NOW } }
 })
 afterEach(async () => {
   await rm(dir, { recursive: true, force: true })
@@ -96,7 +97,7 @@ test("both methods need the key and context", async () => {
     await expect(
       invoke(read!, { method }, { ...ctx, grants: { ...ctx.grants!, key: undefined } }),
     ).rejects.toMatchObject({ code: "forbidden", details: { reason: "no_key" } })
-    await expect(invoke(read!, { method }, { cwd: dir })).rejects.toMatchObject({
+    await expect(invoke(read!, { method }, { cwd: dir, ...DOWNLOAD_CONTEXT })).rejects.toMatchObject({
       code: "forbidden",
       details: { reason: "not_set_up" },
     })
