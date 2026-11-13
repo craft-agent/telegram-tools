@@ -1,12 +1,13 @@
 import { join } from "node:path"
 import { DEFAULT_LIMITS, type ArchiveLimits } from "../archive/limits"
 import { ArchiveRefused } from "../archive/refused"
-import { existingChat, messageMedia, requireChatId } from "../chat/chat-rows"
+import { existingChat, messageMedia, requireChatId, UNKNOWN_CHAT_MESSAGE } from "../chat/chat-rows"
+import { refuseExcludedChats } from "../chat/excluded"
 import { chatFact } from "../chat/facts"
 import { mediaKindValue } from "../chat/media-facts"
 import { PRIVATE_NOTE } from "../chat/message-schema"
 import { pickPaths, readMirror } from "../open"
-import { isAbortError, isToolError } from "../errors"
+import { ToolError, isAbortError, isToolError } from "../errors"
 import { sizeFact } from "../facts"
 import { cutText } from "../pages"
 import type { MediaInfo } from "../telegram/mirror-input"
@@ -97,6 +98,9 @@ export function createFileSave(host: Partial<FileSaveHost> = {}) {
     class: "add",
     input,
     output,
+    gate(args, ctx) {
+      refuseExcludedChats(ctx, [args.chat], () => new ToolError("not_found", UNKNOWN_CHAT_MESSAGE))
+    },
     async describe(args, ctx) {
       const chat = requireChatId(args.chat, FILE_SAVE_TOOL_ID)
       const paths = await pickPaths(ctx, args.account)

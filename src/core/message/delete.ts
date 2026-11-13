@@ -1,4 +1,6 @@
-import { requireChatId } from "../chat/chat-rows"
+import { requireChatId, UNKNOWN_CHAT_MESSAGE } from "../chat/chat-rows"
+import { refuseExcludedChats } from "../chat/excluded"
+import { ToolError } from "../errors"
 import { pickPaths, readMirror } from "../open"
 import { callService } from "../telegram/service"
 import { type DeleteParams, type DeleteResult, SERVICE_REQUESTS } from "../telegram/service-requests"
@@ -27,6 +29,9 @@ export const telegramMessageDelete = defineTool({
   class: "administrative",
   input: deleteInput,
   output: deleteOutput,
+  gate(args, ctx) {
+    refuseExcludedChats(ctx, [args.chat], () => new ToolError("not_found", UNKNOWN_CHAT_MESSAGE))
+  },
   async describe(args, ctx) {
     const chat = requireChatId(args.chat, MESSAGE_DELETE_TOOL_ID)
     const paths = await pickPaths(ctx, args.account)

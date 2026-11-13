@@ -2,7 +2,7 @@ import { z } from "zod"
 import { pickPaths } from "../open"
 import { SYNC_LIST_LIMIT } from "../telegram/service-requests"
 import { defineTool } from "../tool"
-import { accountTargets, changeInput, requestSyncRemove, requireChatIds } from "./change"
+import { accountTargets, changeInput, gateChange, requestSyncRemove, requireChatIds } from "./change"
 import { describeChange } from "./describe"
 import { chatIdsField, limitField, sizeField } from "./schema"
 
@@ -36,6 +36,7 @@ export const telegramSyncRemove = defineTool({
   targets: accountTargets,
   input: changeInput,
   output,
+  gate: gateChange,
   describe: (args, ctx) =>
     describeChange(args, ctx, TOOL_ID, {
       one: "About to remove {chat} from the sync list",

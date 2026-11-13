@@ -1,6 +1,8 @@
 import { realpath } from "node:fs/promises"
 import { join, resolve } from "node:path"
 import { requireChatId } from "../../chat/chat-rows"
+import { refuseExcludedChats } from "../../chat/excluded"
+import { UNKNOWN_LISTED_CHAT_MESSAGE } from "../../telegram/sync-request-calls"
 import { pickPaths } from "../../open"
 import { ToolError, isToolError } from "../../errors"
 import { checkedCaption } from "../../message/arguments"
@@ -92,6 +94,9 @@ export function createFileSend(limits: Partial<FileSendLimits> = {}) {
     class: "add",
     input,
     output,
+    gate(args, ctx) {
+      refuseExcludedChats(ctx, [args.chat], () => new ToolError("not_found", UNKNOWN_LISTED_CHAT_MESSAGE))
+    },
     describe: (args, ctx) => describeFileSend(args, ctx, maxTotalBytes),
     async targets(args, ctx) {
       const files = await Promise.all(args.files.map(({ path }) => fileTarget(path, ctx.cwd)))

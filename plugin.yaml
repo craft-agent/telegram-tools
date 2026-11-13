@@ -41,6 +41,9 @@ config_schema:
   send_dirs:
     type: list
     description: "The directories files may be sent from, besides the working directory; absolute paths, or ones starting with ~, without commas. Blank items are dropped. Defaults to none. Read by tools; no service restart needed."
+  exclude_chats:
+    type: list
+    description: 'The chats every tool leaves out: their ids as list returns them, each quoted ("-1001234567890"). Defaults to none. Read by tools; the sync service still mirrors them, and no service restart is needed.'
   keep_disappearing:
     type: bool
     description: Keeps disappearing and view-once messages for the user; off by default. Read by the sync service.

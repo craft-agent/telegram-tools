@@ -1,4 +1,6 @@
-import { requireChatId } from "../chat/chat-rows"
+import { requireChatId, UNKNOWN_CHAT_MESSAGE } from "../chat/chat-rows"
+import { refuseExcludedChats } from "../chat/excluded"
+import { ToolError } from "../errors"
 import { pickPaths, readMirror } from "../open"
 import { callService } from "../telegram/service"
 import {
@@ -35,6 +37,9 @@ export const telegramMessageEdit = defineTool({
   class: "overwrite",
   input: editInput,
   output: editOutput,
+  gate(args, ctx) {
+    refuseExcludedChats(ctx, [args.chat], () => new ToolError("not_found", UNKNOWN_CHAT_MESSAGE))
+  },
   async describe(args, ctx) {
     const text = checkedText(args.text)
     const chat = requireChatId(args.chat, MESSAGE_EDIT_TOOL_ID)

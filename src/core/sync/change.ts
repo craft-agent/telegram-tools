@@ -1,5 +1,7 @@
 import { z } from "zod"
 import { requireChatId } from "../chat/chat-rows"
+import { refuseExcludedChats } from "../chat/excluded"
+import { UNKNOWN_SYNC_CHAT_MESSAGE } from "../telegram/sync-list-requests"
 import { pickPaths } from "../open"
 import { ToolError } from "../errors"
 import { callService } from "../telegram/service"
@@ -27,6 +29,10 @@ export const changeInput = z.object({
   account: accountArgument,
   chats: chatsArgument,
 })
+
+export function gateChange(args: z.output<typeof changeInput>, ctx: ToolContext): void {
+  refuseExcludedChats(ctx, args.chats, (chat) => new ToolError("not_found", UNKNOWN_SYNC_CHAT_MESSAGE(chat)))
+}
 
 /** What a call that changes the sync list writes to: the label whose list it is. */
 export async function accountTargets(args: { account?: string }, ctx: ToolContext): Promise<string[]> {

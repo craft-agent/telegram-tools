@@ -1,4 +1,6 @@
-import { requireChatId } from "../chat/chat-rows"
+import { requireChatId, UNKNOWN_CHAT_MESSAGE } from "../chat/chat-rows"
+import { refuseExcludedChats } from "../chat/excluded"
+import { ToolError } from "../errors"
 import { pickPaths, readMirror } from "../open"
 import { callService } from "../telegram/service"
 import { type MarkReadParams, type MarkReadResult, SERVICE_REQUESTS } from "../telegram/service-requests"
@@ -29,6 +31,9 @@ export const telegramChatMarkRead = defineTool({
   class: "idempotent",
   input: markReadInput,
   output: markReadOutput,
+  gate(args, ctx) {
+    refuseExcludedChats(ctx, [args.chat], () => new ToolError("not_found", UNKNOWN_CHAT_MESSAGE))
+  },
   async describe(args, ctx) {
     const chat = requireChatId(args.chat, CHAT_MARK_READ_TOOL_ID)
     const paths = await pickPaths(ctx, args.account)

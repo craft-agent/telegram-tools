@@ -1,4 +1,6 @@
-import { requireChatId } from "../chat/chat-rows"
+import { requireChatId, UNKNOWN_CHAT_MESSAGE } from "../chat/chat-rows"
+import { refuseExcludedChats } from "../chat/excluded"
+import { ToolError } from "../errors"
 import { pickPaths, readMirror } from "../open"
 import { cut, MAX_VALUE_LENGTH } from "../describe"
 import { ownReaction } from "../telegram/action-checks"
@@ -31,6 +33,9 @@ export const telegramMessageReact = defineTool({
   class: "overwrite",
   input: reactInput,
   output: reactOutput,
+  gate(args, ctx) {
+    refuseExcludedChats(ctx, [args.chat], () => new ToolError("not_found", UNKNOWN_CHAT_MESSAGE))
+  },
   async describe(args, ctx) {
     const emoji = checkedReaction(args.emoji, args.remove)
     const chat = requireChatId(args.chat, MESSAGE_REACT_TOOL_ID)

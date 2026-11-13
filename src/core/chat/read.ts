@@ -1,4 +1,6 @@
 import { ToolError } from "../errors"
+import { UNKNOWN_CHAT_MESSAGE } from "./chat-rows"
+import { refuseExcludedChats } from "./excluded"
 import type { LabelPaths } from "../telegram/labels"
 import { FETCH_PAGE_SIZE, HISTORY_LIMIT } from "../telegram/service-requests"
 import { formatLocalTime } from "../time"
@@ -110,6 +112,13 @@ export const telegramChatRead = defineTool({
   class: "read",
   input,
   output,
+  gate(args, ctx) {
+    refuseExcludedChats(
+      ctx,
+      args.chat === undefined ? [] : [args.chat],
+      () => new ToolError("not_found", UNKNOWN_CHAT_MESSAGE),
+    )
+  },
   async execute(args, ctx) {
     checkArguments(args)
     const paths = await pickPaths(ctx, args.account)
