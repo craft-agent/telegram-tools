@@ -7,7 +7,7 @@ import {
   settingsFromOptions,
   settingVariables,
 } from "./settings"
-import { failure, profile } from "./settings.testing"
+import { DEFAULT_GRANTS, failure, profile } from "./settings.testing"
 
 const fromOptions = (options: Record<string, unknown> | undefined, env: Record<string, string | undefined> = {}) =>
   settingsFromOptions(options, env, profile)
@@ -21,7 +21,7 @@ describe("languageVariable", () => {
 
 describe("settingsFromOptions language", () => {
   test("reads the option trimmed, and treats blank as unset", () => {
-    expect(fromOptions({ language: "ja" })).toMatchObject({ language: "ja", options: {} })
+    expect(fromOptions({ language: "ja" })).toMatchObject({ language: "ja", options: {}, grants: DEFAULT_GRANTS })
     expect(fromOptions({ language: " ja-JP " }).language).toBe("ja-JP")
     expect(fromOptions({ language: "  " }).language).toBeUndefined()
     expect(fromOptions({ language: "xx-unknown" }).language).toBe("xx-unknown")
@@ -51,9 +51,9 @@ describe("the command-line parsers", () => {
 
   test("ignore the language variable", () => {
     const env = { DEMO_LANGUAGE: "ja" }
-    expect(parseSettings([], env, profile)).toMatchObject({ confirm: "harness", options: {} })
+    expect(parseSettings([], env, profile)).toMatchObject({ confirm: "harness", options: {}, grants: DEFAULT_GRANTS })
     expect(parseSettings([], env, profile)).not.toHaveProperty("language")
-    expect(parseToolSettings([], env, profile)).toMatchObject({ options: {} })
+    expect(parseToolSettings([], env, profile)).toMatchObject({ options: {}, grants: DEFAULT_GRANTS })
     expect(parseToolSettings([], env, profile)).not.toHaveProperty("language")
   })
 })

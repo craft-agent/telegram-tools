@@ -1,5 +1,7 @@
 import { expect } from "bun:test"
-import { isToolError } from "../core"
+import { homedir } from "node:os"
+import { join } from "node:path"
+import { isToolError, type GrantContext } from "../core"
 import { PROFILE_OPTIONS } from "./options.testing"
 import type { EntryProfile } from "./profile"
 
@@ -14,6 +16,13 @@ export const profile: EntryProfile = {
 
 /** The file settings' defaults: download_dir, download_max_mb and send_dirs. */
 export const FILE_SETTINGS = { download_dir: expect.any(String), download_max_mb: 100, send_dirs: [] }
+
+/** The grants' context of settings that name no grant setting, read from an environment without `HOME` or `XDG_STATE_HOME`. */
+export const DEFAULT_GRANTS: GrantContext = {
+  unattended: false,
+  dir: join(homedir(), ".local", "state", profile.name, "grants"),
+  key: undefined,
+}
 
 export function failure(run: () => unknown): Error {
   try {

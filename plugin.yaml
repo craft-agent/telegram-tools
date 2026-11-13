@@ -9,6 +9,9 @@ provides_tools:
   - telegram_chat_read
   - telegram_file_save
   - telegram_file_send
+  - telegram_grant_create
+  - telegram_grant_read
+  - telegram_grant_revoke
   - telegram_message_delete
   - telegram_message_edit
   - telegram_message_pin
@@ -25,6 +28,12 @@ config_schema:
   read_only:
     type: bool
     description: Registers no tool that writes. Wins over every other setting.
+  unattended:
+    type: bool
+    description: "No person can answer: writes run only under a grant that covers them."
+  grants_dir:
+    type: str
+    description: Where grants and their use are kept; default under the user's state directory.
   tools:
     type: list
     description: Single tools to add by id, whatever their toolset.

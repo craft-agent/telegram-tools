@@ -1,14 +1,24 @@
 import { describe, expect, test } from "bun:test"
 import { settingsFromOptions } from "./settings"
-import { FILE_SETTINGS, failure, profile } from "./settings.testing"
+import { DEFAULT_GRANTS, FILE_SETTINGS, failure, profile } from "./settings.testing"
 
 const fromOptions = (options: Record<string, unknown> | undefined, env: Record<string, string | undefined> = {}) =>
   settingsFromOptions(options, env, profile)
 
 describe("settingsFromOptions", () => {
   test("gives no setting for no options", () => {
-    expect(fromOptions(undefined)).toEqual({ options: {}, state_dir: expect.any(String), ...FILE_SETTINGS })
-    expect(fromOptions({})).toEqual({ options: {}, state_dir: expect.any(String), ...FILE_SETTINGS })
+    expect(fromOptions(undefined)).toEqual({
+      options: {},
+      grants: DEFAULT_GRANTS,
+      state_dir: expect.any(String),
+      ...FILE_SETTINGS,
+    })
+    expect(fromOptions({})).toEqual({
+      options: {},
+      grants: DEFAULT_GRANTS,
+      state_dir: expect.any(String),
+      ...FILE_SETTINGS,
+    })
   })
 
   test("reads each option", () => {
@@ -26,6 +36,7 @@ describe("settingsFromOptions", () => {
       tools: ["demo_thing_read"],
       exclude_tools: ["a"],
       options: { state_dir: "/custom/state" },
+      grants: DEFAULT_GRANTS,
       state_dir: "/custom/state",
       ...FILE_SETTINGS,
     })
@@ -46,6 +57,7 @@ describe("settingsFromOptions", () => {
       read_only: true,
       tools: ["a", "b"],
       options: { state_dir: "/env/state" },
+      grants: DEFAULT_GRANTS,
       state_dir: "/env/state",
       ...FILE_SETTINGS,
     })
@@ -56,6 +68,7 @@ describe("settingsFromOptions", () => {
       read_only: false,
       tools: ["a", "b"],
       options: { state_dir: "/opt/state" },
+      grants: DEFAULT_GRANTS,
       state_dir: "/opt/state",
       ...FILE_SETTINGS,
     })
@@ -90,6 +103,7 @@ describe("settingsFromOptions", () => {
   test("reads keep_disappearing and channels from options and the environment", () => {
     expect(fromOptions({ keep_disappearing: true, channels: false })).toEqual({
       options: { keep_disappearing: true, channels: false },
+      grants: DEFAULT_GRANTS,
       state_dir: expect.any(String),
       ...FILE_SETTINGS,
     })

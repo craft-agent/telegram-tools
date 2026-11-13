@@ -1,8 +1,10 @@
 import {
   ENGLISH,
   invoke,
+  isPersonOnly,
   isToolError,
   selectTools,
+  type GrantContext,
   type ToolContext,
   type ToolError,
   type ToolSpec,
@@ -38,6 +40,16 @@ export function persistableResources(resources: string[]): string[] {
   return resources.filter((resource) => resource !== ANY_RESOURCE)
 }
 
+/** The resources an "always" answer may persist for a tool's call: none for a person-only tool, which is asked every time. */
+export function savedResources(spec: object, resources: string[]): string[] {
+  return isPersonOnly(spec) ? [] : persistableResources(resources)
+}
+
+/** The ids of the tools only a person's answer to their own prompt may run. */
+export function personOnlyIds(specs: readonly ToolSpec[]): string[] {
+  return specs.filter(isPersonOnly).map((spec) => spec.id)
+}
+
 /** What the harness is told about a call it is asked to allow. */
 export function permissionMetadata(
   spec: Pick<ToolSpec, "title" | "intent" | "class">,
@@ -60,7 +72,7 @@ export function needsPermission(spec: Pick<ToolSpec, "class">): boolean {
 
 /**
  * The tools, the resolved state and download settings, the package's own
- * settings (`options`) and the program name the
+ * settings (`options`), the grants' context and the program name the
  * plugin options (and the environment behind them) select from `specs`, and the
  * translator of the prompt language they set over the plugin's translations.
  */
@@ -68,7 +80,7 @@ export function selectedTools(
   specs: ToolSpec[],
   options: PluginOptions | undefined,
   deps: PluginDeps,
-): { tools: ToolSpec[]; stateDir: string; translator: Translator } & Pick<
+): { tools: ToolSpec[]; stateDir: string; translator: Translator; grants: GrantContext } & Pick<
   ToolContext,
   "downloadDir" | "downloadMaxMb" | "sendDirs" | "programName" | "options"
 > {
@@ -83,6 +95,7 @@ export function selectedTools(
     programName: PROJECT.name,
     translator: promptTranslator(deps.translations ?? {}, settings.language),
     options: settings.options,
+    grants: settings.grants,
   }
 }
 
