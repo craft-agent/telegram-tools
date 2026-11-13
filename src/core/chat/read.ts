@@ -1,4 +1,6 @@
 import { ToolError } from "../errors"
+import { UNKNOWN_CHAT_MESSAGE } from "./chat-rows"
+import { excludedChats, refuseExcludedChats } from "./excluded"
 import type { LabelPaths } from "../telegram/labels"
 import { FETCH_PAGE_SIZE, HISTORY_LIMIT } from "../telegram/service-requests"
 import { formatLocalTime } from "../time"
@@ -47,20 +49,30 @@ function checkArguments(args: ChatReadInput): void {
 }
 
 /** `list`: with `refresh`, the chat list is taken from Telegram first and the time it was taken is reported. */
-async function list(args: ChatReadInput, paths: LabelPaths, signal?: AbortSignal): Promise<ChatReadOutput> {
-  readListArguments(args)
+async function list(
+  args: ChatReadInput,
+  paths: LabelPaths,
+  excluded: ReadonlySet<string>,
+  signal?: AbortSignal,
+): Promise<ChatReadOutput> {
+  readListArguments(args, excluded)
   const refreshed = args.refresh ? await requestRefresh(paths.socket, signal) : undefined
-  const result = readMirror(paths, (mirror) => listChats(mirror, args, Date.now()))
+  const result = readMirror(paths, (mirror) => listChats(mirror, args, Date.now(), excluded))
   if (refreshed) result.refreshed_at = formatLocalTime(refreshed.refreshed_at)
   return result
 }
 
 /** `view`: a chat the mirror lists and does not keep is read live, with the mirror closed while the service answers. */
-async function view(args: ChatReadInput, paths: LabelPaths, signal?: AbortSignal): Promise<ChatReadOutput> {
-  const plan = readMirror(paths, (mirror) => viewChat(mirror, args, Date.now()))
+async function view(
+  args: ChatReadInput,
+  paths: LabelPaths,
+  excluded: ReadonlySet<string>,
+  signal?: AbortSignal,
+): Promise<ChatReadOutput> {
+  const plan = readMirror(paths, (mirror) => viewChat(mirror, args, Date.now(), excluded))
   if ("output" in plan) return plan.output
   const page = await requestHistory(paths.socket, plan.live.request, signal)
-  return readMirror(paths, (mirror) => liveView(mirror, plan.live, page, Date.now()))
+  return readMirror(paths, (mirror) => liveView(mirror, plan.live, page, Date.now(), excluded))
 }
 
 /** `topics`: always read live; the mirror only says whether the chat is a forum. */
@@ -70,16 +82,21 @@ async function topics(args: ChatReadInput, paths: LabelPaths, signal?: AbortSign
 }
 
 /** `search`: the mirror only, so it never needs the service. */
-function search(args: ChatReadInput, paths: LabelPaths): ChatReadOutput {
-  return readMirror(paths, (mirror) => searchMessages(mirror, args, Date.now()))
+function search(args: ChatReadInput, paths: LabelPaths, excluded: ReadonlySet<string>): ChatReadOutput {
+  return readMirror(paths, (mirror) => searchMessages(mirror, args, Date.now(), excluded))
 }
 
 /** `around`: a chat the mirror lists and does not keep is read live, with the mirror closed while the service answers. */
-async function around(args: ChatReadInput, paths: LabelPaths, signal?: AbortSignal): Promise<ChatReadOutput> {
-  const plan = readMirror(paths, (mirror) => aroundChat(mirror, args, Date.now()))
+async function around(
+  args: ChatReadInput,
+  paths: LabelPaths,
+  excluded: ReadonlySet<string>,
+  signal?: AbortSignal,
+): Promise<ChatReadOutput> {
+  const plan = readMirror(paths, (mirror) => aroundChat(mirror, args, Date.now(), excluded))
   if ("output" in plan) return plan.output
   const found = await requestAround(paths.socket, plan.live.request, signal)
-  return readMirror(paths, (mirror) => liveAround(mirror, plan.live, found, Date.now()))
+  return readMirror(paths, (mirror) => liveAround(mirror, plan.live, found, Date.now(), excluded))
 }
 
 /** `fetch`: the service adds older history of a mirrored chat to the mirror; the tool itself writes nothing. */
@@ -110,20 +127,28 @@ export const telegramChatRead = defineTool({
   class: "read",
   input,
   output,
+  gate(args, ctx) {
+    refuseExcludedChats(
+      ctx,
+      args.chat === undefined ? [] : [args.chat],
+      () => new ToolError("not_found", UNKNOWN_CHAT_MESSAGE),
+    )
+  },
   async execute(args, ctx) {
     checkArguments(args)
+    const excluded = excludedChats(ctx)
     const paths = await pickPaths(ctx, args.account)
     switch (args.method) {
       case "list":
-        return list(args, paths, ctx.signal)
+        return list(args, paths, excluded, ctx.signal)
       case "view":
-        return view(args, paths, ctx.signal)
+        return view(args, paths, excluded, ctx.signal)
       case "topics":
         return topics(args, paths, ctx.signal)
       case "search":
-        return search(args, paths)
+        return search(args, paths, excluded)
       case "around":
-        return around(args, paths, ctx.signal)
+        return around(args, paths, excluded, ctx.signal)
       case "fetch":
         return fetchHistory(args, paths, ctx.signal)
     }

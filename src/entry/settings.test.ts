@@ -20,6 +20,7 @@ describe("settingVariables", () => {
       "DEMO_DOWNLOAD_DIR",
       "DEMO_DOWNLOAD_MAX_MB",
       "DEMO_SEND_DIRS",
+      "DEMO_EXCLUDE_CHATS",
       "DEMO_KEEP_DISAPPEARING",
       "DEMO_CHANNELS",
       "DEMO_NOTE_TEXT",

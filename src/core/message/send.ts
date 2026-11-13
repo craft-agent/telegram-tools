@@ -1,7 +1,9 @@
 import { existingChat, requireChatId, topicTitle } from "../chat/chat-rows"
 import { chatFact } from "../chat/facts"
+import { refuseExcludedChats } from "../chat/excluded"
+import { UNKNOWN_LISTED_CHAT_MESSAGE } from "../telegram/sync-request-calls"
 import { pickPaths, readMirror } from "../open"
-import { isToolError } from "../errors"
+import { ToolError, isToolError } from "../errors"
 import { callService } from "../telegram/service"
 import { SERVICE_REQUESTS, type SendParams, type SendResult, TEXT_MAX_UNITS } from "../telegram/service-requests"
 import { defineTool } from "../tool"
@@ -31,6 +33,9 @@ export const telegramMessageSend = defineTool({
   class: "add",
   input,
   output,
+  gate(args, ctx) {
+    refuseExcludedChats(ctx, [args.chat], () => new ToolError("not_found", UNKNOWN_LISTED_CHAT_MESSAGE))
+  },
   async describe(args, ctx) {
     const text = checkedText(args.text)
     const chat = requireChatId(args.chat, MESSAGE_SEND_TOOL_ID)

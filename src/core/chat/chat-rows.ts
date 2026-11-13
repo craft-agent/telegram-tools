@@ -14,6 +14,8 @@ export const MAX_NAME_LENGTH = 1000
 /** What a call that names a topic, or lists topics, says of a chat that is not a forum. */
 export const NO_TOPICS_MESSAGE = "This chat has no topics."
 
+export const UNKNOWN_CHAT_MESSAGE = "No chat with this id in this account's mirror; take a chat id from list."
+
 /** A chat id: Telegram's signed id, such as `123456789` or `-1001234567890`. */
 const CHAT_ID_PATTERN = /^-?\d+$/
 
@@ -59,8 +61,7 @@ export function requireChatId(chat: string | undefined, method: string): string 
 /** The chat with this id, or `not_found` when this account's mirror has none. */
 export function existingChat(mirror: Mirror, id: string): ChatRow {
   const chat = findChat(mirror, id)
-  if (!chat)
-    throw new ToolError("not_found", "No chat with this id in this account's mirror; take a chat id from list.")
+  if (!chat) throw new ToolError("not_found", UNKNOWN_CHAT_MESSAGE)
   return chat
 }
 

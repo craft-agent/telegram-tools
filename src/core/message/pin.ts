@@ -1,4 +1,6 @@
-import { requireChatId } from "../chat/chat-rows"
+import { requireChatId, UNKNOWN_CHAT_MESSAGE } from "../chat/chat-rows"
+import { refuseExcludedChats } from "../chat/excluded"
+import { ToolError } from "../errors"
 import { pickPaths, readMirror } from "../open"
 import { isPrivateChat } from "../telegram/action-checks"
 import { callService } from "../telegram/service"
@@ -49,6 +51,9 @@ export const telegramMessagePin = defineTool({
   class: "overwrite",
   input: pinInput,
   output: pinOutput,
+  gate(args, ctx) {
+    refuseExcludedChats(ctx, [args.chat], () => new ToolError("not_found", UNKNOWN_CHAT_MESSAGE))
+  },
   async describe(args, ctx) {
     checkedPinFlags(args)
     const chat = requireChatId(args.chat, MESSAGE_PIN_TOOL_ID)

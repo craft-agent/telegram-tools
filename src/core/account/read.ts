@@ -1,8 +1,9 @@
 import { existsSync, statSync } from "node:fs"
 import { z } from "zod"
+import { excludedChats, excludedCondition } from "../chat/excluded"
 import { ToolError } from "../errors"
 import { labelPaths, listLabels, pickLabel, type LabelPaths } from "../telegram/labels"
-import { getMeta, MIRROR_VERSION_REFUSALS, openMirrorForRead } from "../telegram/mirror"
+import { getMeta, MIRROR_VERSION_REFUSALS, openMirrorForRead, type Mirror } from "../telegram/mirror"
 import { META, SYNC_STATUS } from "../telegram/mirror-meta"
 import { missingServiceFiles, readServiceRecord } from "../telegram/service-record"
 import { lockHolder } from "../telegram/sync-lock"
@@ -104,7 +105,23 @@ function nextStep(result: Account, mirrorRefused: boolean, programGone: boolean)
   }
 }
 
-function readAccount(paths: LabelPaths): Account {
+/** The rows of `table` that satisfy `conditions`, without those whose `chatColumn` holds an `excluded` chat. */
+function countRows(
+  mirror: Mirror,
+  table: string,
+  chatColumn: string,
+  excluded: ReadonlySet<string>,
+  ...conditions: string[]
+): number {
+  const hidden = excludedCondition(chatColumn, excluded)
+  const where = [...conditions, ...(hidden ? [hidden.sql] : [])]
+  const row = mirror
+    .prepare(`SELECT count(*) AS count FROM ${table}${where.length > 0 ? ` WHERE ${where.join(" AND ")}` : ""}`)
+    .get(...(hidden?.params ?? [])) as { count: number } | undefined
+  return Number(row?.count ?? 0)
+}
+
+function readAccount(paths: LabelPaths, excluded: ReadonlySet<string>): Account {
   const sessionExists = existsSync(paths.session)
   const result: Account = {
     label: paths.label,
@@ -148,14 +165,9 @@ function readAccount(paths: LabelPaths): Account {
         result.refreshed_at = timestamp(meta[META.refreshedAt])
         result.error = meta[META.error] ?? null
 
-        const chatsRow = mirror.prepare("SELECT count(*) as count FROM chats").get() as { count: number }
-        const followedRow = mirror.prepare("SELECT count(*) as count FROM chats WHERE followed = 1").get() as {
-          count: number
-        }
-        const messagesRow = mirror.prepare("SELECT count(*) as count FROM messages").get() as { count: number }
-        result.chats = Number(chatsRow?.count ?? 0)
-        result.followed = Number(followedRow?.count ?? 0)
-        result.messages = Number(messagesRow?.count ?? 0)
+        result.chats = countRows(mirror, "chats", "id", excluded)
+        result.followed = countRows(mirror, "chats", "id", excluded, "followed = 1")
+        result.messages = countRows(mirror, "messages", "chat", excluded)
       } finally {
         mirror.close()
       }
@@ -203,6 +215,7 @@ export const telegramAccountRead = defineTool({
       args.account !== undefined
         ? [await pickLabel(stateDir, args.account)]
         : (await listLabels(stateDir)).map((label) => labelPaths(stateDir, label))
-    return { accounts: paths.map(readAccount) }
+    const excluded = excludedChats(ctx)
+    return { accounts: paths.map((label) => readAccount(label, excluded)) }
   },
 })

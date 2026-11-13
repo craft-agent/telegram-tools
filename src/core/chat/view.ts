@@ -36,9 +36,10 @@ function viewPage(
   filter: string,
   live: boolean,
   now: number,
+  excluded: ReadonlySet<string>,
 ): ChatReadOutput {
   const header = chatEntry(chat)
-  const entries = messageEntries(mirror, page, now)
+  const entries = messageEntries(mirror, page, now, excluded)
   const assemble = (shown: typeof entries): ChatReadOutput => ({
     chat: header,
     messages: [...shown].reverse(),
@@ -65,6 +66,7 @@ export function viewChat(
   mirror: Mirror,
   args: Pick<ChatReadInput, "chat" | "topic" | "after" | "before" | "limit" | "cursor">,
   now: number,
+  excluded: ReadonlySet<string>,
 ): ViewPlan {
   const chatId = requireChatId(args.chat, "view")
   const limit = clampLimit(args.limit, LIMITS.view, "limit")
@@ -103,7 +105,7 @@ export function viewChat(
   const fetched = mirror
     .prepare(`SELECT ${MESSAGE_COLUMNS} FROM messages WHERE ${where.join(" AND ")} ORDER BY id DESC LIMIT ?`)
     .all(...params, limit + 1) as StoredMessage[]
-  const output = viewPage(mirror, chat, fetched.slice(0, limit), fetched.length > limit, filter, false, now)
+  const output = viewPage(mirror, chat, fetched.slice(0, limit), fetched.length > limit, filter, false, now, excluded)
   return { output }
 }
 
@@ -111,6 +113,12 @@ export function viewChat(
  * The result of a live `view`, from what the service returned (newest first).
  * The mirror is read only for the names and texts the messages refer to.
  */
-export function liveView(mirror: Mirror, read: LiveRead, page: HistoryResult, now: number): ChatReadOutput {
-  return viewPage(mirror, read.chat, page.messages.map(storedMessage), page.more, read.filter, true, now)
+export function liveView(
+  mirror: Mirror,
+  read: LiveRead,
+  page: HistoryResult,
+  now: number,
+  excluded: ReadonlySet<string>,
+): ChatReadOutput {
+  return viewPage(mirror, read.chat, page.messages.map(storedMessage), page.more, read.filter, true, now, excluded)
 }

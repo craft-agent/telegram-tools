@@ -7,6 +7,9 @@ import { isListable, isListed, listChat, listSize, unlistChat } from "./sync-lis
 import type { ResolvedSyncOptions } from "./sync-options"
 import { parseSyncChangeParams } from "./sync-request-params"
 
+export const UNKNOWN_SYNC_CHAT_MESSAGE = (id: string): string =>
+  `The chat list has no chat ${id}; refresh it, or check the id.`
+
 /** What the sync list requests work with; the sync requests' context holds all of it. */
 export type SyncListContext = {
   mirror: Mirror
@@ -21,7 +24,7 @@ export type SyncListContext = {
 function expectListable({ mirror, settings }: SyncListContext, chats: string[]): void {
   for (const id of chats) {
     const row = findChat(mirror, id)
-    if (!row) throw new ToolError("not_found", `The chat list has no chat ${id}; refresh it, or check the id.`)
+    if (!row) throw new ToolError("not_found", UNKNOWN_SYNC_CHAT_MESSAGE(id))
     if (!isListable(row.kind)) {
       throw new ToolError(
         "invalid_argument",

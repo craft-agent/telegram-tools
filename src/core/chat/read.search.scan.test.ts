@@ -21,7 +21,7 @@ afterEach(() => {
 /** Calls the search itself, with scan limits of the test's own. */
 function search(args: Record<string, unknown>, scan: ScanLimits) {
   return readMirror(labelPaths(t.stateDir, "default"), (mirror) =>
-    searchMessages(mirror, { query: "needle", ...args }, Date.now(), scan),
+    searchMessages(mirror, { query: "needle", ...args }, Date.now(), new Set(), scan),
   )
 }
 

@@ -151,6 +151,7 @@ class OptionFlagsTest(unittest.TestCase):
                 "download_dir": "path",
                 "download_max_mb": {"type": "number", "integer": True, "min": 1, "max": 2000},
                 "send_dirs": "paths",
+                "exclude_chats": "list",
                 "keep_disappearing": "boolean",
                 "channels": "boolean",
             },

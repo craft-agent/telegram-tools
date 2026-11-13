@@ -24,7 +24,7 @@ TOOLSET_EMOJI: dict[str, str] = {
 #: The settings the tools themselves read: each snake_case name and a type (``text``, ``boolean``, ``number``,
 #: ``list``, ``path`` or ``paths``) or a dict with ``type`` and optional bounds (``integer``, ``min``, ``max``),
 #: as in ``src/project.ts``. Write OPTIONS on one line with double quotes. A setting ``a_b`` becomes ``--a-b``.
-OPTIONS: dict[str, str | dict[str, object]] = {"state_dir": "path", "download_dir": "path", "download_max_mb": {"type": "number", "integer": True, "min": 1, "max": 2000}, "send_dirs": "paths", "keep_disappearing": "boolean", "channels": "boolean"}
+OPTIONS: dict[str, str | dict[str, object]] = {"state_dir": "path", "download_dir": "path", "download_max_mb": {"type": "number", "integer": True, "min": 1, "max": 2000}, "send_dirs": "paths", "exclude_chats": "list", "keep_disappearing": "boolean", "channels": "boolean"}
 
 __all__ = [
     "CLI_NAME",

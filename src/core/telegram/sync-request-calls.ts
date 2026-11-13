@@ -5,6 +5,8 @@ import type { ServiceCall } from "./service-server"
 import type { ResolvedSyncOptions } from "./sync-options"
 import { abortable, cancelled, requestFailure } from "./sync-request-errors"
 
+export const UNKNOWN_LISTED_CHAT_MESSAGE = "The chat list has no such chat; refresh it, or check the id."
+
 /** What a request that calls Telegram needs of the service's context. */
 export type TelegramCallContext = {
   settings: Pick<ResolvedSyncOptions, "log">
@@ -37,6 +39,6 @@ export async function viaTelegram<T>(
 /** The mirror's row for a chat the mirror lists; `not_found` when it does not. */
 export function listedChat(mirror: Mirror, id: string): ChatRow {
   const row = findChat(mirror, id)
-  if (!row) throw new ToolError("not_found", "The chat list has no such chat; refresh it, or check the id.")
+  if (!row) throw new ToolError("not_found", UNKNOWN_LISTED_CHAT_MESSAGE)
   return row
 }

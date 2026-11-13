@@ -24,6 +24,8 @@ export const PROJECT = {
     download_max_mb: { type: "number", integer: true, min: 1, max: 2000 },
     /** The directories files may be sent from, besides the working directory. */
     send_dirs: "paths",
+    /** The chats every tool leaves out: their ids, as `list` returns them; the sync service still mirrors them. */
+    exclude_chats: "list",
     /** Whether messages that disappear are kept; read by the sync service's commands. */
     keep_disappearing: "boolean",
     /** Whether channels are listed and their messages received; read by the sync service's commands. */
