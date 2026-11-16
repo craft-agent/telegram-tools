@@ -1,6 +1,6 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "craft-agent",
+  "name": "telegram-tools",
   "description": "Plugins by craftsamo.",
   "owner": {
     "name": "craftsamo",
