@@ -66,16 +66,40 @@ rm -rf package craftsamo-telegram-tools-<version>.tgz
 ### Claude Code
 
 ```sh
-claude plugin marketplace add craft-agent/telegram-tools#v<version>
+claude plugin marketplace add craft-agent/plugins
 claude plugin install telegram-tools@craft-agent
 ```
+
+[craft-agent/plugins](https://github.com/craft-agent/plugins) lists every
+craft-agent package at its latest release. To pin this package to a release
+instead, add its own marketplace at the tag, and do not install it from both:
+
+```sh
+claude plugin marketplace add craft-agent/telegram-tools#v<version>
+claude plugin install telegram-tools@telegram-tools
+```
+
+If you added this repository as the `craft-agent` marketplace before, remove
+it first: `claude plugin marketplace remove craft-agent`.
 
 ### Codex
 
 ```sh
-codex plugin marketplace add craft-agent/telegram-tools --ref v<version>
+codex plugin marketplace add craft-agent/plugins
 codex plugin add telegram-tools@craft-agent
 ```
+
+[craft-agent/plugins](https://github.com/craft-agent/plugins) lists every
+craft-agent package at its latest release. To pin this package to a release
+instead, add its own marketplace at the tag, and do not install it from both:
+
+```sh
+codex plugin marketplace add craft-agent/telegram-tools --ref v<version>
+codex plugin add telegram-tools@telegram-tools
+```
+
+If you added this repository as the `craft-agent` marketplace before, remove
+it first: `codex plugin marketplace remove craft-agent`.
 
 Codex turns `-` into `_` in server names, so it shows the tools as
 `mcp__telegram_tools__telegram_*`. It starts the MCP server in the plugin's
